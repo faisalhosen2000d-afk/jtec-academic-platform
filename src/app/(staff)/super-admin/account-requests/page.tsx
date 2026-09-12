@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   approveAdministrationAccountRequest,
   rejectAdministrationAccountRequest,
@@ -67,7 +68,9 @@ export default async function AdministrationAccountRequestsPage() {
     redirect("/");
   }
 
-  const { data, error } = await supabase
+  const serviceSupabase = createServiceRoleClient();
+
+  const { data, error } = await serviceSupabase
     .from("administration_account_requests")
     .select("id, full_name, email, requested_role, status, created_at")
     .eq("status", "pending")
@@ -207,3 +210,4 @@ export default async function AdministrationAccountRequestsPage() {
     </main>
   );
 }
+
