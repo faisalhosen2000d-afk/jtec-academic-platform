@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 
 import {
-  createRegistrationCode,
   toggleRegistrationCode,
   deleteRegistrationCode,
 } from "./actions";
@@ -210,7 +209,6 @@ export default async function RegistrationCodesPage() {
           batches={batches}
           levels={levels}
           terms={terms}
-          action={createRegistrationCode}
         />
 
         {/* Existing codes */}

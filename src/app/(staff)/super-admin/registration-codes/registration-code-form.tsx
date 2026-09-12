@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { createRegistrationCode } from "./actions";
 
 type Department = {
   id: string;
@@ -32,7 +33,6 @@ type RegistrationCodeFormProps = {
   batches: Batch[];
   levels: Level[];
   terms: Term[];
-  action: (formData: FormData) => void | Promise<void>;
 };
 
 export function RegistrationCodeForm({
@@ -40,7 +40,6 @@ export function RegistrationCodeForm({
   batches,
   levels,
   terms,
-  action,
 }: RegistrationCodeFormProps) {
   const [selectedLevelId, setSelectedLevelId] = useState("");
 
@@ -50,7 +49,7 @@ export function RegistrationCodeForm({
 
   return (
     <form
-      action={action}
+      action={createRegistrationCode}
       className="space-y-6 rounded-xl border border-border bg-card p-6"
     >
       <div>
