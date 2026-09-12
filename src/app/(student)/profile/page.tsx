@@ -1,0 +1,110 @@
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { StudentSidebar } from "@/components/dashboard/student-sidebar";
+
+export default async function StudentProfilePage() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const fullName =
+    user.user_metadata?.full_name ||
+    user.email?.split("@")[0] ||
+    "Student";
+
+  const studentId =
+    user.user_metadata?.student_id || "Student";
+
+  return (
+    <div className="min-h-screen bg-muted/30">
+      <div className="flex min-h-screen">
+        <StudentSidebar />
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="flex h-16 items-center border-b border-border bg-background px-6">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Student Portal
+              </p>
+
+              <h1 className="text-lg font-semibold text-foreground">
+                Profile
+              </h1>
+            </div>
+          </header>
+
+          <main className="flex-1 p-6">
+            <div className="mx-auto max-w-3xl space-y-6">
+              <section className="rounded-xl border border-border bg-background p-6 shadow-sm">
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold text-foreground">
+                    Student Profile
+                  </h2>
+
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Your account and academic information.
+                  </p>
+                </div>
+
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Full Name
+                    </p>
+                    <p className="mt-1 font-medium text-foreground">
+                      {fullName}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Student ID
+                    </p>
+                    <p className="mt-1 font-medium text-foreground">
+                      {studentId}
+                    </p>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <p className="text-xs text-muted-foreground">
+                      Email
+                    </p>
+                    <p className="mt-1 break-all font-medium text-foreground">
+                      {user.email || "—"}
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-border bg-background p-6 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full bg-green-500"
+                    aria-hidden="true"
+                  />
+
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      Account session active
+                    </p>
+
+                    <p className="text-xs text-muted-foreground">
+                      You are securely signed in to the JTEC Academic
+                      Platform.
+                    </p>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,1 @@
+ALTER TABLE public.staff_scopes ADD COLUMN IF NOT EXISTS can_delete_notices boolean NOT NULL DEFAULT false;

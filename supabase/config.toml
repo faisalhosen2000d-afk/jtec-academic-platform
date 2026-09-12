@@ -1,0 +1,35 @@
+project_id = "jtec-academic-platform"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false # enable once real email sending is wired (Phase M)
+
+[storage]
+enabled = true
+file_size_limit = "100MiB" # matches the 100MB material upload limit
+
+# Buckets themselves (academic-materials, profile-photos, result-documents,
+# notice-attachments) are created via migration in Phase C, alongside their
+# storage policies — not hard-coded here.

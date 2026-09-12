@@ -1,0 +1,245 @@
+﻿ÔöîÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÉ
+Ôöé pg_get_functiondef                                                    Ôöé
+Ôö£ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöñ
+Ôöé CREATE OR REPLACE FUNCTION public.handle_new_user()                   Ôöé
+Ôöé  RETURNS trigger                                                      Ôöé
+Ôöé  LANGUAGE plpgsql                                                     Ôöé
+Ôöé  SECURITY DEFINER                                                     Ôöé
+Ôöé  SET search_path TO 'public'                                          Ôöé
+Ôöé AS $function$
+                                                         Ôöé
+Ôöé declare
+                                                               Ôöé
+Ôöé   v_staff_role text;
+                                                  Ôöé
+Ôöé   v_full_name  text;
+                                                  Ôöé
+Ôöé   v_reg_code   text;
+                                                  Ôöé
+Ôöé   v_student_id text;
+                                                  Ôöé
+Ôöé   v_code_row   public.registration_codes%rowtype;
+                     Ôöé
+Ôöé begin
+                                                                 Ôöé
+Ôöé   v_staff_role := new.raw_app_meta_data ->> 'staff_role';
+             Ôöé
+Ôöé   v_full_name  := coalesce(
+                                           Ôöé
+Ôöé     new.raw_user_meta_data ->> 'full_name',
+                           Ôöé
+Ôöé     'Unnamed User'
+                                                    Ôöé
+Ôöé   );
+                                                                  Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé   -- STAFF ACCOUNT
+                                                    Ôöé
+Ôöé   if v_staff_role is not null then
+                                    Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé     if v_staff_role not in ('admin', 'moderator', 'super_admin') then
+ Ôöé
+Ôöé       raise exception 'Invalid staff_role: %', v_staff_role;
+          Ôöé
+Ôöé     end if;
+                                                           Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé     insert into public.profiles (
+                                     Ôöé
+Ôöé       id,
+                                                             Ôöé
+Ôöé       role,
+                                                           Ôöé
+Ôöé       full_name,
+                                                      Ôöé
+Ôöé       email,
+                                                          Ôöé
+Ôöé       is_verified
+                                                     Ôöé
+Ôöé     )
+                                                                 Ôöé
+Ôöé     values (
+                                                          Ôöé
+Ôöé       new.id,
+                                                         Ôöé
+Ôöé       v_staff_role,
+                                                   Ôöé
+Ôöé       v_full_name,
+                                                    Ôöé
+Ôöé       new.email,
+                                                      Ôöé
+Ôöé       true
+                                                            Ôöé
+Ôöé     );
+                                                                Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé   -- STUDENT ACCOUNT
+                                                  Ôöé
+Ôöé   else
+                                                                Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé     v_reg_code :=
+                                                     Ôöé
+Ôöé       new.raw_user_meta_data ->> 'registration_code';
+                 Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé     v_student_id :=
+                                                   Ôöé
+Ôöé       nullif(
+                                                         Ôöé
+Ôöé         trim(new.raw_user_meta_data ->> 'student_id'),
+                Ôöé
+Ôöé         ''
+                                                            Ôöé
+Ôöé       );
+                                                              Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé     if v_reg_code is null
+                                             Ôöé
+Ôöé        or length(trim(v_reg_code)) = 0 then
+                           Ôöé
+Ôöé       raise exception
+                                                 Ôöé
+Ôöé         'A valid registration code is required to register.';
+         Ôöé
+Ôöé     end if;
+                                                           Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé     if v_student_id is null then
+                                      Ôöé
+Ôöé       raise exception
+                                                 Ôöé
+Ôöé         'A Student ID is required to register.';
+                      Ôöé
+Ôöé     end if;
+                                                           Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé     -- Find and lock the registration code.
+                           Ôöé
+Ôöé     select *
+                                                          Ôöé
+Ôöé     into v_code_row
+                                                   Ôöé
+Ôöé     from public.registration_codes
+                                    Ôöé
+Ôöé     where code = v_reg_code
+                                           Ôöé
+Ôöé       and is_active
+                                                   Ôöé
+Ôöé       and (expires_at is null or expires_at > now())
+                  Ôöé
+Ôöé       and used_count < max_uses
+                                       Ôöé
+Ôöé     for update;
+                                                       Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé     -- Single generic failure for every case:
+                         Ôöé
+Ôöé     -- code not found, inactive, expired, exhausted,
+                  Ôöé
+Ôöé     -- or Student ID mismatch.
+                                        Ôöé
+Ôöé     if not found
+                                                      Ôöé
+Ôöé        or v_code_row.student_id <> v_student_id then
+                  Ôöé
+Ôöé       raise exception
+                                                 Ôöé
+Ôöé         'Invalid registration code or Student ID.';
+                   Ôöé
+Ôöé     end if;
+                                                           Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé     -- Consume one use of the registration code.
+                      Ôöé
+Ôöé     update public.registration_codes
+                                  Ôöé
+Ôöé     set used_count = used_count + 1
+                                   Ôöé
+Ôöé     where id = v_code_row.id;
+                                         Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé     -- Create the student profile.
+                                    Ôöé
+Ôöé     --
+                                                                Ôöé
+Ôöé     -- Academic information comes ONLY from the
+                       Ôöé
+Ôöé     -- registration code. The student cannot choose
+                   Ôöé
+Ôöé     -- these values from the registration form.
+                       Ôöé
+Ôöé     insert into public.profiles (
+                                     Ôöé
+Ôöé       id,
+                                                             Ôöé
+Ôöé       role,
+                                                           Ôöé
+Ôöé       full_name,
+                                                      Ôöé
+Ôöé       student_id,
+                                                     Ôöé
+Ôöé       email,
+                                                          Ôöé
+Ôöé       department_id,
+                                                  Ôöé
+Ôöé       batch_id,
+                                                       Ôöé
+Ôöé       current_level_id,
+                                               Ôöé
+Ôöé       current_term_id,
+                                                Ôöé
+Ôöé       is_verified
+                                                     Ôöé
+Ôöé     )
+                                                                 Ôöé
+Ôöé     values (
+                                                          Ôöé
+Ôöé       new.id,
+                                                         Ôöé
+Ôöé       'student',
+                                                      Ôöé
+Ôöé       v_full_name,
+                                                    Ôöé
+Ôöé       v_code_row.student_id,
+                                          Ôöé
+Ôöé       new.email,
+                                                      Ôöé
+Ôöé       v_code_row.department_id,
+                                       Ôöé
+Ôöé       v_code_row.batch_id,
+                                            Ôöé
+Ôöé       v_code_row.level_id,
+                                            Ôöé
+Ôöé       v_code_row.term_id,
+                                             Ôöé
+Ôöé       false
+                                                           Ôöé
+Ôöé     );
+                                                                Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé   end if;
+                                                             Ôöé
+Ôöé 
+                                                                      Ôöé
+Ôöé   return new;
+                                                         Ôöé
+Ôöé end;
+                                                                  Ôöé
+Ôöé $function$                                                            Ôöé
+Ôöé                                                                       Ôöé
+ÔööÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÿ

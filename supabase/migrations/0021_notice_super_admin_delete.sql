@@ -1,0 +1,1 @@
+create policy "Super admin can delete notices" on public.notices for delete to authenticated using (public.is_super_admin());
