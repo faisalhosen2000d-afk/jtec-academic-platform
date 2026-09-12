@@ -1,10 +1,45 @@
-"use server";
+﻿"use server";
 
+import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 function normalize(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
+}
+function generateRegistrationCode() {
+  const characters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let randomPart = "";
+
+  for (let index = 0; index < 8; index += 1) {
+    randomPart += characters[randomInt(0, characters.length)];
+  }
+
+  return `JTEC-${randomPart}`;
+}
+
+async function generateUniqueRegistrationCode(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const code = generateRegistrationCode();
+
+    const { data: existingCode, error } = await supabase
+      .from("registration_codes")
+      .select("id")
+      .eq("code", code)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!existingCode) {
+      return code;
+    }
+  }
+
+  throw new Error("Unable to generate a unique registration code. Please try again.");
 }
 
 async function requireSuperAdmin() {
@@ -112,7 +147,7 @@ export async function createRegistrationCode(
 ): Promise<void> {
   const { supabase, userId } = await requireSuperAdmin();
 
-  const code = normalize(formData.get("code")).toUpperCase();
+  const code = await generateUniqueRegistrationCode(supabase);
   const studentId = normalize(formData.get("student_id"));
   const departmentId = normalize(formData.get("department_id"));
   const batchId = normalize(formData.get("batch_id"));
@@ -124,7 +159,6 @@ export async function createRegistrationCode(
   const maxUses = Number(maxUsesValue);
 
   if (
-    !code ||
     !studentId ||
     !departmentId ||
     !batchId ||
@@ -401,3 +435,5 @@ export async function deleteRegistrationCode(
 
   revalidateRegistrationCodes();
 }
+
+
