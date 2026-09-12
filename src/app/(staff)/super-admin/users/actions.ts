@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export type UserActionResult =
   | {
@@ -178,6 +179,100 @@ export async function rejectAdministrationAccountRequest(
   }
 
   revalidatePath("/super-admin/account-requests");
+
+  return {
+    success: true,
+  };
+}
+
+
+/**
+ * Permanently deletes a student account.
+ *
+ * Security:
+ * - The caller must be authenticated.
+ * - The caller must have the Super Admin role.
+ * - The target must be a student profile.
+ * - Supabase Auth user deletion removes the profile through
+ *   the profiles.id -> auth.users.id cascade relationship.
+ */
+export async function deleteStudentAccount(
+  targetStudentId: string,
+): Promise<UserActionResult> {
+  if (!targetStudentId) {
+    return {
+      success: false,
+      error: "Student ID is required.",
+    };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return {
+      success: false,
+      error: "You must be signed in.",
+    };
+  }
+
+  const { data: currentProfile, error: currentProfileError } =
+    await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+  if (
+    currentProfileError ||
+    !currentProfile ||
+    currentProfile.role !== "super_admin"
+  ) {
+    return {
+      success: false,
+      error: "Only Super Admin can delete student accounts.",
+    };
+  }
+
+  const { data: targetProfile, error: targetProfileError } =
+    await supabase
+      .from("profiles")
+      .select("id, role")
+      .eq("id", targetStudentId)
+      .maybeSingle();
+
+  if (targetProfileError) {
+    return {
+      success: false,
+      error: targetProfileError.message,
+    };
+  }
+
+  if (!targetProfile || targetProfile.role !== "student") {
+    return {
+      success: false,
+      error: "Only student accounts can be deleted here.",
+    };
+  }
+
+  const serviceSupabase = createServiceRoleClient();
+
+  const { error: deleteError } =
+    await serviceSupabase.auth.admin.deleteUser(targetStudentId);
+
+  if (deleteError) {
+    return {
+      success: false,
+      error: deleteError.message,
+    };
+  }
+
+  revalidatePath("/super-admin/users/students/accounts");
+  revalidatePath("/super-admin/users/students");
 
   return {
     success: true,

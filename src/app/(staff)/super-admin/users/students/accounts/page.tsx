@@ -1,7 +1,8 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
+import DeleteStudentButton from "./DeleteStudentButton";
 
 type StudentProfile = {
   id: string;
@@ -143,6 +144,7 @@ export default async function StudentAccountsPage() {
                       Upload Permission
                     </th>
                     <th className="px-5 py-3 font-semibold">Created</th>
+                    <th className="px-5 py-3 font-semibold">Action</th>
                   </tr>
                 </thead>
 
@@ -157,7 +159,7 @@ export default async function StudentAccountsPage() {
                       </td>
 
                       <td className="px-5 py-4">
-                        {student.student_id ?? "—"}
+                        {student.student_id ?? "â€”"}
                       </td>
 
                       <td className="px-5 py-4">
@@ -193,6 +195,13 @@ export default async function StudentAccountsPage() {
                           "en-GB",
                         )}
                       </td>
+
+                      <td className="px-5 py-4">
+                        <DeleteStudentButton
+                          studentId={student.id}
+                          studentName={student.full_name}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -204,3 +213,4 @@ export default async function StudentAccountsPage() {
     </main>
   );
 }
+
