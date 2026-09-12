@@ -374,7 +374,7 @@ export default async function StaffPermissionsPage({
 
                     {adminAccounts.map((admin) => (
                       <option key={admin.id} value={admin.id}>
-                        {admin.full_name} â€” {admin.email}
+                        {admin.full_name} - {admin.email}
                       </option>
                     ))}
                   </select>
