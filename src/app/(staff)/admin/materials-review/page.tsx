@@ -1,8 +1,9 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import ReviewActions from "./ReviewActions";
 import ReviewFileActions from "./ReviewFileActions";
 
@@ -31,7 +32,9 @@ export default async function MaterialsReviewPage() {
     redirect("/staff-login");
   }
 
-  const { data: materials, error: materialsError } = await supabase
+  const serviceSupabase = createServiceRoleClient();
+
+  const { data: materials, error: materialsError } = await serviceSupabase
     .from("materials")
     .select(`
       id,
@@ -185,3 +188,4 @@ export default async function MaterialsReviewPage() {
     </main>
   );
 }
+

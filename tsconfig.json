@@ -40,6 +40,7 @@
                     "node_modules",
                     "supabase/functions",
                     "_mobile_responsive_backup",
-                    "_password_recovery_backup"
+                    "_password_recovery_backup",
+                    "_loading_ux_backup"
                 ]
 }

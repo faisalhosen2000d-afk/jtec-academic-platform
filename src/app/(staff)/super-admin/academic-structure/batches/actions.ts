@@ -1,7 +1,8 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 function normalize(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -33,7 +34,8 @@ async function requireSuperAdmin() {
 }
 
 export async function createBatch(formData: FormData): Promise<void> {
-  const supabase = await requireSuperAdmin();
+  await requireSuperAdmin();
+  const supabase = createServiceRoleClient();
 
   const name = normalize(formData.get("name"));
 
@@ -58,7 +60,8 @@ export async function createBatch(formData: FormData): Promise<void> {
 }
 
 export async function updateBatch(formData: FormData): Promise<void> {
-  const supabase = await requireSuperAdmin();
+  await requireSuperAdmin();
+  const supabase = createServiceRoleClient();
 
   const id = normalize(formData.get("id"));
   const name = normalize(formData.get("name"));
@@ -87,7 +90,8 @@ export async function updateBatch(formData: FormData): Promise<void> {
 }
 
 export async function deleteBatch(formData: FormData): Promise<void> {
-  const supabase = await requireSuperAdmin();
+  await requireSuperAdmin();
+  const supabase = createServiceRoleClient();
 
   const id = normalize(formData.get("id"));
 
