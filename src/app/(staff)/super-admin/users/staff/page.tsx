@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 
 const staffSections = [
   {
-    title: "Staff Accounts",
+    title: "Staff Account Verification",
     description:
-      "Create and manage Admin and Moderator staff accounts and their platform access.",
-    href: "/super-admin/users/staff/accounts",
-    action: "Manage Staff Accounts",
+      "Review, verify, approve, or reject Admin and Moderator account requests.",
+    href: "/super-admin/account-requests",
+    action: "Review Staff Requests",
   },
   {
     title: "Staff Permissions",
@@ -92,3 +92,4 @@ export default function StaffManagementPage() {
     </main>
   );
 }
+
