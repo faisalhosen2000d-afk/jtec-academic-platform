@@ -48,3 +48,6 @@ _password_recovery_backup/
 *.recovery-test
 *.pre-*
 *.search-backup
+
+# Next.js dependency upgrade backups
+_nextjs_upgrade_backup/
