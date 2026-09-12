@@ -1,8 +1,8 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import DeleteStudentButton from "./DeleteStudentButton";
+import StudentAccountsTable from "./StudentAccountsTable";
 
 type StudentProfile = {
   id: string;
@@ -131,86 +131,12 @@ export default async function StudentAccountsPage() {
                 There are currently no student profiles available.
               </p>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[950px] text-left text-sm">
-                <thead className="border-b border-border bg-muted/40">
-                  <tr>
-                    <th className="px-5 py-3 font-semibold">Student</th>
-                    <th className="px-5 py-3 font-semibold">Student ID</th>
-                    <th className="px-5 py-3 font-semibold">Email</th>
-                    <th className="px-5 py-3 font-semibold">Verification</th>
-                    <th className="px-5 py-3 font-semibold">
-                      Upload Permission
-                    </th>
-                    <th className="px-5 py-3 font-semibold">Created</th>
-                    <th className="px-5 py-3 font-semibold">Action</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {students.map((student) => (
-                    <tr
-                      key={student.id}
-                      className="border-b border-border last:border-b-0"
-                    >
-                      <td className="px-5 py-4">
-                        <div className="font-medium">{student.full_name}</div>
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {student.student_id ?? "â€”"}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {student.email}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {student.is_verified ? (
-                          <span className="inline-flex rounded-full border border-border px-2.5 py-1 text-xs font-medium">
-                            Verified
-                          </span>
-                        ) : (
-                          <span className="inline-flex rounded-full border border-border px-2.5 py-1 text-xs font-medium">
-                            Pending
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {student.upload_disabled ? (
-                          <span className="inline-flex rounded-full border border-border px-2.5 py-1 text-xs font-medium">
-                            Disabled
-                          </span>
-                        ) : (
-                          <span className="inline-flex rounded-full border border-border px-2.5 py-1 text-xs font-medium">
-                            Enabled
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4 text-muted-foreground">
-                        {new Date(student.created_at).toLocaleDateString(
-                          "en-GB",
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <DeleteStudentButton
-                          studentId={student.id}
-                          studentName={student.full_name}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          ) : (            <StudentAccountsTable students={students} />
           )}
         </section>
       </div>
     </main>
   );
 }
+
 
