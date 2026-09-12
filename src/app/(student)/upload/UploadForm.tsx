@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 type Subject = {
   id: string;
@@ -28,7 +29,6 @@ export default function UploadForm({ subjects }: UploadFormProps) {
 
   const subjectContainerRef = useRef<HTMLDivElement>(null);
 
-  // Close subject dropdown when clicking anywhere outside it.
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
       if (
@@ -46,7 +46,6 @@ export default function UploadForm({ subjects }: UploadFormProps) {
     };
   }, []);
 
-  // Close subject dropdown when pressing Escape.
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -101,30 +100,86 @@ export default function UploadForm({ subjects }: UploadFormProps) {
       return;
     }
 
+    if (file.size <= 0) {
+      setError("The selected file is empty.");
+      return;
+    }
+
+    if (file.size > 100 * 1024 * 1024) {
+      setError("File size cannot exceed 100 MB.");
+      return;
+    }
+
     try {
       setSubmitting(true);
 
-      const formData = new FormData();
+      const metadata = {
+        subject_id: selectedSubjectId,
+        title: title.trim(),
+        description: description.trim(),
+        topic: topic.trim(),
+        file_name: file.name,
+        file_type: file.type || "application/octet-stream",
+        file_size: file.size,
+      };
 
-      formData.append("subject_id", selectedSubjectId);
-      formData.append("title", title.trim());
-      formData.append("description", description.trim());
-      formData.append("topic", topic.trim());
-      formData.append("file", file);
-
-      const response = await fetch("/api/materials/upload", {
+      const prepareResponse = await fetch("/api/materials/upload", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "prepare",
+          ...metadata,
+        }),
       });
 
-      const data = await response.json();
+      const prepareData = await prepareResponse.json();
 
-      if (!response.ok) {
-        throw new Error(data?.error || "Upload failed.");
+      if (!prepareResponse.ok) {
+        throw new Error(
+          prepareData?.error || "Upload preparation failed.",
+        );
+      }
+
+      const supabase = createClient();
+
+      const { error: storageError } = await supabase.storage
+        .from("academic-materials")
+        .upload(prepareData.filePath, file, {
+          contentType: file.type || "application/octet-stream",
+          upsert: false,
+        });
+
+      if (storageError) {
+        throw new Error(
+          storageError.message || "The file could not be uploaded to storage.",
+        );
+      }
+
+      const finalizeResponse = await fetch("/api/materials/upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "finalize",
+          ...metadata,
+          material_id: prepareData.materialId,
+          file_path: prepareData.filePath,
+        }),
+      });
+
+      const finalizeData = await finalizeResponse.json();
+
+      if (!finalizeResponse.ok) {
+        throw new Error(
+          finalizeData?.error || "Material could not be saved.",
+        );
       }
 
       setMessage(
-        data?.message ||
+        finalizeData?.message ||
           "Material submitted successfully. It is now pending review.",
       );
 
@@ -166,7 +221,6 @@ export default function UploadForm({ subjects }: UploadFormProps) {
         </div>
       )}
 
-      {/* Subject */}
       <div ref={subjectContainerRef} className="space-y-2">
         <label
           htmlFor="subject-search"
@@ -228,7 +282,6 @@ export default function UploadForm({ subjects }: UploadFormProps) {
         </div>
       </div>
 
-      {/* Material Title */}
       <div className="space-y-2">
         <label
           htmlFor="material-title"
@@ -247,7 +300,6 @@ export default function UploadForm({ subjects }: UploadFormProps) {
         />
       </div>
 
-      {/* Topic */}
       <div className="space-y-2">
         <label
           htmlFor="material-topic"
@@ -266,7 +318,6 @@ export default function UploadForm({ subjects }: UploadFormProps) {
         />
       </div>
 
-      {/* Description */}
       <div className="space-y-2">
         <label
           htmlFor="material-description"
@@ -285,7 +336,6 @@ export default function UploadForm({ subjects }: UploadFormProps) {
         />
       </div>
 
-      {/* File */}
       <div className="space-y-2">
         <label
           htmlFor="material-file"
@@ -309,7 +359,6 @@ export default function UploadForm({ subjects }: UploadFormProps) {
         </p>
       </div>
 
-      {/* Submit */}
       <div className="flex items-center justify-end">
         <button
           type="submit"
