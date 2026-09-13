@@ -14,6 +14,19 @@ import { NextResponse, type NextRequest } from "next/server";
  * (Role/permission system) — intentionally left out of Phase A.
  */
 export async function middleware(request: NextRequest) {
+  // A visitor without a Supabase session cannot have a token to refresh.
+  // Avoiding `getUser()` here is important: it otherwise makes a network
+  // request before every public page (and every Link prefetch) can render.
+  // Supabase stores an auth session in a cookie named
+  // `sb-<project-ref>-auth-token`, optionally split into numbered chunks.
+  const hasAuthSession = request.cookies
+    .getAll()
+    .some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"));
+
+  if (!hasAuthSession) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
