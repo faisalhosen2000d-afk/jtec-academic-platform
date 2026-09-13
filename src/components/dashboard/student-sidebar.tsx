@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useUnreadNotifications } from "@/lib/use-unread-notifications";
 
 const navigationItems = [
   { label: "Dashboard", href: "/dashboard", icon: "⌂" },
@@ -19,69 +18,7 @@ const navigationItems = [
 
 export function StudentSidebar() {
   const pathname = usePathname();
-  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadUnreadNotifications() {
-      const supabase = createClient();
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        if (isMounted) {
-          setHasUnreadNotifications(false);
-        }
-        return;
-      }
-
-      const { count, error } = await supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("recipient_id", user.id)
-        .eq("is_read", false);
-
-      if (error) {
-        console.error(
-          "Unread notification check failed:",
-          error,
-        );
-
-        if (isMounted) {
-          setHasUnreadNotifications(false);
-        }
-
-        return;
-      }
-
-      if (isMounted) {
-        setHasUnreadNotifications((count ?? 0) > 0);
-      }
-    }
-
-    loadUnreadNotifications();
-
-    const handleNotificationRead = () => {
-      void loadUnreadNotifications();
-    };
-
-    window.addEventListener(
-      "jtec-notification-read",
-      handleNotificationRead,
-    );
-
-    return () => {
-      isMounted = false;
-
-      window.removeEventListener(
-        "jtec-notification-read",
-        handleNotificationRead,
-      );
-    };
-  }, [pathname]);
+  const hasUnreadNotifications = useUnreadNotifications(pathname);
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-border bg-background lg:flex lg:min-h-screen lg:flex-col">

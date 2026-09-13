@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import { signOut } from "@/server/actions/auth";
-import { createClient } from "@/lib/supabase/client";
+import { useUnreadNotifications } from "@/lib/use-unread-notifications";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -20,69 +19,7 @@ const pageTitles: Record<string, string> = {
 
 export function StudentHeader() {
   const pathname = usePathname();
-  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadUnreadNotificationState() {
-      const supabase = createClient();
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        if (isMounted) {
-          setHasUnreadNotifications(false);
-        }
-        return;
-      }
-
-      const { count, error } = await supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("recipient_id", user.id)
-        .eq("is_read", false);
-
-      if (error) {
-        console.error(
-          "Unread notification check failed:",
-          error,
-        );
-
-        if (isMounted) {
-          setHasUnreadNotifications(false);
-        }
-
-        return;
-      }
-
-      if (isMounted) {
-        setHasUnreadNotifications((count ?? 0) > 0);
-      }
-    }
-
-    loadUnreadNotificationState();
-
-    const handleNotificationRead = () => {
-      void loadUnreadNotificationState();
-    };
-
-    window.addEventListener(
-      "jtec-notification-read",
-      handleNotificationRead,
-    );
-
-    return () => {
-      isMounted = false;
-
-      window.removeEventListener(
-        "jtec-notification-read",
-        handleNotificationRead,
-      );
-    };
-  }, [pathname]);
+  const hasUnreadNotifications = useUnreadNotifications(pathname);
 
   const handleSignOut = async () => {
     await signOut();

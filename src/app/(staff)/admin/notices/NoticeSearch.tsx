@@ -12,9 +12,9 @@ export default function NoticeSearch({ initialValue = "" }: { initialValue?: str
   useEffect(() => {
     const currentSearch = searchParams.get("search") ?? "";
 
-    if (currentSearch !== value.trim()) {
-      setValue(currentSearch);
-    }
+    setValue((currentValue) =>
+      currentSearch !== currentValue.trim() ? currentSearch : currentValue,
+    );
   }, [searchParams]);
 
   useEffect(() => {

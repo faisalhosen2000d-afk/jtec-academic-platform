@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import NoticeCreateForm from "./NoticeCreateForm";
 import NoticeList from "./NoticeList";
 import { DeleteNoticeButton } from "@/components/admin/DeleteNoticeButton";
-import { deleteNoticeForm, toggleNoticePinForm } from "@/server/actions/notices";
+import { toggleNoticePinForm } from "@/server/actions/notices";
 
 export default async function AdminNoticesPage() {
 

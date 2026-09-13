@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
 
 const NOTICES_PER_PAGE = 5;
 

@@ -16,78 +16,76 @@ export default async function StudentDashboardPage() {
     redirect("/login");
   }
 
-  const {
-    data: profile,
-    error: profileError,
-  } = await supabase
-    .from("profiles")
-    .select(`
-      student_id,
-      full_name,
-      email,
-      department_id,
-      batch_id,
-      current_level_id,
-      current_term_id
-    `)
-    .eq("id", user.id)
-    .single();
+  // These reads do not depend on one another, so start them together rather
+  // than making the dashboard wait for each network round trip in sequence.
+  const [profileResult, noticesResult, noticeCategoriesResult] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(`
+        student_id,
+        full_name,
+        email,
+        department_id,
+        batch_id,
+        current_level_id,
+        current_term_id
+      `)
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("notices")
+      .select(
+        "id, title, category_id, content, target_scope, target_department_id, target_batch_id, target_level_id, target_term_id, is_pinned, created_at",
+      )
+      .eq("is_archived", false)
+      .order("is_pinned", { ascending: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("notice_categories")
+      .select("id, name")
+      .order("name", { ascending: true }),
+  ]);
 
-  console.log("[dashboard][profile]", profile);
-  console.log("[dashboard][profileError]", profileError);
+  const { data: profile } = profileResult;
+  const { data: notices, error: noticesError } = noticesResult;
+  const { data: noticeCategories } = noticeCategoriesResult;
 
-  const { data: department, error: departmentError } =
-    profile?.department_id
-      ? await supabase
-          .from("departments")
-          .select("name")
-          .eq("id", profile.department_id)
-          .single()
-      : { data: null, error: null };
+  const [departmentResult, batchResult, levelResult, termResult] =
+    await Promise.all([
+      profile?.department_id
+        ? supabase
+            .from("departments")
+            .select("name")
+            .eq("id", profile.department_id)
+            .single()
+        : Promise.resolve({ data: null, error: null }),
+      profile?.batch_id
+        ? supabase
+            .from("batches")
+            .select("name")
+            .eq("id", profile.batch_id)
+            .single()
+        : Promise.resolve({ data: null }),
+      profile?.current_level_id
+        ? supabase
+            .from("levels")
+            .select("name")
+            .eq("id", profile.current_level_id)
+            .single()
+        : Promise.resolve({ data: null }),
+      profile?.current_term_id
+        ? supabase
+            .from("terms")
+            .select("name")
+            .eq("id", profile.current_term_id)
+            .single()
+        : Promise.resolve({ data: null }),
+    ]);
 
-  console.log("[dashboard][department]", department);
-  console.log("[dashboard][departmentError]", departmentError);
-
-  const { data: batch } = profile?.batch_id
-    ? await supabase
-        .from("batches")
-        .select("name")
-        .eq("id", profile.batch_id)
-        .single()
-    : { data: null };
-
-  const { data: level } = profile?.current_level_id
-    ? await supabase
-        .from("levels")
-        .select("name")
-        .eq("id", profile.current_level_id)
-        .single()
-    : { data: null };
-
-  const { data: term } = profile?.current_term_id
-    ? await supabase
-        .from("terms")
-        .select("name")
-        .eq("id", profile.current_term_id)
-        .single()
-    : { data: null };
-
-  const { data: notices, error: noticesError } = await supabase
-    .from("notices")
-    .select(
-      "id, title, category_id, content, target_scope, target_department_id, target_batch_id, target_level_id, target_term_id, is_pinned, created_at",
-    )
-    .eq("is_archived", false)
-    .order("is_pinned", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  console.log("[dashboard][notices]", notices);
-  console.log("[dashboard][noticesError]", noticesError);
-
-  const { data: noticeCategories } = await supabase
-    .from("notice_categories")
-    .select("id, name")
-    .order("name", { ascending: true });
+  const { data: department } = departmentResult;
+  const { data: batch } = batchResult;
+  const { data: level } = levelResult;
+  const { data: term } = termResult;
 
   const studentName =
     profile?.full_name ||
