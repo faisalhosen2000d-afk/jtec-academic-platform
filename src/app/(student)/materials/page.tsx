@@ -154,7 +154,7 @@ function formatFileSize(bytes: number) {
                 <section className="rounded-xl border border-dashed border-border bg-background p-12 text-center">
                   <div className="mx-auto max-w-md">
                     <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted text-xl">
-                      ðŸ“š
+                      Ã°Å¸â€œÅ¡
                     </div>
 
                     <h2 className="mt-4 text-lg font-semibold text-foreground">
@@ -202,7 +202,7 @@ function formatFileSize(bytes: number) {
                             </p>
 
                             <p className="text-sm font-medium text-foreground">
-                              {material.subject.subject_code} â€”{" "}
+                              {material.subject.subject_code} —{" "}
                               {material.subject.subject_name}
                             </p>
                           </div>
@@ -230,15 +230,15 @@ function formatFileSize(bytes: number) {
                           </div>
                         )}
 
-                        {/* Stats */}{/* Stats */}
+                        {/* Stats */}
                         <div className="mt-auto pt-5">
                           <div className="flex items-center gap-4 border-t border-border pt-4 text-xs text-muted-foreground">
                             <span>
-                              ðŸ‘ {material.views_count}
+                              👁️ {material.views_count}
                             </span>
 
                             <span>
-                              â†“ {material.downloads_count}
+                              ↓ {material.downloads_count}
                             </span>
 
                             <span>
