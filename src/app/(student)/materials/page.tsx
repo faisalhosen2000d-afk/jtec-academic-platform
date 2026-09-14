@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
+import UploaderContactProfile from "@/components/student/UploaderContactProfile";
 
 type Material = {
   id: string;
@@ -19,6 +20,12 @@ type Material = {
     id: string;
     full_name: string;
     avatar_url: string | null;
+    email: string | null;
+    phone: string | null;
+    whatsapp: string | null;
+    facebook: string | null;
+    instagram: string | null;
+    linkedin: string | null;
   } | null;
   subject: {
     subject_code: string;
@@ -78,7 +85,7 @@ export default async function MaterialsPage() {
       { p_profile_id: material.uploader_id },
     );
 
-    const uploader = uploaderData?.[0] ?? null;
+    const uploader = (uploaderData?.[0] ?? null) as Material["uploader"];
 
     return {
       ...material,
@@ -214,34 +221,16 @@ function formatFileSize(bytes: number) {
                             {material.description}
                           </p>
                         )}
-
                         {/* Uploader */}
-                       {material.uploader && (
-                         <div className="mt-4 flex items-center gap-3">
-                           {material.uploader.avatar_url ? (
-                             <img
-                               src={material.uploader.avatar_url}
-                               alt={material.uploader.full_name}
-                               className="h-9 w-9 rounded-full object-cover"
-                             />
-                           ) : (
-                             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
-                               {material.uploader.full_name.charAt(0).toUpperCase()}
-                             </div>
-                           )}
+                        {material.uploader && (
+                          <div className="mt-4">
+                            <UploaderContactProfile
+                              profile={material.uploader}
+                            />
+                          </div>
+                        )}
 
-                           <div className="min-w-0">
-                             <p className="text-xs text-muted-foreground">
-                               Uploaded by
-                             </p>
-                             <p className="truncate text-sm font-medium text-foreground">
-                               {material.uploader.full_name}
-                             </p>
-                           </div>
-                         </div>
-                       )}
-
-                       {/* Stats */}
+                        {/* Stats */}{/* Stats */}
                         <div className="mt-auto pt-5">
                           <div className="flex items-center gap-4 border-t border-border pt-4 text-xs text-muted-foreground">
                             <span>
