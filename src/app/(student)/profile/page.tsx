@@ -1,6 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
+import StudentContactSettings from "@/components/student/StudentContactSettings";
 
 export default async function StudentProfilePage() {
   const supabase = await createClient();
@@ -13,6 +14,14 @@ export default async function StudentProfilePage() {
     redirect("/login");
   }
 
+  const { data: contactData } = await supabase
+    .from("profile_contacts")
+    .select(
+      "email, phone, whatsapp, facebook, instagram, linkedin",
+    )
+    .eq("profile_id", user.id)
+    .maybeSingle();
+
   const fullName =
     user.user_metadata?.full_name ||
     user.email?.split("@")[0] ||
@@ -20,6 +29,15 @@ export default async function StudentProfilePage() {
 
   const studentId =
     user.user_metadata?.student_id || "Student";
+
+  const initialContactValues = {
+    email: contactData?.email ?? "",
+    phone: contactData?.phone ?? "",
+    whatsapp: contactData?.whatsapp ?? "",
+    facebook: contactData?.facebook ?? "",
+    instagram: contactData?.instagram ?? "",
+    linkedin: contactData?.linkedin ?? "",
+  };
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -81,6 +99,10 @@ export default async function StudentProfilePage() {
                   </div>
                 </div>
               </section>
+
+              <StudentContactSettings
+                initialValues={initialContactValues}
+              />
 
               <section className="rounded-xl border border-border bg-background p-6 shadow-sm">
                 <div className="flex items-center gap-3">
