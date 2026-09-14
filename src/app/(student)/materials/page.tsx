@@ -6,6 +6,7 @@ import { StudentHeader } from "@/components/dashboard/student-header";
 
 type Material = {
   id: string;
+  uploader_id: string;
   title: string;
   description: string | null;
   topic: string | null;
@@ -14,6 +15,11 @@ type Material = {
   views_count: number;
   downloads_count: number;
   created_at: string;
+  uploader: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
   subject: {
     subject_code: string;
     subject_name: string;
@@ -35,6 +41,7 @@ export default async function MaterialsPage() {
     .from("materials")
     .select(`
       id,
+     uploader_id,
       title,
       description,
       topic,
@@ -64,14 +71,25 @@ export default async function MaterialsPage() {
   );
 }
 
-  const materialList: Material[] = (materials ?? []).map((material) => ({
-    ...material,
-    subject: Array.isArray(material.subject)
-      ? material.subject[0] ?? null
-      : material.subject,
-  }));
+  const materialList: Material[] = await Promise.all(
+  (materials ?? []).map(async (material) => {
+    const { data: uploaderData } = await supabase.rpc(
+      "get_public_contact_profile",
+      { p_profile_id: material.uploader_id },
+    );
 
-  function formatFileSize(bytes: number) {
+    const uploader = uploaderData?.[0] ?? null;
+
+    return {
+      ...material,
+      uploader,
+      subject: Array.isArray(material.subject)
+        ? material.subject[0] ?? null
+        : material.subject,
+    };
+  }),
+);
+function formatFileSize(bytes: number) {
     if (bytes < 1024) {
       return `${bytes} B`;
     }
@@ -129,7 +147,7 @@ export default async function MaterialsPage() {
                 <section className="rounded-xl border border-dashed border-border bg-background p-12 text-center">
                   <div className="mx-auto max-w-md">
                     <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted text-xl">
-                      📚
+                      ðŸ“š
                     </div>
 
                     <h2 className="mt-4 text-lg font-semibold text-foreground">
@@ -177,7 +195,7 @@ export default async function MaterialsPage() {
                             </p>
 
                             <p className="text-sm font-medium text-foreground">
-                              {material.subject.subject_code} —{" "}
+                              {material.subject.subject_code} â€”{" "}
                               {material.subject.subject_name}
                             </p>
                           </div>
@@ -197,15 +215,41 @@ export default async function MaterialsPage() {
                           </p>
                         )}
 
-                        {/* Stats */}
+                        {/* Uploader */}
+                       {material.uploader && (
+                         <div className="mt-4 flex items-center gap-3">
+                           {material.uploader.avatar_url ? (
+                             <img
+                               src={material.uploader.avatar_url}
+                               alt={material.uploader.full_name}
+                               className="h-9 w-9 rounded-full object-cover"
+                             />
+                           ) : (
+                             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
+                               {material.uploader.full_name.charAt(0).toUpperCase()}
+                             </div>
+                           )}
+
+                           <div className="min-w-0">
+                             <p className="text-xs text-muted-foreground">
+                               Uploaded by
+                             </p>
+                             <p className="truncate text-sm font-medium text-foreground">
+                               {material.uploader.full_name}
+                             </p>
+                           </div>
+                         </div>
+                       )}
+
+                       {/* Stats */}
                         <div className="mt-auto pt-5">
                           <div className="flex items-center gap-4 border-t border-border pt-4 text-xs text-muted-foreground">
                             <span>
-                              👁 {material.views_count}
+                              ðŸ‘ {material.views_count}
                             </span>
 
                             <span>
-                              ↓ {material.downloads_count}
+                              â†“ {material.downloads_count}
                             </span>
 
                             <span>
