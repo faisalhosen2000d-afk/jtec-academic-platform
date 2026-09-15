@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import StudentContactSettings from "@/components/student/StudentContactSettings";
+import StudentProfilePhoto from "@/components/student/StudentProfilePhoto";
 
 export default async function StudentProfilePage() {
   const supabase = await createClient();
@@ -14,6 +15,12 @@ export default async function StudentProfilePage() {
     redirect("/login");
   }
 
+  const { data: profileData } = await supabase
+    .from("profiles")
+    .select("full_name, student_id, email, avatar_url")
+    .eq("id", user.id)
+    .maybeSingle();
+
   const { data: contactData } = await supabase
     .from("profile_contacts")
     .select(
@@ -23,12 +30,17 @@ export default async function StudentProfilePage() {
     .maybeSingle();
 
   const fullName =
+    profileData?.full_name ||
     user.user_metadata?.full_name ||
     user.email?.split("@")[0] ||
     "Student";
 
   const studentId =
-    user.user_metadata?.student_id || "Student";
+    profileData?.student_id ||
+    user.user_metadata?.student_id ||
+    "Student";
+
+  const profileEmail = profileData?.email || user.email || "";
 
   const initialContactValues = {
     email: contactData?.email ?? "",
@@ -75,6 +87,7 @@ export default async function StudentProfilePage() {
                     <p className="text-xs text-muted-foreground">
                       Full Name
                     </p>
+
                     <p className="mt-1 font-medium text-foreground">
                       {fullName}
                     </p>
@@ -84,6 +97,7 @@ export default async function StudentProfilePage() {
                     <p className="text-xs text-muted-foreground">
                       Student ID
                     </p>
+
                     <p className="mt-1 font-medium text-foreground">
                       {studentId}
                     </p>
@@ -93,12 +107,19 @@ export default async function StudentProfilePage() {
                     <p className="text-xs text-muted-foreground">
                       Email
                     </p>
+
                     <p className="mt-1 break-all font-medium text-foreground">
-                      {user.email || "—"}
+                      {profileEmail || "Not available"}
                     </p>
                   </div>
                 </div>
               </section>
+
+              <StudentProfilePhoto
+                userId={user.id}
+                fullName={fullName}
+                initialAvatarUrl={profileData?.avatar_url ?? null}
+              />
 
               <StudentContactSettings
                 initialValues={initialContactValues}
@@ -130,3 +151,4 @@ export default async function StudentProfilePage() {
     </div>
   );
 }
+
