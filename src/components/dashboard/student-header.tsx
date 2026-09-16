@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/server/actions/auth";
 import { useUnreadNotifications } from "@/lib/use-unread-notifications";
+import { createClient } from "@/lib/supabase/client";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -20,6 +22,44 @@ const pageTitles: Record<string, string> = {
 export function StudentHeader() {
   const pathname = usePathname();
   const hasUnreadNotifications = useUnreadNotifications(pathname);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfilePhoto = async () => {
+      const supabase = createClient();
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("avatar_url")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Student header avatar load failed:", error);
+        return;
+      }
+
+      if (isMounted) {
+        setAvatarUrl(data?.avatar_url ?? null);
+      }
+    };
+
+    void loadProfilePhoto();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [pathname]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -94,8 +134,16 @@ export function StudentHeader() {
             className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted"
             aria-label="Open profile"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-              S
+            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-semibold text-primary">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Student profile"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                "S"
+              )}
             </div>
 
             <div className="hidden text-left md:block">

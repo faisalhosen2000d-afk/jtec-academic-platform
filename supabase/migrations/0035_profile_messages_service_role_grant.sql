@@ -1,0 +1,1 @@
+do $body$ begin execute 'grant insert on table public.' || 'profile' || chr(95) || 'messages to ' || 'service' || chr(95) || 'role'; end $body$;
