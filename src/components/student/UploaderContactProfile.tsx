@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { sendProfileMessage } from "@/server/actions/profile-messages";
@@ -13,6 +13,7 @@ type ContactProfile = {
   facebook: string | null;
   instagram: string | null;
   linkedin: string | null;
+  telegram: string | null;
 };
 
 type UploaderContactProfileProps = {
@@ -26,6 +27,7 @@ const contactFields = [
   { key: "facebook", label: "Facebook" },
   { key: "instagram", label: "Instagram" },
   { key: "linkedin", label: "LinkedIn" },
+  { key: "telegram", label: "Telegram" },
 ] as const;
 
 export default function UploaderContactProfile({

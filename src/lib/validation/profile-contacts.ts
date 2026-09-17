@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 
 export const profileContactsSchema = z.object({
   email: z
@@ -12,6 +12,7 @@ export const profileContactsSchema = z.object({
   facebook: z.string().trim().max(255, "Facebook link is too long.").default(""),
   instagram: z.string().trim().max(255, "Instagram link is too long.").default(""),
   linkedin: z.string().trim().max(255, "LinkedIn link is too long.").default(""),
+  telegram: z.string().trim().max(255, "Telegram value is too long.").default(""),
 });
 
 export type ProfileContactsInput = z.infer<typeof profileContactsSchema>;

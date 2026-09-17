@@ -1,4 +1,4 @@
-﻿import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import StudentContactSettings from "@/components/student/StudentContactSettings";
@@ -24,7 +24,7 @@ export default async function StudentProfilePage() {
   const { data: contactData } = await supabase
     .from("profile_contacts")
     .select(
-      "email, phone, whatsapp, facebook, instagram, linkedin",
+      "email, phone, whatsapp, facebook, instagram, linkedin, telegram",
     )
     .eq("profile_id", user.id)
     .maybeSingle();
@@ -49,6 +49,7 @@ export default async function StudentProfilePage() {
     facebook: contactData?.facebook ?? "",
     instagram: contactData?.instagram ?? "",
     linkedin: contactData?.linkedin ?? "",
+    telegram: "",
   };
 
   return (

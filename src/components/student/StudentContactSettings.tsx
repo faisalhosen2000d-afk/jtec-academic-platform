@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { saveProfileContacts } from "@/server/actions/profile-contacts";
@@ -10,6 +10,7 @@ type ContactValues = {
   facebook: string;
   instagram: string;
   linkedin: string;
+  telegram: string;
 };
 
 type StudentContactSettingsProps = {
@@ -53,8 +54,12 @@ const fields: Array<{
     label: "LinkedIn",
     placeholder: "LinkedIn profile link",
   },
+  {
+    name: "telegram",
+    label: "Telegram",
+    placeholder: "Telegram username or link",
+  },
 ];
-
 export default function StudentContactSettings({
   initialValues,
 }: StudentContactSettingsProps) {

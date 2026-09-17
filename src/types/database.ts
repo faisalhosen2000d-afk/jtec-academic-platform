@@ -1022,6 +1022,7 @@ export type Database = {
           facebook: string | null
           instagram: string | null
           linkedin: string | null
+          telegram: string | null
           phone: string | null
           profile_id: string
           updated_at: string
@@ -1033,6 +1034,7 @@ export type Database = {
           facebook?: string | null
           instagram?: string | null
           linkedin?: string | null
+          telegram?: string | null
           phone?: string | null
           profile_id: string
           updated_at?: string
@@ -1044,6 +1046,7 @@ export type Database = {
           facebook?: string | null
           instagram?: string | null
           linkedin?: string | null
+          telegram?: string | null
           phone?: string | null
           profile_id?: string
           updated_at?: string
@@ -1655,6 +1658,7 @@ export type Database = {
           id: string
           instagram: string
           linkedin: string
+          telegram: string
           phone: string
           whatsapp: string
         }[]

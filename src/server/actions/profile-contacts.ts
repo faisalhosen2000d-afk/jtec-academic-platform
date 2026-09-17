@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -18,6 +18,7 @@ export async function saveProfileContacts(
     facebook: formData.get("facebook"),
     instagram: formData.get("instagram"),
     linkedin: formData.get("linkedin"),
+    telegram: formData.get("telegram"),
   });
 
   if (!parsed.success) {
@@ -49,6 +50,7 @@ export async function saveProfileContacts(
       facebook: parsed.data.facebook || null,
       instagram: parsed.data.instagram || null,
       linkedin: parsed.data.linkedin || null,
+    telegram: parsed.data.telegram || null,
     },
     {
       onConflict: "profile_id",

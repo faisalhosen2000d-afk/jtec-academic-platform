@@ -26,6 +26,7 @@ type Material = {
     facebook: string | null;
     instagram: string | null;
     linkedin: string | null;
+    telegram: string | null;
   } | null;
   subject: {
     subject_code: string;

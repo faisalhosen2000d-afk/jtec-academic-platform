@@ -51,3 +51,10 @@ _password_recovery_backup/
 
 # Next.js dependency upgrade backups
 _nextjs_upgrade_backup/
+
+# local backup and audit artifacts
+_contact_feature_audit/
+_loading_ux_backup/
+_messaging_upgrade_backup/
+audit-contact/
+backup/
