@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import StudentContactSettings from "@/components/student/StudentContactSettings";
@@ -49,7 +49,7 @@ export default async function StudentProfilePage() {
     facebook: contactData?.facebook ?? "",
     instagram: contactData?.instagram ?? "",
     linkedin: contactData?.linkedin ?? "",
-    telegram: "",
+    telegram: contactData?.telegram ?? "",
   };
 
   return (
