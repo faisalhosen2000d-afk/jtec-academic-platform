@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { sendProfileMessage } from "@/server/actions/profile-messages";
+import ContactMethodQr from "./ContactMethodQr";
 
 type ContactProfile = {
   id: string;
@@ -29,6 +30,49 @@ const contactFields = [
   { key: "linkedin", label: "LinkedIn" },
   { key: "telegram", label: "Telegram" },
 ] as const;
+
+type ContactKey = (typeof contactFields)[number]["key"];
+
+function getContactDestination(key: ContactKey, value: string) {
+  const trimmedValue = value.trim();
+
+  if (/^[a-z][a-z\d+\-.]*:/i.test(trimmedValue)) {
+    return trimmedValue;
+  }
+
+  if (key === "email") {
+    return `mailto:${trimmedValue}`;
+  }
+
+  if (key === "phone") {
+    return `tel:${trimmedValue}`;
+  }
+
+  if (key === "whatsapp") {
+    const digits = trimmedValue.replace(/[^\d]/g, "");
+    return digits ? `https://wa.me/${digits}` : trimmedValue;
+  }
+
+  if (key === "facebook") {
+    return `https://facebook.com/${trimmedValue.replace(/^@/, "")}`;
+  }
+
+  if (key === "instagram") {
+    return `https://instagram.com/${trimmedValue.replace(/^@/, "")}`;
+  }
+
+  if (key === "linkedin") {
+    return trimmedValue.startsWith("in/")
+      ? `https://linkedin.com/${trimmedValue}`
+      : `https://linkedin.com/in/${trimmedValue.replace(/^@/, "")}`;
+  }
+
+  if (key === "telegram") {
+    return `https://t.me/${trimmedValue.replace(/^@/, "")}`;
+  }
+
+  return trimmedValue;
+}
 
 export default function UploaderContactProfile({
   profile,
@@ -93,6 +137,7 @@ export default function UploaderContactProfile({
                 <h2 className="text-lg font-semibold text-foreground">
                   Contact Profile
                 </h2>
+
                 <p className="mt-1 text-sm text-muted-foreground">
                   {profile.full_name}
                 </p>
@@ -116,11 +161,27 @@ export default function UploaderContactProfile({
                 }
 
                 return (
-                  <div key={key} className="rounded-lg border border-border p-3">
-                    <p className="text-xs text-muted-foreground">{label}</p>
-                    <p className="mt-1 break-words text-sm text-foreground">
-                      {value}
-                    </p>
+                  <div
+                    key={key}
+                    className="rounded-lg border border-border p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">
+                          {label}
+                        </p>
+
+                        <p className="mt-1 break-words text-sm text-foreground">
+                          {value}
+                        </p>
+                      </div>
+
+                      <ContactMethodQr
+                        label={label}
+                        value={value}
+                        destination={getContactDestination(key, value)}
+                      />
+                    </div>
                   </div>
                 );
               })}
