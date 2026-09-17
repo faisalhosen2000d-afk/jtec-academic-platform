@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -92,6 +92,22 @@ export async function sendProfileMessage(
 
   if (messageError) {
     console.error("Profile message insert error:", messageError);
+
+    const errorMessage = messageError.message ?? "";
+
+    if (errorMessage.includes("SENDER_MESSAGE_LIMIT_REACHED")) {
+      return {
+        success: false,
+        error: "You have reached your 5-message limit in this conversation.",
+      };
+    }
+
+    if (errorMessage.includes("CONVERSATION_MESSAGE_LIMIT_REACHED")) {
+      return {
+        success: false,
+        error: "This conversation has reached its 10-message limit.",
+      };
+    }
 
     return {
       success: false,
