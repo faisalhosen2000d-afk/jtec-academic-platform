@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { sendProfileMessage } from "@/server/actions/profile-messages";
@@ -50,7 +50,15 @@ function getContactDestination(key: ContactKey, value: string) {
 
   if (key === "whatsapp") {
     const digits = trimmedValue.replace(/[^\d]/g, "");
-    return digits ? `https://wa.me/${digits}` : trimmedValue;
+    const internationalDigits = digits.startsWith("0")
+      ? `880${digits.slice(1)}`
+      : digits.startsWith("880")
+        ? digits
+        : digits;
+
+    return internationalDigits
+      ? `https://wa.me/${internationalDigits}`
+      : trimmedValue;
   }
 
   if (key === "facebook") {
