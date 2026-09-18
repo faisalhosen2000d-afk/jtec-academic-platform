@@ -1,7 +1,8 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
+import { StudentConversationReply } from "@/components/student/StudentConversationReply";
 
 type StudentConversationPageProps = {
   params: Promise<{
@@ -148,6 +149,8 @@ export default async function StudentConversationPage({
                   </div>
                 )}
               </section>
+
+            <StudentConversationReply recipientId={studentId} />
             </div>
           </main>
         </div>
