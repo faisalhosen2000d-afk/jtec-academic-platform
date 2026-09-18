@@ -122,7 +122,7 @@ export async function sendProfileMessage(
       type: "profile_message",
       title: `New message from ${senderProfile.full_name}`,
       body: parsed.data.message,
-      link_url: "/notifications",
+      link_url: `/messages/${senderProfile.id}`,
       is_read: false,
     });
 

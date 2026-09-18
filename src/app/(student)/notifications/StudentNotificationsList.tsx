@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { deleteNotification, markNotificationAsRead } from "@/server/actions/notifications";
@@ -56,32 +56,37 @@ export default function StudentNotificationsList({
 
   async function handleNotificationClick(
     notification: NotificationItem,
+    shouldNavigate = false,
   ) {
-    if (notification.is_read || readingId === notification.id || deletingId === notification.id) {
+    if (readingId === notification.id || deletingId === notification.id) {
       return;
     }
 
-    setReadingId(notification.id);
+    if (!notification.is_read) {
+      setReadingId(notification.id);
 
-    const result = await markNotificationAsRead(notification.id);
+      const result = await markNotificationAsRead(notification.id);
 
-    if (result.success) {
-      setNotifications((current) =>
-        current.map((item) =>
-          item.id === notification.id
-            ? { ...item, is_read: true }
-            : item,
-        ),
-      );
+      if (result.success) {
+        setNotifications((current) =>
+          current.map((item) =>
+            item.id === notification.id
+              ? { ...item, is_read: true }
+              : item,
+          ),
+        );
 
-      window.dispatchEvent(
-        new CustomEvent("jtec-notification-read"),
-      );
+        window.dispatchEvent(
+          new CustomEvent("jtec-notification-read"),
+        );
+      }
 
-      router.refresh();
+      setReadingId(null);
     }
 
-    setReadingId(null);
+    if (shouldNavigate && notification.link_url) {
+      router.push(notification.link_url);
+    }
   }
 
   return (
@@ -135,16 +140,17 @@ export default function StudentNotificationsList({
 
               <div className="mt-4 flex flex-wrap items-center gap-4">
                 {notification.link_url && (
-                  <Link
-                    href={notification.link_url}
+                  <button
+                    type="button"
                     onClick={(event) => {
+                      event.preventDefault();
                       event.stopPropagation();
-                      void handleNotificationClick(notification);
+                      void handleNotificationClick(notification, true);
                     }}
                     className="text-sm font-medium text-foreground underline underline-offset-4"
                   >
                     Open
-                  </Link>
+                  </button>
                 )}
 
                 <button
