@@ -13,6 +13,7 @@ export async function sendProfileMessage(
 ): Promise<ProfileMessageActionResult> {
   const parsed = profileMessageSchema.safeParse({
     recipient_id: formData.get("recipient_id"),
+    material_id: formData.get("material_id") || undefined,
     message: formData.get("message"),
   });
 
@@ -63,12 +64,11 @@ export async function sendProfileMessage(
 
   const notificationService = createServiceRoleClient();
 
-  const { data: recipientProfile, error: recipientError } =
-    await notificationService
-      .from("profiles")
-      .select("id, role, is_verified, full_name")
-      .eq("id", parsed.data.recipient_id)
-      .single();
+  const { data: recipientProfile, error: recipientError } = await notificationService
+    .from("profiles")
+    .select("id, role, is_verified, full_name")
+    .eq("id", parsed.data.recipient_id)
+    .single();
 
   if (
     recipientError ||
@@ -78,36 +78,21 @@ export async function sendProfileMessage(
   ) {
     return {
       success: false,
-      error: "The selected student could not be found.",
+      error: "The selected student is not available for messaging.",
     };
   }
 
-  const { error: messageError } = await notificationService
+  const { error: messageError } = await supabase
     .from("profile_messages")
     .insert({
       sender_id: user.id,
       recipient_id: recipientProfile.id,
+      material_id: parsed.data.material_id ?? null,
       message: parsed.data.message,
     });
 
   if (messageError) {
     console.error("Profile message insert error:", messageError);
-
-    const errorMessage = messageError.message ?? "";
-
-    if (errorMessage.includes("SENDER_MESSAGE_LIMIT_REACHED")) {
-      return {
-        success: false,
-        error: "You have reached your 5-message limit in this conversation.",
-      };
-    }
-
-    if (errorMessage.includes("CONVERSATION_MESSAGE_LIMIT_REACHED")) {
-      return {
-        success: false,
-        error: "This conversation has reached its 10-message limit.",
-      };
-    }
 
     return {
       success: false,
@@ -115,23 +100,110 @@ export async function sendProfileMessage(
     };
   }
 
-  const { error: notificationError } = await notificationService
-    .from("notifications")
-    .insert({
-      recipient_id: recipientProfile.id,
-      type: "profile_message",
-      title: `New message from ${senderProfile.full_name}`,
-      body: parsed.data.message,
-      link_url: `/messages/${senderProfile.id}`,
-      is_read: false,
-    });
 
-  if (notificationError) {
-    console.error("Profile message notification error:", notificationError);
+  return { success: true };
+}
+
+export async function markMessageAsRead(
+  messageId: string,
+): Promise<ProfileMessageActionResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      success: false,
+      error: "You must be logged in to mark messages as read.",
+    };
+  }
+
+  if (!messageId) {
+    return {
+      success: false,
+      error: "Invalid message.",
+    };
+  }
+
+  const serviceRole = createServiceRoleClient();
+
+  const { error } = await serviceRole
+    .from("profile_messages")
+    .update({
+      read_at: new Date().toISOString(),
+    })
+    .eq("id", messageId)
+    .eq("recipient_id", user.id)
+    .is("read_at", null);
+
+  if (error) {
+    console.error("Mark message as read error:", error);
 
     return {
       success: false,
-      error: "The message was saved, but notification could not be created.",
+      error: "Message could not be marked as read.",
+    };
+  }
+
+  return { success: true };
+}
+
+
+
+export async function markConversationMessagesAsRead(
+  partnerId: string,
+): Promise<ProfileMessageActionResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      success: false,
+      error: "You must be logged in to mark messages as read.",
+    };
+  }
+
+  if (!partnerId || partnerId === user.id) {
+    return {
+      success: false,
+      error: "Invalid conversation.",
+    };
+  }
+
+  const serviceRole = createServiceRoleClient();
+
+  const { error } = await serviceRole
+    .from("profile_messages")
+    .update({
+      read_at: new Date().toISOString(),
+    })
+    .eq("sender_id", partnerId)
+    .eq("recipient_id", user.id)
+    .is("read_at", null)
+    .gte(
+      "created_at",
+      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    );
+
+  if (error) {
+    console.error(
+      "MARK_CONVERSATION_MESSAGES_AS_READ_ERROR",
+      JSON.stringify({
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      }),
+    );
+
+    return {
+      success: false,
+      error: "Conversation messages could not be marked as read.",
     };
   }
 

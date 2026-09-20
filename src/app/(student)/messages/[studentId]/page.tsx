@@ -1,8 +1,11 @@
+﻿import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
 import { StudentConversationReply } from "@/components/student/StudentConversationReply";
+import { StudentConversationMessages } from "@/components/student/StudentConversationMessages";
+import { markConversationMessagesAsRead } from "@/server/actions/profile-messages";
 
 type StudentConversationPageProps = {
   params: Promise<{
@@ -60,6 +63,8 @@ export default async function StudentConversationPage({
     );
   }
 
+  await markConversationMessagesAsRead(studentId);
+
   const conversationFilter = [
     `and(sender_id.eq.${user.id},recipient_id.eq.${studentId})`,
     `and(sender_id.eq.${studentId},recipient_id.eq.${user.id})`,
@@ -67,9 +72,26 @@ export default async function StudentConversationPage({
 
   const { data: messages, error } = await supabase
     .from("profile_messages")
-    .select("id, sender_id, recipient_id, message, created_at")
+    .select("id, sender_id, recipient_id, message, created_at, read_at, material_id")
     .or(conversationFilter)
+    .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
     .order("created_at", { ascending: true });
+
+  const materialIds = Array.from(
+    new Set((messages ?? []).map((item) => item.material_id).filter((id): id is string => Boolean(id))), 
+  );
+
+  const { data: referencedMaterials } = materialIds.length
+    ? await supabase
+        .from("materials")
+        .select("id, title")
+        .in("id", materialIds)
+        .eq("status", "approved")
+    : { data: [] };
+
+  const materialTitleById = new Map(
+    (referencedMaterials ?? []).map((material) => [material.id, material.title]),
+  );
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -82,7 +104,14 @@ export default async function StudentConversationPage({
           <main className="flex-1 p-6">
             <div className="mx-auto w-full max-w-4xl space-y-6">
               <section>
-                <p className="text-sm text-muted-foreground">
+                <Link
+                  href="/messages"
+                  className="inline-flex items-center text-sm font-medium text-primary hover:underline"
+                >
+                  ← Back to Conversations
+                </Link>
+
+                <p className="mt-4 text-sm text-muted-foreground">
                   Student Portal
                 </p>
 
@@ -101,42 +130,11 @@ export default async function StudentConversationPage({
                     Conversation could not be loaded: {error.message}
                   </div>
                 ) : messages && messages.length > 0 ? (
-                  <div className="space-y-4">
-                    {messages.map((item) => {
-                      const isMine = item.sender_id === user.id;
-
-                      return (
-                        <div
-                          key={item.id}
-                          className={`flex ${
-                            isMine ? "justify-end" : "justify-start"
-                          }`}
-                        >
-                          <div
-                            className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                              isMine
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted text-foreground"
-                            }`}
-                          >
-                            <p className="whitespace-pre-wrap break-words text-sm">
-                              {item.message}
-                            </p>
-
-                            <p
-                              className={`mt-1 text-xs ${
-                                isMine
-                                  ? "text-primary-foreground/70"
-                                  : "text-muted-foreground"
-                              }`}
-                            >
-                              {new Date(item.created_at).toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <StudentConversationMessages
+                    messages={messages}
+                    currentUserId={user.id}
+                    materialTitleById={materialTitleById}
+                  />
                 ) : (
                   <div className="py-12 text-center">
                     <h2 className="font-semibold text-foreground">
@@ -150,7 +148,19 @@ export default async function StudentConversationPage({
                 )}
               </section>
 
-            <StudentConversationReply recipientId={studentId} />
+            <StudentConversationReply
+  recipientId={studentId}
+  sentMessageCount={messages?.filter((item) => item.sender_id === user.id).length ?? 0}
+              contactProfile={{
+                email: partnerProfile.email,
+                phone: partnerProfile.phone,
+                whatsapp: partnerProfile.whatsapp,
+                facebook: partnerProfile.facebook,
+                instagram: partnerProfile.instagram,
+                linkedin: partnerProfile.linkedin,
+                telegram: partnerProfile.telegram,
+              }}
+/>
             </div>
           </main>
         </div>
@@ -158,6 +168,13 @@ export default async function StudentConversationPage({
     </div>
   );
 }
+
+
+
+
+
+
+
 
 
 

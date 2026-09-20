@@ -1,0 +1,181 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { StudentSidebar } from "@/components/dashboard/student-sidebar";
+import { StudentHeader } from "@/components/dashboard/student-header";
+
+type Conversation = {
+  partner_id: string;
+  latest_message: string;
+  latest_message_created_at: string;
+  unread_count: number;
+};
+
+type PartnerProfile = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+};
+
+export default async function StudentMessagesPage() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: currentProfile, error: currentProfileError } = await supabase
+    .from("profiles")
+    .select("id, full_name, role, is_verified")
+    .eq("id", user.id)
+    .single();
+
+  if (
+    !currentProfile ||
+    currentProfile.role !== "student" ||
+    !currentProfile.is_verified
+  ) {
+    throw new Error(
+      `Messages list route error: Current student profile validation failed. userId=${user.id}; profile=${JSON.stringify(
+        currentProfile
+      )}; queryError=${currentProfileError?.message ?? "none"}`
+    );
+  }
+
+  const {
+    data: conversations,
+    error: conversationsError,
+  } = await supabase.rpc("get_student_conversations");
+
+  if (conversationsError) {
+    throw new Error(
+      `Messages list route error: Conversation query failed. ${conversationsError.message}`
+    );
+  }
+
+  const conversationRows = (conversations ?? []) as unknown as Conversation[];
+
+  const partnerProfiles = await Promise.all(
+    conversationRows.map(async (conversation) => {
+      const { data, error } = await supabase.rpc(
+        "get_public_contact_profile",
+        { p_profile_id: conversation.partner_id }
+      );
+
+      if (error) {
+        throw new Error(
+          `Messages list route error: Partner profile query failed. partnerId=${conversation.partner_id}; error=${error.message}`
+        );
+      }
+
+      return {
+        conversation,
+        profile: (data?.[0] ?? null) as PartnerProfile | null,
+      };
+    })
+  );
+
+  const items = partnerProfiles.filter(
+    (
+      item
+    ): item is {
+      conversation: Conversation;
+      profile: PartnerProfile;
+    } => Boolean(item.profile)
+  );
+
+  return (
+    <div className="min-h-screen bg-muted/30">
+      <div className="flex min-h-screen">
+        <StudentSidebar />
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <StudentHeader />
+
+          <main className="flex-1 p-6">
+            <div className="mx-auto w-full max-w-4xl">
+              <div className="mb-6">
+                <h1 className="text-2xl font-semibold text-foreground">
+                  Conversations
+                </h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Your recent student conversations
+                </p>
+              </div>
+
+              {items.length === 0 ? (
+                <div className="rounded-xl border border-border bg-background p-8 text-center">
+                  <p className="text-sm font-medium text-foreground">
+                    No conversations yet
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Your student conversations will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-border bg-background">
+                  {items.map(({ conversation, profile }) => (
+                    <Link
+                      key={conversation.partner_id}
+                      href={`/messages/${conversation.partner_id}`}
+                      className="flex items-center gap-4 border-b border-border px-5 py-4 transition-colors last:border-b-0 hover:bg-muted/50"
+                    >
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                        {profile.avatar_url ? (
+                          <img
+                            src={profile.avatar_url}
+                            alt={profile.full_name ?? "Student"}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          (profile.full_name?.trim().charAt(0) ?? "S").toUpperCase()
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-foreground">
+                          {profile.full_name ?? "Student"}
+                        </p>
+
+                        <p
+                          className={`mt-1 flex items-center gap-2 truncate text-sm ${
+                            conversation.unread_count > 0
+                              ? "font-semibold text-foreground"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          <span className="truncate">
+                            {conversation.latest_message}
+                          </span>
+                          {conversation.unread_count > 0 ? (
+                            <span
+                              aria-label="Unread messages"
+                              className="inline-block h-2 w-2 shrink-0 rounded-full bg-destructive"
+                            />
+                          ) : null}
+                        </p>
+                      </div>
+
+                      <time
+                        dateTime={conversation.latest_message_created_at}
+                        className="shrink-0 text-xs text-muted-foreground"
+                      >
+                        {new Date(
+                          conversation.latest_message_created_at
+                        ).toLocaleDateString()}
+                      </time>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+  );
+}

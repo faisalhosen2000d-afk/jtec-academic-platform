@@ -1,7 +1,8 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 
 export const profileMessageSchema = z.object({
   recipient_id: z.string().uuid("Invalid recipient."),
+  material_id: z.string().uuid("Invalid material reference.").nullable().optional(),
   message: z
     .string()
     .trim()

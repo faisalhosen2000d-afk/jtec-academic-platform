@@ -226,6 +226,7 @@ function formatFileSize(bytes: number) {
                           <div className="mt-4">
                             <UploaderContactProfile
                               profile={material.uploader}
+                              materialId={material.id}
                             />
                           </div>
                         )}

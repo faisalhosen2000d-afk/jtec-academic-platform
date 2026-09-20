@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUnreadNotifications } from "@/lib/use-unread-notifications";
+import { useUnreadMessages } from "@/lib/use-unread-messages";
 
 const navigationItems = [
   { label: "Dashboard", href: "/dashboard", icon: "⌂" },
@@ -12,6 +13,7 @@ const navigationItems = [
   { label: "Upload", href: "/upload", icon: "↑" },
   { label: "Results", href: "/results", icon: "▥" },
   { label: "Ranking", href: "/ranking", icon: "♜" },
+  { label: "Conversations", href: "/messages", icon: "C" },
   { label: "Notifications", href: "/notifications", icon: "●" },
   { label: "Profile", href: "/profile", icon: "○" },
 ];
@@ -19,6 +21,7 @@ const navigationItems = [
 export function StudentSidebar() {
   const pathname = usePathname();
   const hasUnreadNotifications = useUnreadNotifications(pathname);
+  const hasUnreadMessages = useUnreadMessages(pathname);
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-border bg-background lg:flex lg:min-h-screen lg:flex-col">
@@ -58,6 +61,9 @@ export function StudentSidebar() {
             const isNotifications =
               item.href === "/notifications";
 
+            const isConversations =
+              item.href === "/messages";
+
             return (
               <Link
                 key={item.href}
@@ -85,6 +91,13 @@ export function StudentSidebar() {
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full bg-destructive"
                     aria-label="Unread notifications"
+                  />
+                )}
+
+                {isConversations && hasUnreadMessages && (
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full bg-destructive"
+                    aria-label="Unread messages"
                   />
                 )}
               </Link>

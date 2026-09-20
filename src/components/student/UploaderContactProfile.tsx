@@ -19,6 +19,7 @@ type ContactProfile = {
 
 type UploaderContactProfileProps = {
   profile: ContactProfile;
+  materialId: string;
 };
 
 const contactFields = [
@@ -84,6 +85,7 @@ function getContactDestination(key: ContactKey, value: string) {
 
 export default function UploaderContactProfile({
   profile,
+  materialId,
 }: UploaderContactProfileProps) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -96,6 +98,7 @@ export default function UploaderContactProfile({
 
     const formData = new FormData();
     formData.set("recipient_id", profile.id);
+    formData.set("material_id", materialId);
     formData.set("message", message);
 
     const result = await sendProfileMessage(formData);

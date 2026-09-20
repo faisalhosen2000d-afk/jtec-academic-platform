@@ -1066,25 +1066,38 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          material_id: string | null
           message: string
+          read_at: string | null
           recipient_id: string
           sender_id: string
         }
         Insert: {
           created_at?: string
           id?: string
+          material_id?: string | null
           message: string
+          read_at?: string | null
           recipient_id: string
           sender_id: string
         }
         Update: {
           created_at?: string
           id?: string
+          material_id?: string | null
           message?: string
+          read_at?: string | null
           recipient_id?: string
           sender_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profile_messages_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profile_messages_recipient_id_fkey"
             columns: ["recipient_id"]
@@ -1648,6 +1661,15 @@ export type Database = {
         Returns: string
       }
       current_user_role: { Args: never; Returns: string }
+      get_student_conversations: {
+        Args: Record<string, never>
+        Returns: {
+          partner_id: string
+          latest_message: string
+          latest_message_created_at: string
+          unread_count: number
+        }[]
+      }
       get_public_contact_profile: {
         Args: { p_profile_id: string }
         Returns: {
@@ -2294,3 +2316,4 @@ export const Constants = {
     },
   },
 } as const
+
