@@ -1,12 +1,15 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
 import UploaderContactProfile from "@/components/student/UploaderContactProfile";
+import MaterialsSearch from "@/components/student/MaterialsSearch";
+import MaterialCard from "@/components/student/MaterialCard";
 
 type Material = {
   id: string;
+  subject_id: string;
   uploader_id: string;
   title: string;
   description: string | null;
@@ -45,10 +48,39 @@ export default async function MaterialsPage() {
     redirect("/login");
   }
 
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("department_id, current_level_id, current_term_id")
+    .eq("id", user.id)
+    .single();
+
+  if (
+    profileError ||
+    !profile ||
+    !profile.department_id ||
+    !profile.current_level_id ||
+    !profile.current_term_id
+  ) {
+    redirect("/dashboard");
+  }
+
+  const { data: subjects, error: subjectsError } = await supabase
+    .from("subjects")
+    .select("id, subject_code, subject_name")
+    .eq("department_id", profile.department_id)
+    .eq("level_id", profile.current_level_id)
+    .eq("term_id", profile.current_term_id)
+    .order("subject_code", { ascending: true });
+
+  if (subjectsError) {
+    console.error("[materials][subjects]", subjectsError);
+  }
+
   const { data: materials, error } = await supabase
     .from("materials")
     .select(`
       id,
+      subject_id,
      uploader_id,
       title,
       description,
@@ -123,7 +155,7 @@ function formatFileSize(bytes: number) {
 
           <main className="flex-1 p-6">
             <div className="mx-auto w-full max-w-7xl space-y-6">
-              
+
               {/* Page Header */}
               <section>
                 <p className="text-sm text-muted-foreground">
@@ -139,6 +171,12 @@ function formatFileSize(bytes: number) {
                 </p>
               </section>
 
+              {/* Materials Search */}
+              <MaterialsSearch
+                subjects={subjects ?? []}
+                materials={materialList}
+              />
+
               {/* Materials Count */}
               <section className="rounded-xl border border-border bg-background p-5 shadow-sm">
                 <p className="text-sm text-muted-foreground">
@@ -150,116 +188,6 @@ function formatFileSize(bytes: number) {
                 </p>
               </section>
 
-              {/* Materials */}
-              {materialList.length === 0 ? (
-                <section className="rounded-xl border border-dashed border-border bg-background p-12 text-center">
-                  <div className="mx-auto max-w-md">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted text-xl">
-                    No files
-                    </div>
-
-                    <h2 className="mt-4 text-lg font-semibold text-foreground">
-                      No materials available
-                    </h2>
-
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      There are no approved academic materials available
-                      right now.
-                    </p>
-                  </div>
-                </section>
-              ) : (
-                <section>
-                  <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                    {materialList.map((material) => (
-                      <article
-                        key={material.id}
-                        className="flex h-full flex-col rounded-xl border border-border bg-background p-5 shadow-sm transition-shadow hover:shadow-md"
-                      >
-                        {/* File Type */}
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-bold uppercase text-foreground">
-                            {material.file_type
-                              .replace("application/", "")
-                              .replace("text/", "")
-                              .slice(0, 4)}
-                          </div>
-
-                          <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                            Approved
-                          </span>
-                        </div>
-
-                        {/* Title */}
-                        <h2 className="mt-4 line-clamp-2 text-lg font-semibold text-foreground">
-                          {material.title}
-                        </h2>
-
-                        {/* Subject */}
-                        {material.subject && (
-                          <div className="mt-2">
-                            <p className="text-xs font-medium text-muted-foreground">
-                              Subject
-                            </p>
-
-                            <p className="text-sm font-medium text-foreground">
-                              {material.subject.subject_code} - {material.subject.subject_name}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Topic */}
-                        {material.topic && (
-                          <p className="mt-2 line-clamp-1 text-sm text-muted-foreground">
-                            Topic: {material.topic}
-                          </p>
-                        )}
-
-                        {/* Description */}
-                        {material.description && (
-                          <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted-foreground">
-                            {material.description}
-                          </p>
-                        )}
-                        {/* Uploader */}
-                        {material.uploader && (
-                          <div className="mt-4">
-                            <UploaderContactProfile
-                              profile={material.uploader}
-                              materialId={material.id}
-                            />
-                          </div>
-                        )}
-
-                        {/* Stats */}
-                        <div className="mt-auto pt-5">
-                          <div className="flex items-center gap-4 border-t border-border pt-4 text-xs text-muted-foreground">
-                            <span>
-                              Views: {material.views_count}
-                            </span>
-
-                            <span>
-                              Downloads: {material.downloads_count}
-                            </span>
-
-                            <span>
-                              {formatFileSize(material.file_size_bytes)}
-                            </span>
-                          </div>
-
-                          {/* Details Button */}
-                          <Link
-                            href={`/materials/${material.id}`}
-                            className="mt-4 flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-                          >
-                            View Material
-                          </Link>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              )}
             </div>
           </main>
         </div>
