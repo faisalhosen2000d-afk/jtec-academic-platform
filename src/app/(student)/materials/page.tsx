@@ -34,6 +34,8 @@ type Material = {
   subject: {
     subject_code: string;
     subject_name: string;
+    level_id: string;
+    term_id: string;
   } | null;
 };
 
@@ -64,9 +66,9 @@ export default async function MaterialsPage() {
     redirect("/dashboard");
   }
 
-  const { data: subjects, error: subjectsError } = await supabase
+  const { data: currentTermSubjects, error: subjectsError } = await supabase
     .from("subjects")
-    .select("id, subject_code, subject_name")
+    .select("id, subject_code, subject_name, level_id, term_id")
     .eq("department_id", profile.department_id)
     .eq("level_id", profile.current_level_id)
     .eq("term_id", profile.current_term_id)
@@ -74,6 +76,79 @@ export default async function MaterialsPage() {
 
   if (subjectsError) {
     console.error("[materials][subjects]", subjectsError);
+  }
+
+  const { data: academicTerms, error: academicTermsError } = await supabase
+    .from("terms")
+    .select(`
+      id,
+      level_id,
+      sort_order,
+      level:levels (
+        sort_order
+      )
+    `)
+    .order("sort_order", { ascending: true });
+
+  if (academicTermsError) {
+    console.error("[materials][academic-terms]", academicTermsError);
+  }
+
+  const currentLevelOrder = (
+    Array.isArray(academicTerms)
+      ? academicTerms.find((term) => term.id === profile.current_term_id)?.level
+      : null
+  );
+
+  const currentLevelSortOrder = Array.isArray(currentLevelOrder)
+    ? currentLevelOrder[0]?.sort_order
+    : currentLevelOrder?.sort_order;
+
+  const allowedTermIds = new Set(
+    (academicTerms ?? [])
+      .filter((term) => {
+        const levelSortOrder = Array.isArray(term.level)
+          ? term.level[0]?.sort_order
+          : term.level?.sort_order;
+
+        if (levelSortOrder == null || currentLevelSortOrder == null) {
+          return false;
+        }
+
+        return (
+          levelSortOrder < currentLevelSortOrder ||
+          (
+            levelSortOrder === currentLevelSortOrder &&
+            term.sort_order <= (
+              (academicTerms ?? []).find(
+                (currentTerm) => currentTerm.id === profile.current_term_id,
+              )?.sort_order ?? 0
+            )
+          )
+        );
+      })
+      .map((term) => term.id),
+  );
+
+  const { data: curriculumSubjects, error: curriculumSubjectsError } =
+    await supabase
+      .from("subjects")
+      .select(`
+        id,
+        subject_code,
+        subject_name,
+        level_id,
+        term_id
+      `)
+      .eq("department_id", profile.department_id)
+      .in("term_id", Array.from(allowedTermIds))
+      .order("subject_code", { ascending: true });
+
+  if (curriculumSubjectsError) {
+    console.error(
+      "[materials][curriculum-subjects]",
+      curriculumSubjectsError,
+    );
   }
 
   const { data: materials, error } = await supabase
@@ -92,7 +167,9 @@ export default async function MaterialsPage() {
       created_at,
       subject:subjects (
         subject_code,
-        subject_name
+        subject_name,
+        level_id,
+        term_id
       )
     `)
     .eq("status", "approved")
@@ -111,8 +188,28 @@ export default async function MaterialsPage() {
   );
 }
 
+  const curriculumKeys = new Set(
+    (curriculumSubjects ?? []).map(
+      (subject) =>
+        `${subject.subject_code}::${subject.level_id}::${subject.term_id}`,
+    ),
+  );
+
+  const visibleMaterials = (materials ?? []).filter((material) => {
+    const subject = Array.isArray(material.subject)
+      ? material.subject[0] ?? null
+      : material.subject;
+
+    return (
+      subject != null &&
+      curriculumKeys.has(
+        `${subject.subject_code}::${subject.level_id}::${subject.term_id}`,
+      )
+    );
+  });
+
   const materialList: Material[] = await Promise.all(
-  (materials ?? []).map(async (material) => {
+  visibleMaterials.map(async (material) => {
     const { data: uploaderData } = await supabase.rpc(
       "get_public_contact_profile",
       { p_profile_id: material.uploader_id },
@@ -173,7 +270,7 @@ function formatFileSize(bytes: number) {
 
               {/* Materials Search */}
               <MaterialsSearch
-                subjects={subjects ?? []}
+                subjects={currentTermSubjects ?? []}
                 materials={materialList}
               />
 

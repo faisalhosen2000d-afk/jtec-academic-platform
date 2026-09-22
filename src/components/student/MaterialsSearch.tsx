@@ -30,6 +30,8 @@ type MaterialSearchItem = {
   subject: {
     subject_code: string;
     subject_name: string;
+    level_id: string;
+    term_id: string;
   } | null;
 };
 
@@ -37,6 +39,8 @@ type MaterialSearchSubject = {
   id: string;
   subject_code: string;
   subject_name: string;
+  level_id: string;
+  term_id: string;
 };
 
 type MaterialsSearchProps = {
@@ -60,18 +64,24 @@ export default function MaterialsSearch({
       ? normalizedQuery.split(" ").filter(Boolean)
       : [];
 
-    const currentTermSubjectIds = new Set(subjects.map((subject) => subject.id));
-
-    const currentTermMaterials = materials.filter((material) =>
-      currentTermSubjectIds.has(material.subject_id),
+    const selectedSubject = subjects.find(
+      (subject) => subject.id === selectedSubjectId,
     );
 
     const subjectFiltered =
-      selectedSubjectId === "all"
-        ? currentTermMaterials
-        : currentTermMaterials.filter(
-            (material) => material.subject_id === selectedSubjectId,
-          );
+      selectedSubjectId === "all" || !selectedSubject
+        ? materials
+        : materials.filter((material) => {
+            const materialSubject = material.subject;
+
+            return (
+              materialSubject != null &&
+              materialSubject.subject_code === selectedSubject.subject_code &&
+              materialSubject.level_id === selectedSubject.level_id &&
+              materialSubject.term_id === selectedSubject.term_id
+            );
+          });
+
 
     if (!normalizedQuery) {
       return subjectFiltered;
