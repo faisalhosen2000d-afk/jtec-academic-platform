@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
@@ -191,7 +191,7 @@ export default async function MaterialsPage() {
   const curriculumKeys = new Set(
     (curriculumSubjects ?? []).map(
       (subject) =>
-        `${subject.subject_code}::${subject.level_id}::${subject.term_id}`,
+        `${subject.subject_code}::${subject.level_id}`,
     ),
   );
 
@@ -203,7 +203,7 @@ export default async function MaterialsPage() {
     return (
       subject != null &&
       curriculumKeys.has(
-        `${subject.subject_code}::${subject.level_id}::${subject.term_id}`,
+        `${subject.subject_code}::${subject.level_id}`,
       )
     );
   });

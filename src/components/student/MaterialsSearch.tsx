@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import MaterialCard from "@/components/student/MaterialCard";
@@ -77,8 +77,7 @@ export default function MaterialsSearch({
             return (
               materialSubject != null &&
               materialSubject.subject_code === selectedSubject.subject_code &&
-              materialSubject.level_id === selectedSubject.level_id &&
-              materialSubject.term_id === selectedSubject.term_id
+              materialSubject.level_id === selectedSubject.level_id
             );
           });
 
