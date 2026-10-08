@@ -40,6 +40,13 @@ const sections = [
     action: "Manage Users",
   },
   {
+    title: "Approved Materials",
+    description:
+      "Review approved academic materials and manage Super Admin deletion controls.",
+    href: "/super-admin/approved-materials",
+    action: "Manage Approved Materials",
+  },
+  {
     title: "Audit Logs",
     description:
       "Review important administrative and system activities.",

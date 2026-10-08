@@ -1,0 +1,1 @@
+grant delete on table public.materials to service_role;
