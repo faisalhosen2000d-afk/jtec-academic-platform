@@ -5,6 +5,7 @@ import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
 import MaterialFileActions from "./MaterialFileActions";
 import MaterialBookmarkButton from "./MaterialBookmarkButton";
+import MaterialRating from "@/components/materials/MaterialRating";
 
 type Material = {
   id: string;
@@ -116,6 +117,36 @@ export default async function MaterialDetailsPage({
 
   const isBookmarked = Boolean(existingBookmark);
 
+  const { data: ratingStats, error: ratingStatsError } = await supabase.rpc(
+    "get_material_rating_stats",
+    {
+      p_material_id: materialData.id,
+    },
+  );
+
+  if (ratingStatsError) {
+    console.error("Material rating stats loading error:", ratingStatsError);
+  }
+
+  const { data: existingRating, error: ratingError } = await supabase
+    .from("material_ratings")
+    .select("stars")
+    .eq("material_id", materialData.id)
+    .eq("student_id", user.id)
+    .maybeSingle();
+
+  if (ratingError) {
+    console.error("Material rating loading error:", ratingError);
+  }
+
+  const ratingStatsData = Array.isArray(ratingStats)
+    ? ratingStats[0]
+    : ratingStats;
+
+  const averageRating = Number(ratingStatsData?.average_rating ?? 0);
+  const ratingCount = Number(ratingStatsData?.rating_count ?? 0);
+  const initialRating = existingRating?.stars ?? null;
+
   return (
     <div className="min-h-screen bg-muted/30">
       <div className="flex min-h-screen">
@@ -133,7 +164,7 @@ export default async function MaterialDetailsPage({
                   href="/materials"
                   className="text-sm text-muted-foreground hover:text-foreground"
                 >
-                  ← Back to Materials
+                  {String.fromCharCode(8592)} Back to Materials
                 </Link>
 
                 <p className="mt-5 text-sm text-muted-foreground">
@@ -281,6 +312,14 @@ export default async function MaterialDetailsPage({
                       </div>
                     </div>
                   </div>
+
+                  {/* Rating */}
+                  <MaterialRating
+                    materialId={materialData.id}
+                    initialRating={initialRating}
+                    averageRating={averageRating}
+                    ratingCount={ratingCount}
+                  />
 
                   {/* File Actions */}
                   <div className="border-t border-border pt-5">

@@ -1661,6 +1661,13 @@ export type Database = {
         Returns: string
       }
       current_user_role: { Args: never; Returns: string }
+      get_material_rating_stats: {
+        Args: { p_material_id: string }
+        Returns: {
+          average_rating: number
+          rating_count: number
+        }[]
+      }
       get_student_conversations: {
         Args: Record<string, never>
         Returns: {
