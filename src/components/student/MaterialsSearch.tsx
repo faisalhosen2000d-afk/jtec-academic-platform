@@ -46,11 +46,13 @@ type MaterialSearchSubject = {
 type MaterialsSearchProps = {
   subjects: MaterialSearchSubject[];
   materials: MaterialSearchItem[];
+  bookmarkedMaterialIds: string[];
 };
 
 export default function MaterialsSearch({
   subjects,
   materials,
+  bookmarkedMaterialIds,
 }: MaterialsSearchProps) {
   const [selectedSubjectId, setSelectedSubjectId] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -203,6 +205,7 @@ export default function MaterialsSearch({
               key={material.id}
               material={material}
               searchQuery={searchQuery}
+              initialBookmarked={bookmarkedMaterialIds.includes(material.id)}
             />
           ))}
         </div>

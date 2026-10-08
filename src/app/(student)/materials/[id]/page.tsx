@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
 import MaterialFileActions from "./MaterialFileActions";
+import MaterialBookmarkButton from "./MaterialBookmarkButton";
 
 type Material = {
   id: string;
@@ -102,6 +103,19 @@ export default async function MaterialDetailsPage({
       : material.subject,
   };
 
+  const { data: existingBookmark, error: bookmarkError } = await supabase
+    .from("material_bookmarks")
+    .select("id")
+    .eq("material_id", materialData.id)
+    .eq("student_id", user.id)
+    .maybeSingle();
+
+  if (bookmarkError) {
+    console.error("Material bookmark status loading error:", bookmarkError);
+  }
+
+  const isBookmarked = Boolean(existingBookmark);
+
   return (
     <div className="min-h-screen bg-muted/30">
       <div className="flex min-h-screen">
@@ -166,7 +180,7 @@ export default async function MaterialDetailsPage({
                       </p>
 
                       <p className="mt-1 text-sm font-medium text-foreground">
-                        {materialData.subject.subject_code} —{" "}
+                        {materialData.subject.subject_code} -{" "}
                         {materialData.subject.subject_name}
                       </p>
                     </div>
@@ -270,6 +284,13 @@ export default async function MaterialDetailsPage({
 
                   {/* File Actions */}
                   <div className="border-t border-border pt-5">
+                    <div className="mb-4 flex justify-end">
+                    <MaterialBookmarkButton
+                      materialId={materialData.id}
+                      initialBookmarked={isBookmarked}
+                    />
+                    </div>
+
                     <MaterialFileActions
                       materialId={materialData.id}
                       fileType={materialData.file_type}

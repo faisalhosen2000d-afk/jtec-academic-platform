@@ -1,5 +1,6 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import UploaderContactProfile from "@/components/student/UploaderContactProfile";
+import MaterialBookmarkButton from "@/app/(student)/materials/[id]/MaterialBookmarkButton";
 
 type MaterialCardData = {
   id: string;
@@ -33,6 +34,7 @@ type MaterialCardData = {
 type MaterialCardProps = {
   material: MaterialCardData;
   searchQuery?: string;
+  initialBookmarked: boolean;
 };
 
 function formatFileSize(bytes: number) {
@@ -101,6 +103,7 @@ function HighlightText({
 export default function MaterialCard({
   material,
   searchQuery,
+  initialBookmarked,
 }: MaterialCardProps) {
   return (
     <article className="flex h-full flex-col rounded-xl border border-border bg-background p-5 shadow-sm transition-shadow hover:shadow-md">
@@ -163,12 +166,19 @@ export default function MaterialCard({
           <span>Size: {formatFileSize(material.file_size_bytes)}</span>
         </div>
 
-        <Link
-          href={`/materials/${material.id}`}
-          className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90"
-        >
-          View Material
-        </Link>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Link
+            href={`/materials/${material.id}`}
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+          >
+            View Material
+          </Link>
+
+          <MaterialBookmarkButton
+            materialId={material.id}
+            initialBookmarked={initialBookmarked}
+          />
+        </div>
       </div>
     </article>
   );

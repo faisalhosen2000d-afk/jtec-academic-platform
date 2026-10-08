@@ -208,6 +208,19 @@ export default async function MaterialsPage() {
     );
   });
 
+  const { data: bookmarkedMaterials, error: bookmarkedMaterialsError } =
+    await supabase
+      .from("material_bookmarks")
+      .select("material_id")
+      .eq("student_id", user.id);
+
+  if (bookmarkedMaterialsError) {
+    console.error("[materials][bookmarks]", bookmarkedMaterialsError);
+  }
+
+  const bookmarkedMaterialIds = new Set(
+    (bookmarkedMaterials ?? []).map((bookmark) => bookmark.material_id),
+  );
   const materialList: Material[] = await Promise.all(
   visibleMaterials.map(async (material) => {
     const { data: uploaderData } = await supabase.rpc(
@@ -272,6 +285,7 @@ function formatFileSize(bytes: number) {
               <MaterialsSearch
                 subjects={currentTermSubjects ?? []}
                 materials={materialList}
+                bookmarkedMaterialIds={Array.from(bookmarkedMaterialIds)}
               />
 
               {/* Materials Count */}
