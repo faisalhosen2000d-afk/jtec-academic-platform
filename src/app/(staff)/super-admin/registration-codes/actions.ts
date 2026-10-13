@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -225,6 +225,9 @@ export async function createRegistrationCode(
 
   if (error) {
     if (error.code === "23505") {
+      if (error.message.includes("registration_codes_student_id_key")) {
+        throw new Error("A registration code already exists for this Student ID.");
+      }
       throw new Error("This registration code already exists.");
     }
 
@@ -335,6 +338,9 @@ export async function updateRegistrationCode(
 
   if (error) {
     if (error.code === "23505") {
+      if (error.message.includes("registration_codes_student_id_key")) {
+        throw new Error("A registration code already exists for this Student ID.");
+      }
       throw new Error("This registration code already exists.");
     }
 

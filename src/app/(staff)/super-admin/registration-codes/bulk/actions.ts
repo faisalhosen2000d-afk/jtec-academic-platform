@@ -366,6 +366,12 @@ export async function bulkCreateRegistrationCodes(
     .insert(registrationCodes);
 
   if (insertError) {
+    if (insertError.code === "23505") {
+      if (insertError.message.includes("registration_codes_student_id_key")) {
+        throw new Error("A registration code already exists for one of these Student IDs.");
+      }
+      throw new Error("A registration code already exists. Please retry the bulk operation.");
+    }
     throw new Error(insertError.message);
   }
 

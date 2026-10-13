@@ -12,6 +12,13 @@ const sections = [
     action: "Manage Academic Structure",
   },
   {
+    title: "Academic Progression",
+    description:
+      "Review student batches, preview academic assignments, and prepare progression.",
+    href: "/super-admin/academic-progression",
+    action: "Manage Academic Progression",
+  },
+  {
     title: "Registration Codes",
     description:
       "Create and manage student registration codes with academic assignments.",
