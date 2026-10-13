@@ -100,6 +100,7 @@ export default function AcademicProgressionPanel({
   const [targetTermId, setTargetTermId] = useState("");
   const [reason, setReason] = useState("");
   const [reviewed, setReviewed] = useState(false);
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
 
 
 
@@ -144,14 +145,14 @@ export default function AcademicProgressionPanel({
     };
   }, []);
 
-  async function handleApply() {
+  function handleApply() {
     if (!canReview || !reviewed || applying) return;
+    setConfirmModalOpen(true);
+  }
 
-    const confirmed = window.confirm(
-      `Apply this academic progression to ${cohort.length} students? This action updates student assignments and records an audit history.`
-    );
-    if (!confirmed) return;
-
+  async function confirmApply() {
+    if (!canReview || !reviewed || applying) return;
+    setConfirmModalOpen(false);
     setApplying(true);
     setStatusMessage("");
     setStatusError(false);
@@ -389,6 +390,98 @@ export default function AcademicProgressionPanel({
         </div>
       </section>
 
+      <style jsx global>{`
+        @keyframes academicModalEnter {
+          from { opacity: 0; transform: translateY(10px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
+      {confirmModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/35 p-4 backdrop-blur-[2px]"
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm academic progression"
+            className="my-auto w-full max-w-md rounded-[22px] border border-slate-200 bg-white p-5 text-slate-900 shadow-2xl sm:p-6"
+            style={{ animation: "academicModalEnter 220ms ease-out" }}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="flex size-16 items-center justify-center rounded-full bg-slate-50">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-8" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m2 9 10-5 10 5-10 5L2 9Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 11v5c3.5 3 8.5 3 12 0v-5M22 9v6" />
+                </svg>
+              </div>
+              <h2 className="mt-3 text-center text-xl font-semibold tracking-tight">
+                Confirm Academic Progression
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Please review the change before applying.
+              </p>
+            </div>
+
+            <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-slate-600">Selected students</span>
+                <span className="text-sm font-semibold">
+                  {cohort.length} {cohort.length === 1 ? "student" : "students"}
+                </span>
+              </div>
+
+              <div className="my-4 border-t border-slate-200" />
+
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Current</p>
+                  <p className="mt-2 text-sm font-semibold sm:text-base">
+                    {levels.find((l) => l.id === currentLevelId)?.name}
+                    {" / "}
+                    {terms.find((t) => t.id === currentTermId)?.name}
+                  </p>
+                </div>
+
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-5 shrink-0" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14m-6-6 6 6-6 6" />
+                </svg>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Proposed</p>
+                  <p className="mt-2 text-sm font-semibold sm:text-base">
+                    {levels.find((l) => l.id === targetLevelId)?.name}
+                    {" / "}
+                    {terms.find((t) => t.id === targetTermId)?.name}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <p className="mt-4 text-sm leading-6 text-slate-600">
+              This action updates student assignments and records an audit history.
+            </p>
+
+            <button
+              type="button"
+              disabled={applying || !canReview || !reviewed}
+              onClick={() => void confirmApply()}
+              className="mt-4 flex w-full items-center justify-center rounded-xl bg-blue-700 px-4 py-4 text-base font-semibold text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {applying ? "Applying..." : "Confirm Progression"}
+            </button>
+
+            <button
+              type="button"
+              disabled={applying}
+              onClick={() => setConfirmModalOpen(false)}
+              className="mt-2.5 flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-4 text-base font-semibold text-slate-900 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
   <div className="flex flex-wrap items-start justify-between gap-3">
     <div>
