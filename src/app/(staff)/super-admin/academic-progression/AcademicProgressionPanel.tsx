@@ -509,39 +509,103 @@ export default function AcademicProgressionPanel({
   )}
 
   <div className="mt-5 space-y-3">
-    {history.map((item) => (
-      <article key={item.id} className="rounded-lg border border-border p-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <p className="text-sm font-semibold">{item.reason}</p>
-          <time className="text-xs text-muted-foreground">
-            {new Date(item.created_at).toLocaleString()}
-          </time>
-        </div>
-        <p className="mt-2 break-all text-xs text-muted-foreground">
-          Student profile: {item.student_profile_id}
-        </p>
-        <p className="mt-1 break-all text-xs text-muted-foreground">
-          Operation: {item.operation_id}
-        </p>
-        <details className="mt-3 text-sm">
-          <summary className="cursor-pointer font-medium">View assignment change</summary>
-          <div className="mt-2 grid gap-3 sm:grid-cols-2">
+    {history.map((item) => {
+      const student = students.find(
+        (entry) => entry.id === item.student_profile_id
+      );
+
+      const previousLevelId = item.previous_state.current_level_id;
+      const previousTermId = item.previous_state.current_term_id;
+      const newLevelId = item.new_state.current_level_id;
+      const newTermId = item.new_state.current_term_id;
+      const batchId = item.previous_state.batch_id;
+
+      const previousLevel = levels.find(
+        (entry) => entry.id === previousLevelId
+      );
+      const previousTerm = terms.find(
+        (entry) => entry.id === previousTermId
+      );
+      const newLevel = levels.find((entry) => entry.id === newLevelId);
+      const newTerm = terms.find((entry) => entry.id === newTermId);
+      const batch = batches.find((entry) => entry.id === batchId);
+
+      return (
+        <article key={item.id} className="rounded-lg border border-border p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <p className="text-xs font-semibold text-muted-foreground">Previous state</p>
-              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words text-xs">
-                {JSON.stringify(item.previous_state, null, 2)}
-              </pre>
+              <p className="text-sm font-semibold">
+                {student?.full_name || "Unknown student"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Student ID: {student?.student_id || "Not available"}
+              </p>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground">New state</p>
-              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words text-xs">
-                {JSON.stringify(item.new_state, null, 2)}
-              </pre>
+            <time className="text-xs text-muted-foreground">
+              {new Date(item.created_at).toLocaleString()}
+            </time>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg bg-muted/40 p-3">
+              <p className="text-xs font-medium text-muted-foreground">Batch</p>
+              <p className="mt-1 text-sm font-semibold">
+                {batch?.name || "Not available"}
+              </p>
+            </div>
+            <div className="rounded-lg bg-muted/40 p-3">
+              <p className="text-xs font-medium text-muted-foreground">Reason</p>
+              <p className="mt-1 text-sm">{item.reason}</p>
             </div>
           </div>
-        </details>
-      </article>
-    ))}
+
+          <div className="mt-3 rounded-lg border border-border p-3">
+            <p className="text-xs font-semibold text-muted-foreground">
+              Assignment change
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <span className="rounded-md bg-muted px-2 py-1">
+                {previousLevel?.name || "Unknown level"} · {previousTerm?.name || "Unknown term"}
+              </span>
+              <span aria-label="changed to" className="text-muted-foreground">→</span>
+              <span className="rounded-md bg-muted px-2 py-1 font-semibold">
+                {newLevel?.name || "Unknown level"} · {newTerm?.name || "Unknown term"}
+              </span>
+            </div>
+          </div>
+
+          <details className="mt-3 text-sm">
+            <summary className="cursor-pointer font-medium">
+              Technical details
+            </summary>
+            <div className="mt-2 space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground">Operation ID</p>
+                <p className="mt-1 break-all font-mono text-xs">{item.operation_id}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground">Student profile ID</p>
+                <p className="mt-1 break-all font-mono text-xs">{item.student_profile_id}</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">Previous state (JSON)</p>
+                  <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words text-xs">
+                    {JSON.stringify(item.previous_state, null, 2)}
+                  </pre>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">New state (JSON)</p>
+                  <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words text-xs">
+                    {JSON.stringify(item.new_state, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </details>
+        </article>
+      );
+    })}
   </div>
 </section>
     </div>
