@@ -4,7 +4,10 @@ import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
 import NoticeList from "@/components/dashboard/NoticeList";
-import { getStudentBookmarksCount, getStudentVisibleMaterialsCount } from "@/server/services/student-materials";
+import {
+  getStudentBookmarksCount,
+  getStudentVisibleMaterialsCount,
+} from "@/server/services/student-materials";
 
 export default async function StudentDashboardPage() {
   const supabase = await createClient();
@@ -17,9 +20,12 @@ export default async function StudentDashboardPage() {
     redirect("/login");
   }
 
-  // These reads do not depend on one another, so start them together rather
-  // than making the dashboard wait for each network round trip in sequence.
-  const [profileResult, noticesResult, noticeCategoriesResult] = await Promise.all([
+  const [
+    profileResult,
+    noticesResult,
+    noticeCategoriesResult,
+    bookmarksCount,
+  ] = await Promise.all([
     supabase
       .from("profiles")
       .select(`
@@ -45,43 +51,58 @@ export default async function StudentDashboardPage() {
       .from("notice_categories")
       .select("id, name")
       .order("name", { ascending: true }),
+    getStudentBookmarksCount(supabase, user.id),
   ]);
 
   const { data: profile } = profileResult;
   const { data: notices, error: noticesError } = noticesResult;
   const { data: noticeCategories } = noticeCategoriesResult;
 
-  const [departmentResult, batchResult, levelResult, termResult] =
-    await Promise.all([
-      profile?.department_id
-        ? supabase
-            .from("departments")
-            .select("name")
-            .eq("id", profile.department_id)
-            .single()
-        : Promise.resolve({ data: null, error: null }),
-      profile?.batch_id
-        ? supabase
-            .from("batches")
-            .select("name")
-            .eq("id", profile.batch_id)
-            .single()
-        : Promise.resolve({ data: null }),
-      profile?.current_level_id
-        ? supabase
-            .from("levels")
-            .select("name")
-            .eq("id", profile.current_level_id)
-            .single()
-        : Promise.resolve({ data: null }),
-      profile?.current_term_id
-        ? supabase
-            .from("terms")
-            .select("name")
-            .eq("id", profile.current_term_id)
-            .single()
-        : Promise.resolve({ data: null }),
-    ]);
+  const [
+    departmentResult,
+    batchResult,
+    levelResult,
+    termResult,
+    materialsCount,
+  ] = await Promise.all([
+    profile?.department_id
+      ? supabase
+          .from("departments")
+          .select("name")
+          .eq("id", profile.department_id)
+          .single()
+      : Promise.resolve({ data: null, error: null }),
+    profile?.batch_id
+      ? supabase
+          .from("batches")
+          .select("name")
+          .eq("id", profile.batch_id)
+          .single()
+      : Promise.resolve({ data: null }),
+    profile?.current_level_id
+      ? supabase
+          .from("levels")
+          .select("name")
+          .eq("id", profile.current_level_id)
+          .single()
+      : Promise.resolve({ data: null }),
+    profile?.current_term_id
+      ? supabase
+          .from("terms")
+          .select("name")
+          .eq("id", profile.current_term_id)
+          .single()
+      : Promise.resolve({ data: null }),
+    profile?.department_id &&
+    profile?.current_level_id &&
+    profile?.current_term_id
+      ? getStudentVisibleMaterialsCount(supabase, {
+          department_id: profile.department_id,
+          current_level_id: profile.current_level_id,
+          current_term_id: profile.current_term_id,
+        })
+      : Promise.resolve(0),
+  ]);
 
   const { data: department } = departmentResult;
   const { data: batch } = batchResult;
@@ -100,19 +121,6 @@ export default async function StudentDashboardPage() {
     "Student";
 
   const studentEmail = profile?.email || user.email || "-";
-
-  const bookmarksCount = await getStudentBookmarksCount(supabase, user.id);
-
-  const materialsCount =
-    profile?.department_id &&
-    profile?.current_level_id &&
-    profile?.current_term_id
-      ? await getStudentVisibleMaterialsCount(supabase, {
-          department_id: profile.department_id,
-          current_level_id: profile.current_level_id,
-          current_term_id: profile.current_term_id,
-        })
-      : 0;
 
   const departmentName = department?.name || "Not assigned";
   const batchName = batch?.name || "Not assigned";
@@ -347,7 +355,8 @@ export default async function StudentDashboardPage() {
                       </p>
                     </div>
                   )}
-                </div>              </section>
+                </div>
+              </section>
 
               {/* Quick Access */}
               <section className="grid gap-6 lg:grid-cols-3">

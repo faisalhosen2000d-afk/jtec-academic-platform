@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { TopProgressBar } from "@/components/ui/TopProgressBar";
 
 export const metadata: Metadata = {
   title: {
@@ -7,7 +8,7 @@ export const metadata: Metadata = {
     template: "%s | JTEC Academic Platform",
   },
   description:
-    "The academic platform for Jhenaidah Textile Engineering College — materials, notices, results, and rankings in one place.",
+    "The academic platform for Jhenaidah Textile Engineering College \u2014 materials, notices, results, and rankings in one place.",
 };
 
 export const viewport: Viewport = {
@@ -24,7 +25,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>{children}</body>
+      <body>
+        <TopProgressBar />
+        {children}
+      </body>
     </html>
   );
 }

@@ -19,12 +19,20 @@ const pageTitles: Record<string, string> = {
   "/profile": "Profile",
 };
 
+let cachedStudentAvatarUrl: string | null | undefined = undefined;
+
 export function StudentHeader() {
   const pathname = usePathname();
   const hasUnreadNotifications = useUnreadNotifications(pathname);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(
+    cachedStudentAvatarUrl ?? null,
+  );
 
   useEffect(() => {
+    if (cachedStudentAvatarUrl !== undefined && pathname !== "/profile") {
+      return;
+    }
+
     let isMounted = true;
 
     const loadProfilePhoto = async () => {
@@ -49,8 +57,11 @@ export function StudentHeader() {
         return;
       }
 
+      const nextAvatar = data?.avatar_url ?? null;
+      cachedStudentAvatarUrl = nextAvatar;
+
       if (isMounted) {
-        setAvatarUrl(data?.avatar_url ?? null);
+        setAvatarUrl(nextAvatar);
       }
     };
 
@@ -62,6 +73,7 @@ export function StudentHeader() {
   }, [pathname]);
 
   const handleSignOut = async () => {
+    cachedStudentAvatarUrl = undefined;
     await signOut();
     window.location.href = "/";
   };

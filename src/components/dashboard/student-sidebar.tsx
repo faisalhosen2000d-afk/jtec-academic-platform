@@ -1,27 +1,35 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUnreadNotifications } from "@/lib/use-unread-notifications";
 import { useUnreadMessages } from "@/lib/use-unread-messages";
 
 const navigationItems = [
-  { label: "Dashboard", href: "/dashboard", icon: "⌂" },
-  { label: "Materials", href: "/materials", icon: "▣" },
-  { label: "Folders", href: "/folders", icon: "▤" },
-  { label: "Bookmarks", href: "/bookmarks", icon: "★" },
-  { label: "Upload", href: "/upload", icon: "↑" },
-  { label: "Results", href: "/results", icon: "▥" },
-  { label: "Ranking", href: "/ranking", icon: "♜" },
+  { label: "Dashboard", href: "/dashboard", icon: "\u2302" },
+  { label: "Materials", href: "/materials", icon: "\u25A3" },
+  { label: "Folders", href: "/folders", icon: "\u25A4" },
+  { label: "Bookmarks", href: "/bookmarks", icon: "\u2605" },
+  { label: "Upload", href: "/upload", icon: "\u2191" },
+  { label: "Results", href: "/results", icon: "\u25A5" },
+  { label: "Ranking", href: "/ranking", icon: "\u265B" },
   { label: "Conversations", href: "/messages", icon: "C" },
-  { label: "Notifications", href: "/notifications", icon: "●" },
-  { label: "Profile", href: "/profile", icon: "○" },
+  { label: "Notifications", href: "/notifications", icon: "\u25CC" },
+  { label: "Profile", href: "/profile", icon: "\u25CB" },
 ];
 
 export function StudentSidebar() {
   const pathname = usePathname();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
   const hasUnreadNotifications = useUnreadNotifications(pathname);
   const hasUnreadMessages = useUnreadMessages(pathname);
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+
+  const activePath = pendingHref ?? pathname;
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-border bg-background lg:flex lg:min-h-screen lg:flex-col">
@@ -54,20 +62,23 @@ export function StudentSidebar() {
         <div className="space-y-1">
           {navigationItems.map((item) => {
             const isActive =
-              pathname === item.href ||
+              activePath === item.href ||
               (item.href !== "/dashboard" &&
-                pathname.startsWith(`${item.href}/`));
+                activePath.startsWith(`${item.href}/`));
 
-            const isNotifications =
-              item.href === "/notifications";
-
-            const isConversations =
-              item.href === "/messages";
+            const isPending = pendingHref === item.href;
+            const isNotifications = item.href === "/notifications";
+            const isConversations = item.href === "/messages";
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => {
+                  if (pathname !== item.href) {
+                    setPendingHref(item.href);
+                  }
+                }}
                 className={[
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
@@ -87,14 +98,21 @@ export function StudentSidebar() {
 
                 <span className="flex-1">{item.label}</span>
 
-                {isNotifications && hasUnreadNotifications && (
+                {isPending && (
+                  <span
+                    className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent"
+                    aria-label="Loading page"
+                  />
+                )}
+
+                {!isPending && isNotifications && hasUnreadNotifications && (
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full bg-destructive"
                     aria-label="Unread notifications"
                   />
                 )}
 
-                {isConversations && hasUnreadMessages && (
+                {!isPending && isConversations && hasUnreadMessages && (
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full bg-destructive"
                     aria-label="Unread messages"

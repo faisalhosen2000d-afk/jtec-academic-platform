@@ -1,12 +1,9 @@
-﻿import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAcademicTermNavigation } from "@/lib/academic-terms";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
-import UploaderContactProfile from "@/components/student/UploaderContactProfile";
 import MaterialsSearch from "@/components/student/MaterialsSearch";
-import MaterialCard from "@/components/student/MaterialCard";
 
 type Material = {
   id: string;
@@ -52,11 +49,52 @@ export default async function MaterialsPage() {
     redirect("/login");
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("department_id, current_level_id, current_term_id")
-    .eq("id", user.id)
-    .single();
+  const [
+    { data: profile, error: profileError },
+    levelsResult,
+    termsResult,
+    { data: materials, error },
+    { data: bookmarkedMaterials, error: bookmarkedMaterialsError },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("department_id, current_level_id, current_term_id")
+      .eq("id", user.id)
+      .single(),
+    supabase.from("levels").select("id, name, sort_order").order("sort_order"),
+    supabase
+      .from("terms")
+      .select("id, level_id, name, sort_order")
+      .order("sort_order"),
+    supabase
+      .from("materials")
+      .select(`
+        id,
+        subject_id,
+        uploader_id,
+        title,
+        description,
+        topic,
+        file_type,
+        file_size_bytes,
+        views_count,
+        downloads_count,
+        created_at,
+        subject:subjects (
+          id,
+          subject_code,
+          subject_name,
+          level_id,
+          term_id
+        )
+      `)
+      .eq("status", "approved")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("material_bookmarks")
+      .select("material_id")
+      .eq("student_id", user.id),
+  ]);
 
   if (
     profileError ||
@@ -68,17 +106,27 @@ export default async function MaterialsPage() {
     redirect("/dashboard");
   }
 
-  const [levelsResult, termsResult] = await Promise.all([
-    supabase.from("levels").select("id, name, sort_order").order("sort_order"),
-    supabase.from("terms").select("id, level_id, name, sort_order").order("sort_order"),
-  ]);
-
   if (levelsResult.error) {
     console.error("[materials][levels]", levelsResult.error);
   }
 
   if (termsResult.error) {
     console.error("[materials][terms]", termsResult.error);
+  }
+
+  if (error) {
+    console.error("Materials loading error:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+
+    throw new Error(`Materials loading failed: ${error.message}`);
+  }
+
+  if (bookmarkedMaterialsError) {
+    console.error("[materials][bookmarks]", bookmarkedMaterialsError);
   }
 
   const termNavigation = getAcademicTermNavigation(
@@ -106,6 +154,7 @@ export default async function MaterialsPage() {
       label: `${level?.name ?? "Level"} - ${term.name}`,
     };
   });
+
   const { data: curriculumSubjects, error: curriculumSubjectsError } =
     await supabase
       .from("subjects")
@@ -127,42 +176,6 @@ export default async function MaterialsPage() {
     );
   }
 
-  const { data: materials, error } = await supabase
-    .from("materials")
-    .select(`
-      id,
-      subject_id,
-      uploader_id,
-      title,
-      description,
-      topic,
-      file_type,
-      file_size_bytes,
-      views_count,
-      downloads_count,
-      created_at,
-      subject:subjects (
-        id,
-        subject_code,
-        subject_name,
-        level_id,
-        term_id
-      )
-    `)
-    .eq("status", "approved")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Materials loading error:", {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-    });
-
-    throw new Error(`Materials loading failed: ${error.message}`);
-  }
-
   const curriculumSubjectIds = new Set(
     (curriculumSubjects ?? []).map((subject) => subject.id),
   );
@@ -178,52 +191,37 @@ export default async function MaterialsPage() {
       allowedTermIds.has(subject.term_id)
     );
   });
-  const { data: bookmarkedMaterials, error: bookmarkedMaterialsError } =
-    await supabase
-      .from("material_bookmarks")
-      .select("material_id")
-      .eq("student_id", user.id);
-
-  if (bookmarkedMaterialsError) {
-    console.error("[materials][bookmarks]", bookmarkedMaterialsError);
-  }
 
   const bookmarkedMaterialIds = new Set(
     (bookmarkedMaterials ?? []).map((bookmark) => bookmark.material_id),
   );
-  const materialList: Material[] = await Promise.all(
-  visibleMaterials.map(async (material) => {
-    const { data: uploaderData } = await supabase.rpc(
-      "get_public_contact_profile",
-      { p_profile_id: material.uploader_id },
-    );
 
-    const uploader = (uploaderData?.[0] ?? null) as Material["uploader"];
+  const uniqueUploaderIds = Array.from(
+    new Set(visibleMaterials.map((m) => m.uploader_id)),
+  );
 
-    return {
-      ...material,
-      uploader,
-      subject: Array.isArray(material.subject)
-        ? material.subject[0] ?? null
-        : material.subject,
-    };
-  }),
-);
-function formatFileSize(bytes: number) {
-    if (bytes < 1024) {
-      return `${bytes} B`;
-    }
+  const uploaderEntries = await Promise.all(
+    uniqueUploaderIds.map(async (uploaderId) => {
+      const { data: uploaderData } = await supabase.rpc(
+        "get_public_contact_profile",
+        { p_profile_id: uploaderId },
+      );
+      return [
+        uploaderId,
+        (uploaderData?.[0] ?? null) as Material["uploader"],
+      ] as const;
+    }),
+  );
 
-    if (bytes < 1024 * 1024) {
-      return `${(bytes / 1024).toFixed(1)} KB`;
-    }
+  const uploaderMap = new Map(uploaderEntries);
 
-    if (bytes < 1024 * 1024 * 1024) {
-      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    }
-
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-  }
+  const materialList: Material[] = visibleMaterials.map((material) => ({
+    ...material,
+    uploader: uploaderMap.get(material.uploader_id) ?? null,
+    subject: Array.isArray(material.subject)
+      ? material.subject[0] ?? null
+      : material.subject,
+  }));
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -235,7 +233,6 @@ function formatFileSize(bytes: number) {
 
           <main className="flex-1 p-6">
             <div className="mx-auto w-full max-w-7xl space-y-6">
-
               {/* Page Header */}
               <section>
                 <p className="text-sm text-muted-foreground">
@@ -270,7 +267,6 @@ function formatFileSize(bytes: number) {
                   {materialList.length}
                 </p>
               </section>
-
             </div>
           </main>
         </div>
@@ -278,9 +274,3 @@ function formatFileSize(bytes: number) {
     </div>
   );
 }
-
-
-
-
-
-

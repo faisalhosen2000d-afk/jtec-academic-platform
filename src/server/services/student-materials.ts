@@ -25,6 +25,7 @@ type AcademicTerm = {
 type CurriculumSubject = {
   subject_code: string;
   level_id: string;
+  term_id: string;
 };
 
 type MaterialWithSubject = {
@@ -44,21 +45,52 @@ export async function getStudentVisibleMaterialsCount(
   supabase: SupabaseClient,
   profile: StudentAcademicProfile,
 ): Promise<number> {
-  const { data: academicTerms, error: academicTermsError } = await supabase
-    .from("terms")
-    .select(`
-      id,
-      level_id,
-      sort_order,
-      level:levels (
-        sort_order
-      )
-    `)
-    .order("sort_order", { ascending: true });
+  const [
+    { data: academicTerms, error: academicTermsError },
+    { data: departmentSubjects, error: curriculumSubjectsError },
+    { data: materials, error: materialsError },
+  ] = await Promise.all([
+    supabase
+      .from("terms")
+      .select(`
+        id,
+        level_id,
+        sort_order,
+        level:levels (
+          sort_order
+        )
+      `)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("subjects")
+      .select("subject_code, level_id, term_id")
+      .eq("department_id", profile.department_id),
+    supabase
+      .from("materials")
+      .select(`
+        subject:subjects (
+          subject_code,
+          level_id
+        )
+      `)
+      .eq("status", "approved"),
+  ]);
 
   if (academicTermsError) {
     throw new Error(
       `Student materials terms loading failed: ${academicTermsError.message}`,
+    );
+  }
+
+  if (curriculumSubjectsError) {
+    throw new Error(
+      `Student materials subjects loading failed: ${curriculumSubjectsError.message}`,
+    );
+  }
+
+  if (materialsError) {
+    throw new Error(
+      `Student materials loading failed: ${materialsError.message}`,
     );
   }
 
@@ -67,7 +99,9 @@ export async function getStudentVisibleMaterialsCount(
   );
 
   const currentLevelOrder = currentTerm?.level;
-  const currentLevelSortOrderFromObject = currentLevelOrder as unknown as { sort_order: number } | null;
+  const currentLevelSortOrderFromObject = currentLevelOrder as unknown as {
+    sort_order: number;
+  } | null;
   const currentLevelSortOrder = Array.isArray(currentLevelOrder)
     ? currentLevelOrder[0]?.sort_order
     : currentLevelSortOrderFromObject?.sort_order;
@@ -95,44 +129,17 @@ export async function getStudentVisibleMaterialsCount(
       .map((term) => term.id),
   );
 
-  const { data: curriculumSubjects, error: curriculumSubjectsError } =
-    await supabase
-      .from("subjects")
-      .select("subject_code, level_id")
-      .eq("department_id", profile.department_id)
-      .in("term_id", Array.from(allowedTermIds));
-
-  if (curriculumSubjectsError) {
-    throw new Error(
-      `Student materials subjects loading failed: ${curriculumSubjectsError.message}`,
-    );
-  }
-
   const curriculumKeys = new Set(
-    (curriculumSubjects ?? []).map(
-      (subject: CurriculumSubject) =>
-        `${subject.subject_code}::${subject.level_id}`,
-    ),
+    (departmentSubjects ?? [])
+      .filter((subject: CurriculumSubject) => allowedTermIds.has(subject.term_id))
+      .map(
+        (subject: CurriculumSubject) =>
+          `${subject.subject_code}::${subject.level_id}`,
+      ),
   );
 
   if (curriculumKeys.size === 0) {
     return 0;
-  }
-
-  const { data: materials, error: materialsError } = await supabase
-    .from("materials")
-    .select(`
-      subject:subjects (
-        subject_code,
-        level_id
-      )
-    `)
-    .eq("status", "approved");
-
-  if (materialsError) {
-    throw new Error(
-      `Student materials loading failed: ${materialsError.message}`,
-    );
   }
 
   return (materials ?? []).filter((material: MaterialWithSubject) => {
@@ -146,6 +153,7 @@ export async function getStudentVisibleMaterialsCount(
     );
   }).length;
 }
+
 export async function getStudentBookmarksCount(
   supabase: SupabaseClient,
   studentId: string,
