@@ -1,4 +1,5 @@
 ﻿import { createClient } from "@/lib/supabase/server";
+import { getAcademicTermNavigation } from "@/lib/academic-terms";
 import { redirect } from "next/navigation";
 import UploadForm from "./UploadForm";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
@@ -30,17 +31,60 @@ export default async function UploadPage() {
     redirect("/dashboard");
   }
 
+  const [levelsResult, termsResult] = await Promise.all([
+    supabase.from("levels").select("id, name, sort_order").order("sort_order"),
+    supabase.from("terms").select("id, level_id, name, sort_order").order("sort_order"),
+  ]);
+
+  if (levelsResult.error) {
+    console.error("[upload][levels]", levelsResult.error);
+  }
+
+  if (termsResult.error) {
+    console.error("[upload][terms]", termsResult.error);
+  }
+
+  const termNavigation = getAcademicTermNavigation(
+    levelsResult.data ?? [],
+    termsResult.data ?? [],
+    profile.current_level_id,
+    profile.current_term_id,
+  );
+
+  if (!termNavigation) {
+    console.error("[upload] Invalid current academic assignment.");
+    redirect("/dashboard");
+  }
+
+  const allowedTermIds = termNavigation.currentAndPreviousTerms.map(
+    (term) => term.id,
+  );
+
   const { data: subjects, error: subjectsError } = await supabase
     .from("subjects")
-    .select("id, subject_code, subject_name")
+    .select("id, subject_code, subject_name, department_id, level_id, term_id")
     .eq("department_id", profile.department_id)
-    .eq("level_id", profile.current_level_id)
-    .eq("term_id", profile.current_term_id)
+    .in("term_id", allowedTermIds)
     .order("subject_code", { ascending: true });
 
   if (subjectsError) {
     console.error("[upload][subjects]", subjectsError);
   }
+
+  const subjectsWithTermLabels = (subjects ?? []).map((subject) => {
+    const level = (levelsResult.data ?? []).find(
+      (item) => item.id === subject.level_id,
+    );
+    const term = (termsResult.data ?? []).find(
+      (item) => item.id === subject.term_id,
+    );
+
+    return {
+      ...subject,
+      level_name: level?.name ?? "Level",
+      term_name: term?.name ?? "Term",
+    };
+  });
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -72,7 +116,7 @@ export default async function UploadPage() {
                     Unable to load subjects. Please try again.
                   </p>
                 ) : (
-                  <UploadForm subjects={subjects ?? []} />
+                  <UploadForm subjects={subjectsWithTermLabels} />
                 )}
               </section>
             </div>
@@ -82,3 +126,5 @@ export default async function UploadPage() {
     </div>
   );
 }
+
+

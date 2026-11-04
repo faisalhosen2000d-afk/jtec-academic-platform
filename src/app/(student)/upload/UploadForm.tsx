@@ -7,6 +7,10 @@ type Subject = {
   id: string;
   subject_code: string;
   subject_name: string;
+  level_id: string;
+  term_id: string;
+  level_name: string;
+  term_name: string;
 };
 
 type UploadFormProps = {
@@ -270,6 +274,9 @@ export default function UploadForm({ subjects }: UploadFormProps) {
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {subject.subject_name}
                     </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {subject.level_name} — {subject.term_name}
+                    </p>
                   </button>
                 ))
               ) : (
@@ -371,3 +378,4 @@ export default function UploadForm({ subjects }: UploadFormProps) {
     </form>
   );
 }
+

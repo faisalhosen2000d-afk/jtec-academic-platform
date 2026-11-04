@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import MaterialCard from "@/components/student/MaterialCard";
@@ -28,6 +28,7 @@ type MaterialSearchItem = {
     telegram: string | null;
   } | null;
   subject: {
+    id: string;
     subject_code: string;
     subject_name: string;
     level_id: string;
@@ -43,19 +44,55 @@ type MaterialSearchSubject = {
   term_id: string;
 };
 
+type MaterialTermOption = {
+  id: string;
+  label: string;
+};
+
 type MaterialsSearchProps = {
   subjects: MaterialSearchSubject[];
   materials: MaterialSearchItem[];
   bookmarkedMaterialIds: string[];
+  terms: MaterialTermOption[];
+  currentTermId: string;
 };
+
+const ALL_PREVIOUS_TERMS = "all-previous";
 
 export default function MaterialsSearch({
   subjects,
   materials,
   bookmarkedMaterialIds,
+  terms,
+  currentTermId,
 }: MaterialsSearchProps) {
+  const [selectedTermId, setSelectedTermId] = useState(currentTermId);
   const [selectedSubjectId, setSelectedSubjectId] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const previousTermIds = useMemo(() => {
+    const currentTermIndex = terms.findIndex(
+      (term) => term.id === currentTermId,
+    );
+
+    if (currentTermIndex < 0) {
+      return [];
+    }
+
+    return terms
+      .slice(0, currentTermIndex)
+      .map((term) => term.id);
+  }, [currentTermId, terms]);
+
+  const visibleSubjects = useMemo(() => {
+    if (selectedTermId === ALL_PREVIOUS_TERMS) {
+      return subjects.filter((subject) =>
+        previousTermIds.includes(subject.term_id),
+      );
+    }
+
+    return subjects.filter((subject) => subject.term_id === selectedTermId);
+  }, [previousTermIds, selectedTermId, subjects]);
 
   const filteredMaterials = useMemo(() => {
     const normalizeText = (value: string) =>
@@ -66,23 +103,25 @@ export default function MaterialsSearch({
       ? normalizedQuery.split(" ").filter(Boolean)
       : [];
 
-    const selectedSubject = subjects.find(
+    const visibleSubjectIds = new Set(
+      visibleSubjects.map((subject) => subject.id),
+    );
+
+    const selectedSubject = visibleSubjects.find(
       (subject) => subject.id === selectedSubjectId,
     );
 
-    const subjectFiltered =
-      selectedSubjectId === "all" || !selectedSubject
-        ? materials
-        : materials.filter((material) => {
-            const materialSubject = material.subject;
+    const subjectFiltered = materials.filter((material) => {
+      if (!visibleSubjectIds.has(material.subject_id)) {
+        return false;
+      }
 
-            return (
-              materialSubject != null &&
-              materialSubject.subject_code === selectedSubject.subject_code &&
-              materialSubject.level_id === selectedSubject.level_id
-            );
-          });
-
+      return (
+        selectedSubjectId === "all" ||
+        !selectedSubject ||
+        material.subject_id === selectedSubject.id
+      );
+    });
 
     if (!normalizedQuery) {
       return subjectFiltered;
@@ -126,10 +165,7 @@ export default function MaterialsSearch({
           score = 30;
         }
 
-        return {
-          material,
-          score,
-        };
+        return { material, score };
       })
       .filter((result) => result.score > 0)
       .sort((a, b) => {
@@ -143,11 +179,51 @@ export default function MaterialsSearch({
         );
       })
       .map((result) => result.material);
-  }, [materials, searchQuery, selectedSubjectId, subjects]);
+  }, [
+    materials,
+    searchQuery,
+    selectedSubjectId,
+    visibleSubjects,
+  ]);
+
+  const handleTermChange = (termId: string) => {
+    setSelectedTermId(termId);
+    setSelectedSubjectId("all");
+  };
 
   return (
     <section className="rounded-xl border border-border bg-background p-5 shadow-sm">
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
+      <div className="grid gap-4 md:grid-cols-3">
+        <div>
+          <label
+            htmlFor="material-term"
+            className="mb-2 block text-sm font-medium text-foreground"
+          >
+            Academic Term
+          </label>
+
+          <select
+            id="material-term"
+            value={selectedTermId}
+            onChange={(event) => handleTermChange(event.target.value)}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+          >
+            <option value={currentTermId}>Current Term</option>
+
+            {terms
+              .filter((term) => term.id !== currentTermId)
+              .map((term) => (
+                <option key={term.id} value={term.id}>
+                  {term.label}
+                </option>
+              ))}
+
+            {previousTermIds.length > 0 && (
+              <option value={ALL_PREVIOUS_TERMS}>All Previous Terms</option>
+            )}
+          </select>
+        </div>
+
         <div>
           <label
             htmlFor="material-search"
@@ -171,7 +247,7 @@ export default function MaterialsSearch({
             htmlFor="material-subject"
             className="mb-2 block text-sm font-medium text-foreground"
           >
-            Category / Subject
+            Subject
           </label>
 
           <select
@@ -182,7 +258,7 @@ export default function MaterialsSearch({
           >
             <option value="all">All Subjects</option>
 
-            {subjects.map((subject) => (
+            {visibleSubjects.map((subject) => (
               <option key={subject.id} value={subject.id}>
                 {subject.subject_code} - {subject.subject_name}
               </option>
@@ -217,16 +293,12 @@ export default function MaterialsSearch({
 
           <p className="mt-2 text-sm text-muted-foreground">
             {searchQuery.trim()
-              ? "No approved materials match your search in the selected subject."
-              : "No approved materials are available for the selected subject right now."}
+              ? "No approved materials match your search in the selected term and subject."
+              : "No approved materials are available for the selected term and subject right now."}
           </p>
         </div>
       )}
     </section>
   );
 }
-
-
-
-
 

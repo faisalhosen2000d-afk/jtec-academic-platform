@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
 import NoticeList from "@/components/dashboard/NoticeList";
+import { getStudentBookmarksCount, getStudentVisibleMaterialsCount } from "@/server/services/student-materials";
 
 export default async function StudentDashboardPage() {
   const supabase = await createClient();
@@ -99,6 +100,19 @@ export default async function StudentDashboardPage() {
     "Student";
 
   const studentEmail = profile?.email || user.email || "-";
+
+  const bookmarksCount = await getStudentBookmarksCount(supabase, user.id);
+
+  const materialsCount =
+    profile?.department_id &&
+    profile?.current_level_id &&
+    profile?.current_term_id
+      ? await getStudentVisibleMaterialsCount(supabase, {
+          department_id: profile.department_id,
+          current_level_id: profile.current_level_id,
+          current_term_id: profile.current_term_id,
+        })
+      : 0;
 
   const departmentName = department?.name || "Not assigned";
   const batchName = batch?.name || "Not assigned";
@@ -197,7 +211,7 @@ export default async function StudentDashboardPage() {
                   </p>
 
                   <p className="mt-2 text-3xl font-semibold text-foreground">
-                    &mdash;
+                    {materialsCount}
                   </p>
 
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -211,7 +225,7 @@ export default async function StudentDashboardPage() {
                   </p>
 
                   <p className="mt-2 text-3xl font-semibold text-foreground">
-                    &mdash;
+                    {bookmarksCount}
                   </p>
 
                   <p className="mt-1 text-xs text-muted-foreground">

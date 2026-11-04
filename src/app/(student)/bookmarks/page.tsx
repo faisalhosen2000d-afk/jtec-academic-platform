@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
 import BookmarksFilter from "@/components/student/BookmarksFilter";
+import { getAcademicTermNavigation } from "@/lib/academic-terms";
 type BookmarkMaterial = {
   id: string;
   uploader_id: string;
@@ -28,8 +29,11 @@ type BookmarkMaterial = {
     telegram: string | null;
   } | null;
   subject: {
+    id: string;
     subject_code: string;
     subject_name: string;
+    level_id: string;
+    term_id: string;
   } | null;
 };
 
@@ -60,12 +64,56 @@ export default async function BookmarksPage() {
     redirect("/dashboard");
   }
 
+  const [levelsResult, termsResult] = await Promise.all([
+    supabase
+      .from("levels")
+      .select("id, name, sort_order")
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("terms")
+      .select("id, level_id, name, sort_order")
+      .order("sort_order", { ascending: true }),
+  ]);
+
+  if (levelsResult.error) {
+    console.error("[bookmarks][levels]", levelsResult.error);
+  }
+
+  if (termsResult.error) {
+    console.error("[bookmarks][terms]", termsResult.error);
+  }
+
+  const termNavigation = getAcademicTermNavigation(
+    levelsResult.data ?? [],
+    termsResult.data ?? [],
+    profile.current_level_id,
+    profile.current_term_id,
+  );
+
+  if (!termNavigation) {
+    console.error("[bookmarks] Current academic term could not be resolved.");
+    redirect("/dashboard");
+  }
+
+  const allowedTerms = termNavigation.currentAndPreviousTerms;
+  const allowedTermIds = allowedTerms.map((term) => term.id);
+
+  const termOptions = allowedTerms.map((term) => {
+    const level = (levelsResult.data ?? []).find(
+      (item) => item.id === term.level_id,
+    );
+
+    return {
+      id: term.id,
+      label: `${level?.name ?? "Level"} - ${term.name}`,
+    };
+  });
   const { data: currentTermSubjects, error: subjectsError } = await supabase
     .from("subjects")
     .select("id, subject_code, subject_name, level_id, term_id")
     .eq("department_id", profile.department_id)
-    .eq("level_id", profile.current_level_id)
-    .eq("term_id", profile.current_term_id)
+
+    .in("term_id", allowedTermIds)
     .order("subject_code", { ascending: true });
 
   if (subjectsError) {
@@ -91,8 +139,11 @@ export default async function BookmarksPage() {
         created_at,
         status,
         subject:subjects (
+          id,
           subject_code,
-          subject_name
+          subject_name,
+          level_id,
+          term_id
         )
       )
     `)
@@ -210,6 +261,8 @@ export default async function BookmarksPage() {
                   <BookmarksFilter
                     subjects={currentTermSubjects ?? []}
                     materials={bookmarkMaterials}
+                    terms={termOptions}
+                    currentTermId={profile.current_term_id}
                   />
                 </section>
               )}

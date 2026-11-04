@@ -1,5 +1,6 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getAcademicTermNavigation } from "@/lib/academic-terms";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
@@ -32,6 +33,7 @@ type Material = {
     telegram: string | null;
   } | null;
   subject: {
+    id: string;
     subject_code: string;
     subject_name: string;
     level_id: string;
@@ -66,70 +68,44 @@ export default async function MaterialsPage() {
     redirect("/dashboard");
   }
 
-  const { data: currentTermSubjects, error: subjectsError } = await supabase
-    .from("subjects")
-    .select("id, subject_code, subject_name, level_id, term_id")
-    .eq("department_id", profile.department_id)
-    .eq("level_id", profile.current_level_id)
-    .eq("term_id", profile.current_term_id)
-    .order("subject_code", { ascending: true });
+  const [levelsResult, termsResult] = await Promise.all([
+    supabase.from("levels").select("id, name, sort_order").order("sort_order"),
+    supabase.from("terms").select("id, level_id, name, sort_order").order("sort_order"),
+  ]);
 
-  if (subjectsError) {
-    console.error("[materials][subjects]", subjectsError);
+  if (levelsResult.error) {
+    console.error("[materials][levels]", levelsResult.error);
   }
 
-  const { data: academicTerms, error: academicTermsError } = await supabase
-    .from("terms")
-    .select(`
-      id,
-      level_id,
-      sort_order,
-      level:levels (
-        sort_order
-      )
-    `)
-    .order("sort_order", { ascending: true });
-
-  if (academicTermsError) {
-    console.error("[materials][academic-terms]", academicTermsError);
+  if (termsResult.error) {
+    console.error("[materials][terms]", termsResult.error);
   }
 
-  const currentLevelOrder = (
-    Array.isArray(academicTerms)
-      ? academicTerms.find((term) => term.id === profile.current_term_id)?.level
-      : null
+  const termNavigation = getAcademicTermNavigation(
+    levelsResult.data ?? [],
+    termsResult.data ?? [],
+    profile.current_level_id,
+    profile.current_term_id,
   );
 
-  const currentLevelSortOrder = Array.isArray(currentLevelOrder)
-    ? currentLevelOrder[0]?.sort_order
-    : currentLevelOrder?.sort_order;
+  if (!termNavigation) {
+    console.error("[materials] Invalid current academic assignment.");
+    redirect("/dashboard");
+  }
 
-  const allowedTermIds = new Set(
-    (academicTerms ?? [])
-      .filter((term) => {
-        const levelSortOrder = Array.isArray(term.level)
-          ? term.level[0]?.sort_order
-          : term.level?.sort_order;
+  const allowedTerms = termNavigation.currentAndPreviousTerms;
+  const allowedTermIds = new Set(allowedTerms.map((term) => term.id));
 
-        if (levelSortOrder == null || currentLevelSortOrder == null) {
-          return false;
-        }
+  const termOptions = allowedTerms.map((term) => {
+    const level = (levelsResult.data ?? []).find(
+      (item) => item.id === term.level_id,
+    );
 
-        return (
-          levelSortOrder < currentLevelSortOrder ||
-          (
-            levelSortOrder === currentLevelSortOrder &&
-            term.sort_order <= (
-              (academicTerms ?? []).find(
-                (currentTerm) => currentTerm.id === profile.current_term_id,
-              )?.sort_order ?? 0
-            )
-          )
-        );
-      })
-      .map((term) => term.id),
-  );
-
+    return {
+      id: term.id,
+      label: `${level?.name ?? "Level"} - ${term.name}`,
+    };
+  });
   const { data: curriculumSubjects, error: curriculumSubjectsError } =
     await supabase
       .from("subjects")
@@ -156,7 +132,7 @@ export default async function MaterialsPage() {
     .select(`
       id,
       subject_id,
-     uploader_id,
+      uploader_id,
       title,
       description,
       topic,
@@ -166,6 +142,7 @@ export default async function MaterialsPage() {
       downloads_count,
       created_at,
       subject:subjects (
+        id,
         subject_code,
         subject_name,
         level_id,
@@ -176,23 +153,18 @@ export default async function MaterialsPage() {
     .order("created_at", { ascending: false });
 
   if (error) {
-  console.error("Materials loading error:", {
-    message: error.message,
-    details: error.details,
-    hint: error.hint,
-    code: error.code,
-  });
+    console.error("Materials loading error:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
 
-  throw new Error(
-    `Materials loading failed: ${error.message}`
-  );
-}
+    throw new Error(`Materials loading failed: ${error.message}`);
+  }
 
-  const curriculumKeys = new Set(
-    (curriculumSubjects ?? []).map(
-      (subject) =>
-        `${subject.subject_code}::${subject.level_id}`,
-    ),
+  const curriculumSubjectIds = new Set(
+    (curriculumSubjects ?? []).map((subject) => subject.id),
   );
 
   const visibleMaterials = (materials ?? []).filter((material) => {
@@ -202,12 +174,10 @@ export default async function MaterialsPage() {
 
     return (
       subject != null &&
-      curriculumKeys.has(
-        `${subject.subject_code}::${subject.level_id}`,
-      )
+      curriculumSubjectIds.has(subject.id) &&
+      allowedTermIds.has(subject.term_id)
     );
   });
-
   const { data: bookmarkedMaterials, error: bookmarkedMaterialsError } =
     await supabase
       .from("material_bookmarks")
@@ -283,9 +253,11 @@ function formatFileSize(bytes: number) {
 
               {/* Materials Search */}
               <MaterialsSearch
-                subjects={currentTermSubjects ?? []}
+                subjects={curriculumSubjects ?? []}
                 materials={materialList}
                 bookmarkedMaterialIds={Array.from(bookmarkedMaterialIds)}
+                terms={termOptions}
+                currentTermId={profile.current_term_id}
               />
 
               {/* Materials Count */}
@@ -306,3 +278,9 @@ function formatFileSize(bytes: number) {
     </div>
   );
 }
+
+
+
+
+
+
