@@ -58,3 +58,12 @@ _loading_ux_backup/
 _messaging_upgrade_backup/
 audit-contact/
 backup/
+.env*
+*.backup*
+*.before-*
+*.dump
+*.log
+backups/
+_*/
+supabase/drafts/
+supabase/_drafts/
