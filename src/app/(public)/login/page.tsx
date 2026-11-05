@@ -80,9 +80,9 @@ export default function LoginPage() {
                 id="student_id"
                 name="student_id"
                 type="text"
-                placeholder="e.g. 2021-1-4-001"
+                placeholder="e.g. 2021...042"
                 autoComplete="username"
-                className="h-11 rounded-xl bg-muted/30 text-sm focus:bg-background"
+                className="h-11 rounded-xl bg-muted/30 text-sm focus:bg-background focus:ring-4 focus:ring-primary/15 transition-all"
                 required
               />
             </FormField>
@@ -97,7 +97,7 @@ export default function LoginPage() {
                 name="password"
                 autoComplete="current-password"
                 placeholder="••••••••"
-                className="h-11 rounded-xl bg-muted/30 text-sm focus:bg-background"
+                className="h-11 rounded-xl bg-muted/30 text-sm focus:bg-background focus:ring-4 focus:ring-primary/15 transition-all"
                 required
               />
             </FormField>

@@ -1,91 +1,234 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
+import { useActionState } from "react";
+import { GraduationCap, ShieldCheck, ArrowRight, Lock, User, Mail } from "lucide-react";
+import { signIn, staffSignIn, type AuthActionResult } from "@/server/actions/auth";
+import { Button } from "@/components/ui/button";
+
+const initialAuthState: AuthActionResult = {
+  success: false,
+  error: "",
+};
 
 export default function HomePage() {
+  const [activeTab, setActiveTab] = useState<"student" | "staff">("student");
+
+  const [studentState, studentFormAction, studentPending] = useActionState(
+    async (_prevState: AuthActionResult, formData: FormData) => signIn(formData),
+    initialAuthState,
+  );
+
+  const [staffState, staffFormAction, staffPending] = useActionState(
+    async (_prevState: AuthActionResult, formData: FormData) => staffSignIn(formData),
+    initialAuthState,
+  );
+
+  const studentError = studentState.success ? undefined : studentState.error;
+  const staffError = staffState.success ? undefined : staffState.error;
+
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-6 py-12">
-        <div className="w-full max-w-4xl">
-          {/* Header */}
-          <section className="text-center">
-            <p className="text-sm font-medium tracking-wide text-muted-foreground">
-              Jhenaidah Textile Engineering College
-            </p>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50/70 px-4 py-10 dark:bg-slate-950">
+      {/* Background Ambient Glow */}
+      <div
+        className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-primary/15 blur-3xl"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute -bottom-40 right-1/4 -z-10 h-96 w-96 rounded-full bg-blue-500/10 blur-3xl"
+        aria-hidden="true"
+      />
 
-            <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
-              JTEC Academic Platform
-            </h1>
-
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-              A centralized academic platform for students and authorized
-              college staff.
-            </p>
-          </section>
-
-          {/* Login Options */}
-          <section className="mt-12">
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Student */}
-              <article className="flex flex-col rounded-2xl border border-border bg-card p-7 shadow-sm transition-shadow hover:shadow-md sm:p-8">
-                <div className="flex-1">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-xl">
-                    🎓
-                  </div>
-
-                  <h2 className="mt-6 text-2xl font-semibold">
-                    Student
-                  </h2>
-
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                    Access academic materials, notices, results, and other
-                    student services.
-                  </p>
-                </div>
-
-                <div className="mt-7">
-                  <Link
-                    href="/login"
-                    className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                  >
-                    Student Login
-                  </Link>
-                </div>
-              </article>
-
-              {/* Staff */}
-              <article className="flex flex-col rounded-2xl border border-border bg-card p-7 shadow-sm transition-shadow hover:shadow-md sm:p-8">
-                <div className="flex-1">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-xl">
-                    🛡️
-                  </div>
-
-                  <h2 className="mt-6 text-2xl font-semibold">
-                    Administration
-                  </h2>
-
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                    Access administrative and academic management tools for
-                    authorized college staff.
-                  </p>
-                </div>
-
-                <div className="mt-7">
-                  <Link
-                    href="/staff-login"
-                    className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                  >
-                    Administration Login
-                  </Link>
-                </div>
-              </article>
-            </div>
-          </section>
-
-          {/* Footer note */}
-          <p className="mt-10 text-center text-xs text-muted-foreground">
-            Authorized users only. Access is controlled according to account
-            role and permissions.
+      <div className="w-full max-w-md">
+        {/* Header Institution Badge */}
+        <div className="text-center space-y-2 mb-6">
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider text-primary shadow-xs backdrop-blur">
+            <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            Jhenaidah Textile Engineering College
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+            JTEC Academic Platform
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            Sign in to access courses, notices, results and academic tools
           </p>
         </div>
+
+        {/* 2-in-1 Unified Card */}
+        <div className="relative rounded-3xl border border-border/80 bg-background/95 p-6 sm:p-8 shadow-2xl shadow-slate-900/10 backdrop-blur-xl transition-all">
+          
+          {/* Smooth Sliding Tab Switcher */}
+          <div className="relative flex rounded-2xl bg-muted/60 p-1.5 shadow-inner backdrop-blur-md">
+            <div
+              className="absolute inset-y-1.5 rounded-xl bg-background shadow-md transition-all duration-300 ease-out"
+              style={{
+                left: activeTab === "student" ? "6px" : "calc(50% + 3px)",
+                width: "calc(50% - 9px)",
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setActiveTab("student")}
+              className={`relative z-10 flex flex-1 items-center justify-center gap-2 py-2.5 text-xs font-bold transition-colors duration-200 ${
+                activeTab === "student" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <GraduationCap className="h-4 w-4" />
+              Student Portal
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("staff")}
+              className={`relative z-10 flex flex-1 items-center justify-center gap-2 py-2.5 text-xs font-bold transition-colors duration-200 ${
+                activeTab === "staff" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Staff / Admin
+            </button>
+          </div>
+
+          {/* Form Content */}
+          <div className="mt-6">
+            {activeTab === "student" ? (
+              <form action={studentFormAction} className="space-y-4 animate-in fade-in duration-200" noValidate>
+                <div>
+                  <label htmlFor="home_student_id" className="block text-xs font-semibold text-foreground mb-1.5">
+                    Student ID
+                  </label>
+                  <div className="relative group">
+                    <User className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition group-focus-within:text-primary" />
+                    <input
+                      id="home_student_id"
+                      name="student_id"
+                      type="text"
+                      placeholder="e.g. 2021...042"
+                      autoComplete="username"
+                      required
+                      className="w-full h-11 pl-10 pr-4 rounded-xl border border-input bg-muted/20 text-sm text-foreground placeholder:text-muted-foreground/60 transition-all duration-200 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 focus:outline-none focus:scale-[1.005]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="home_student_password" className="block text-xs font-semibold text-foreground mb-1.5">
+                    Password
+                  </label>
+                  <div className="relative group">
+                    <Lock className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition group-focus-within:text-primary" />
+                    <input
+                      id="home_student_password"
+                      name="password"
+                      type="password"
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      required
+                      className="w-full h-11 pl-10 pr-4 rounded-xl border border-input bg-muted/20 text-sm text-foreground placeholder:text-muted-foreground/60 transition-all duration-200 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 focus:outline-none focus:scale-[1.005]"
+                    />
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">
+                      Forgot password?
+                    </Link>
+                  </div>
+                </div>
+
+                {studentError && (
+                  <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-center text-xs font-medium text-destructive">
+                    {studentError}
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  disabled={studentPending}
+                  className="h-11 w-full rounded-xl text-sm font-semibold shadow-md shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                >
+                  {studentPending ? "Signing in..." : "Sign in to Dashboard"}
+                  {!studentPending && <ArrowRight className="ml-1.5 h-4 w-4" />}
+                </Button>
+
+                <div className="pt-2 text-center text-xs text-muted-foreground border-t border-border/60">
+                  Don&apos;t have an account?{" "}
+                  <Link href="/register" className="font-semibold text-primary hover:underline">
+                    Register here
+                  </Link>
+                </div>
+              </form>
+            ) : (
+              <form action={staffFormAction} className="space-y-4 animate-in fade-in duration-200" noValidate>
+                <div>
+                  <label htmlFor="home_staff_email" className="block text-xs font-semibold text-foreground mb-1.5">
+                    Staff Email
+                  </label>
+                  <div className="relative group">
+                    <Mail className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition group-focus-within:text-primary" />
+                    <input
+                      id="home_staff_email"
+                      name="email"
+                      type="email"
+                      placeholder="name@example.com"
+                      autoComplete="username"
+                      required
+                      className="w-full h-11 pl-10 pr-4 rounded-xl border border-input bg-muted/20 text-sm text-foreground placeholder:text-muted-foreground/60 transition-all duration-200 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 focus:outline-none focus:scale-[1.005]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="home_staff_password" className="block text-xs font-semibold text-foreground mb-1.5">
+                    Password
+                  </label>
+                  <div className="relative group">
+                    <Lock className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition group-focus-within:text-primary" />
+                    <input
+                      id="home_staff_password"
+                      name="password"
+                      type="password"
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      required
+                      className="w-full h-11 pl-10 pr-4 rounded-xl border border-input bg-muted/20 text-sm text-foreground placeholder:text-muted-foreground/60 transition-all duration-200 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 focus:outline-none focus:scale-[1.005]"
+                    />
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">
+                      Forgot password?
+                    </Link>
+                  </div>
+                </div>
+
+                {staffError && (
+                  <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-center text-xs font-medium text-destructive">
+                    {staffError}
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  disabled={staffPending}
+                  className="h-11 w-full rounded-xl text-sm font-semibold shadow-md shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                >
+                  {staffPending ? "Verifying..." : "Sign in as Staff"}
+                  {!staffPending && <ArrowRight className="ml-1.5 h-4 w-4" />}
+                </Button>
+
+                <div className="pt-2 text-center text-xs text-muted-foreground border-t border-border/60">
+                  Need a staff account?{" "}
+                  <Link href="/administration/create-account" className="font-semibold text-primary hover:underline">
+                    Request Access
+                  </Link>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+
+        {/* Footer info */}
+        <p className="mt-6 text-center text-[11px] font-medium text-muted-foreground">
+          &copy; {new Date().getFullYear()} JTEC Academic Platform • All Rights Reserved
+        </p>
       </div>
     </main>
   );
