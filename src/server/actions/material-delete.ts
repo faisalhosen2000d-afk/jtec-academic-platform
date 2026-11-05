@@ -77,16 +77,7 @@ export async function deleteApprovedMaterial(
     .eq("status", "approved")
     .maybeSingle();
 
-  if (materialError) {
-    console.error("Approved material lookup error:", materialError);
-
-    return {
-      success: false,
-      error: "Approved material could not be found.",
-    };
-  }
-
-  if (!material) {
+  if (materialError || !material) {
     return {
       success: false,
       error: "Approved material could not be found.",
@@ -108,7 +99,6 @@ export async function deleteApprovedMaterial(
 
   if (deleteError) {
     console.error("Approved material database deletion error:", deleteError);
-
     return {
       success: false,
       error: "Material record could not be deleted.",
@@ -120,57 +110,42 @@ export async function deleteApprovedMaterial(
     .remove([material.file_path]);
 
   if (storageError) {
-    console.error(
-      "Material storage deletion error after database deletion:",
-      storageError,
-    );
-
-    return {
-      success: false,
-      error:
-        "Material record was deleted, but its storage file could not be removed.",
-    };
+    console.error("Material storage deletion error:", storageError);
   }
 
-  const { error: auditError } = await serviceSupabase
-    .from("audit_logs")
-    .insert({
-      actor_id: user.id,
-      action: "material.deleted",
-      target_table: "materials",
-      target_id: material.id,
-      previous_state: {
-        id: material.id,
-        title: material.title,
-        status: material.status,
-        file_path: material.file_path,
-        uploader_id: material.uploader_id,
-        subject_id: material.subject_id,
-        department_id: material.department_id,
-        level_id: material.level_id,
-        term_id: material.term_id,
-        file_type: material.file_type,
-        file_size_bytes: material.file_size_bytes,
-        views_count: material.views_count,
-        downloads_count: material.downloads_count,
-        created_at: material.created_at,
-        reviewed_by: material.reviewed_by,
-        reviewed_at: material.reviewed_at,
-        rejection_reason: material.rejection_reason,
-      },
-      new_state: null,
-    });
-
-  if (auditError) {
-    console.error("Material deletion audit log error:", auditError);
+  // Send in-app notification to the uploader
+  if (material.uploader_id) {
+    try {
+      await serviceSupabase.from("notifications").insert({
+        recipient_id: material.uploader_id,
+        type: "material_deleted",
+        title: "Material Removed",
+        body: `Your uploaded material "${material.title}" has been removed by the administration.`,
+        link_url: "/materials",
+        is_read: false,
+      });
+    } catch (notifErr) {
+      console.error("Failed to send deletion notification:", notifErr);
+    }
   }
+
+  await serviceSupabase.from("audit_logs").insert({
+    actor_id: user.id,
+    action: "material.deleted",
+    target_table: "materials",
+    target_id: material.id,
+    previous_state: {
+      id: material.id,
+      title: material.title,
+      uploader_id: material.uploader_id,
+    },
+    new_state: null,
+  });
 
   revalidatePath("/super-admin/approved-materials");
   revalidatePath("/materials");
-  revalidatePath(`/materials/${material.id}`);
   revalidatePath("/bookmarks");
+  revalidatePath("/notifications");
 
-  return {
-    success: true,
-  };
+  return { success: true };
 }

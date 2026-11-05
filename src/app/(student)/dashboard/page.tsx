@@ -387,18 +387,7 @@ export default async function StudentDashboardPage() {
                       </p>
                     </Link>
 
-                    <Link
-                      href="/folders"
-                      className="rounded-lg border border-border p-4 transition-colors hover:bg-muted"
-                    >
-                      <p className="font-medium text-foreground">
-                        My Folders
-                      </p>
 
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Organize your saved materials.
-                      </p>
-                    </Link>
 
                     <Link
                       href="/bookmarks"

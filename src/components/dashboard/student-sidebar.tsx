@@ -9,7 +9,6 @@ import { useUnreadMessages } from "@/lib/use-unread-messages";
 const navigationItems = [
   { label: "Dashboard", href: "/dashboard", icon: "\u2302" },
   { label: "Materials", href: "/materials", icon: "\u25A3" },
-  { label: "Folders", href: "/folders", icon: "\u25A4" },
   { label: "Bookmarks", href: "/bookmarks", icon: "\u2605" },
   { label: "Upload", href: "/upload", icon: "\u2191" },
   { label: "Results", href: "/results", icon: "\u25A5" },
