@@ -21,21 +21,22 @@ const navigationItems = [
 
 export function StudentSidebar() {
   const pathname = usePathname();
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [optimisticHref, setOptimisticHref] = useState<string | null>(null);
   const hasUnreadNotifications = useUnreadNotifications(pathname);
   const hasUnreadMessages = useUnreadMessages(pathname);
 
   useEffect(() => {
-    setPendingHref(null);
+    setOptimisticHref(null);
   }, [pathname]);
 
-  const activePath = pendingHref ?? pathname;
+  const activePath = optimisticHref ?? pathname;
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-border bg-background lg:flex lg:min-h-screen lg:flex-col">
       <div className="flex h-16 items-center border-b border-border px-6">
         <Link
           href="/dashboard"
+          prefetch={true}
           className="flex items-center gap-3"
           aria-label="JTEC Academic Platform"
         >
@@ -66,7 +67,6 @@ export function StudentSidebar() {
               (item.href !== "/dashboard" &&
                 activePath.startsWith(`${item.href}/`));
 
-            const isPending = pendingHref === item.href;
             const isNotifications = item.href === "/notifications";
             const isConversations = item.href === "/messages";
 
@@ -74,9 +74,10 @@ export function StudentSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={true}
                 onClick={() => {
                   if (pathname !== item.href) {
-                    setPendingHref(item.href);
+                    setOptimisticHref(item.href);
                   }
                 }}
                 className={[
@@ -98,21 +99,14 @@ export function StudentSidebar() {
 
                 <span className="flex-1">{item.label}</span>
 
-                {isPending && (
-                  <span
-                    className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent"
-                    aria-label="Loading page"
-                  />
-                )}
-
-                {!isPending && isNotifications && hasUnreadNotifications && (
+                {isNotifications && hasUnreadNotifications && (
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full bg-destructive"
                     aria-label="Unread notifications"
                   />
                 )}
 
-                {!isPending && isConversations && hasUnreadMessages && (
+                {isConversations && hasUnreadMessages && (
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full bg-destructive"
                     aria-label="Unread messages"
