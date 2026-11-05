@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   approveMaterial,
   rejectMaterial,
@@ -103,17 +103,39 @@ export async function POST(request: Request) {
       );
     }
 
+    const serviceSupabase = createServiceRoleClient();
+
     if (body.action === "approve") {
+      // 1. Fetch material info before/during approval to get uploader_id and title
+      const { data: material } = await serviceSupabase
+        .from("materials")
+        .select("id, title, uploader_id")
+        .eq("id", body.materialId)
+        .maybeSingle();
+
       const result = await approveMaterial(
         user.id,
         body.materialId,
       );
 
-      /*
-       * Moderator approval creates a pending escalation.
-       * Direct Admin/Super Admin approval completes the action.
-       */
-      if ("escalated" in result && result.escalated) {
+      // If approved directly by Admin / Super Admin (not escalated)
+      const isEscalated = "escalated" in result && result.escalated;
+      if (!isEscalated && material?.uploader_id) {
+        try {
+          await serviceSupabase.from("notifications").insert({
+            recipient_id: material.uploader_id,
+            type: "material_approved",
+            title: "Material Approved!",
+            body: `Your uploaded material "${material.title}" has been approved and is now live for all students.`,
+            link_url: "/materials",
+            is_read: false,
+          });
+        } catch (notifErr) {
+          console.error("Failed to insert approval notification:", notifErr);
+        }
+      }
+
+      if (isEscalated) {
         return NextResponse.json(result, { status: 202 });
       }
 
@@ -121,17 +143,35 @@ export async function POST(request: Request) {
     }
 
     if (body.action === "reject") {
+      const { data: material } = await serviceSupabase
+        .from("materials")
+        .select("id, title, uploader_id")
+        .eq("id", body.materialId)
+        .maybeSingle();
+
       const result = await rejectMaterial(
         user.id,
         body.materialId,
         body.rejectionReason,
       );
 
-      /*
-       * Moderator rejection creates a pending escalation.
-       * Direct Admin/Super Admin rejection completes the action.
-       */
-      if ("escalated" in result && result.escalated) {
+      const isEscalated = "escalated" in result && result.escalated;
+      if (!isEscalated && material?.uploader_id) {
+        try {
+          await serviceSupabase.from("notifications").insert({
+            recipient_id: material.uploader_id,
+            type: "material_rejected",
+            title: "Material Rejected",
+            body: `Your uploaded material "${material.title}" was not approved. Reason: ${body.rejectionReason}`,
+            link_url: "/upload",
+            is_read: false,
+          });
+        } catch (notifErr) {
+          console.error("Failed to insert rejection notification:", notifErr);
+        }
+      }
+
+      if (isEscalated) {
         return NextResponse.json(result, { status: 202 });
       }
 
@@ -144,10 +184,6 @@ export async function POST(request: Request) {
       body.approve,
     );
 
-    /*
-     * Denying an escalation returns null because the original
-     * material action is not executed.
-     */
     return NextResponse.json(
       {
         success: true,
