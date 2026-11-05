@@ -176,20 +176,31 @@ export default async function MaterialsPage() {
     );
   }
 
-  const curriculumSubjectIds = new Set(
-    (curriculumSubjects ?? []).map((subject) => subject.id),
+  const curriculumSubjectByKey = new Map(
+    (curriculumSubjects ?? []).map(
+      (subject) =>
+        [`${subject.subject_code}::${subject.level_id}`, subject] as const,
+    ),
   );
 
-  const visibleMaterials = (materials ?? []).filter((material) => {
-    const subject = Array.isArray(material.subject)
+  const visibleMaterials = (materials ?? []).flatMap((material) => {
+    const materialSubject = Array.isArray(material.subject)
       ? material.subject[0] ?? null
       : material.subject;
 
-    return (
-      subject != null &&
-      curriculumSubjectIds.has(subject.id) &&
-      allowedTermIds.has(subject.term_id)
+    if (materialSubject == null) {
+      return [];
+    }
+
+    const ownSubject = curriculumSubjectByKey.get(
+      `${materialSubject.subject_code}::${materialSubject.level_id}`,
     );
+
+    if (!ownSubject) {
+      return [];
+    }
+
+    return [{ ...material, subject_id: ownSubject.id, subject: ownSubject }];
   });
 
   const bookmarkedMaterialIds = new Set(
