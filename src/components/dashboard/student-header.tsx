@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { User, LogOut, ExternalLink, Bell } from "lucide-react";
 import { signOut } from "@/server/actions/auth";
 import { useUnreadNotifications } from "@/lib/use-unread-notifications";
 import { createClient } from "@/lib/supabase/client";
@@ -14,57 +15,133 @@ const pageTitles: Record<string, string> = {
   "/upload": "Upload",
   "/results": "Results",
   "/ranking": "Ranking",
+  "/messages": "Conversations",
   "/notifications": "Notifications",
   "/profile": "Profile",
 };
 
-let cachedStudentAvatarUrl: string | null | undefined = undefined;
+type StudentProfilePreview = {
+  fullName: string;
+  studentId: string;
+  email: string;
+  avatarUrl: string | null;
+  departmentName: string;
+  batchName: string;
+};
+
+let cachedStudentProfile: StudentProfilePreview | null = null;
 
 export function StudentHeader() {
   const pathname = usePathname();
   const hasUnreadNotifications = useUnreadNotifications(pathname);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(
-    cachedStudentAvatarUrl ?? null,
+  const [profile, setProfile] = useState<StudentProfilePreview | null>(
+    cachedStudentProfile,
   );
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (cachedStudentAvatarUrl !== undefined && pathname !== "/profile") {
-      return;
-    }
+    setDropdownOpen(false);
+  }, [pathname]);
 
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setDropdownOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
 
-    const loadProfilePhoto = async () => {
-      const supabase = createClient();
+    const loadProfile = async () => {
+      if (cachedStudentProfile && pathname !== "/profile") {
+        return;
+      }
 
+      const supabase = createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (!user) {
-        return;
-      }
+      if (!user) return;
 
-      const { data, error } = await supabase
+      const { data: profileRow } = await supabase
         .from("profiles")
-        .select("avatar_url")
+        .select(`
+          full_name,
+          student_id,
+          avatar_url,
+          email,
+          department_id,
+          batch_id
+        `)
         .eq("id", user.id)
         .maybeSingle();
 
-      if (error) {
-        console.error("Student header avatar load failed:", error);
-        return;
+      let departmentName = "Department";
+      let batchName = "Batch";
+
+      if (profileRow?.department_id) {
+        const { data: dept } = await supabase
+          .from("departments")
+          .select("name")
+          .eq("id", profileRow.department_id)
+          .maybeSingle();
+        if (dept?.name) departmentName = dept.name;
       }
 
-      const nextAvatar = data?.avatar_url ?? null;
-      cachedStudentAvatarUrl = nextAvatar;
+      if (profileRow?.batch_id) {
+        const { data: b } = await supabase
+          .from("batches")
+          .select("name")
+          .eq("id", profileRow.batch_id)
+          .maybeSingle();
+        if (b?.name) batchName = b.name;
+      }
+
+      const previewData: StudentProfilePreview = {
+        fullName:
+          profileRow?.full_name ||
+          user.user_metadata?.full_name ||
+          user.email?.split("@")[0] ||
+          "Student",
+        studentId:
+          profileRow?.student_id ||
+          user.user_metadata?.student_id ||
+          "Not assigned",
+        email: profileRow?.email || user.email || "",
+        avatarUrl: profileRow?.avatar_url ?? null,
+        departmentName,
+        batchName,
+      };
+
+      cachedStudentProfile = previewData;
 
       if (isMounted) {
-        setAvatarUrl(nextAvatar);
+        setProfile(previewData);
       }
     };
 
-    void loadProfilePhoto();
+    void loadProfile();
 
     return () => {
       isMounted = false;
@@ -72,7 +149,7 @@ export function StudentHeader() {
   }, [pathname]);
 
   const handleSignOut = async () => {
-    cachedStudentAvatarUrl = undefined;
+    cachedStudentProfile = null;
     await signOut();
     window.location.href = "/";
   };
@@ -92,7 +169,7 @@ export function StudentHeader() {
         <div className="lg:hidden">
           <Link
             href="/dashboard"
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground"
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground shadow-sm"
             aria-label="JTEC Academic Platform"
           >
             J
@@ -111,71 +188,122 @@ export function StudentHeader() {
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Notifications Icon */}
         <Link
           href="/notifications"
           className="relative flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           aria-label="Notifications"
         >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            className="h-5 w-5"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 17H9m9-6a6 6 0 0 0-12 0c0 7-3 7-3 8h18c0-1-3-1-3-8Zm-4.5 8a2 2 0 0 1-3 0"
-            />
-          </svg>
-
+          <Bell className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
           {hasUnreadNotifications && (
             <span
-              className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-background"
+              className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background"
               aria-label="Unread notifications"
             />
           )}
         </Link>
 
-        <div className="flex items-center gap-2">
-          <Link
-            href="/profile"
-            className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted"
-            aria-label="Open profile"
+        {/* Profile Avatar with Dropdown */}
+        <div ref={dropdownRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setDropdownOpen((prev) => !prev)}
+            className="flex items-center gap-2 rounded-lg p-1 transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20"
+            aria-expanded={dropdownOpen}
+            aria-haspopup="true"
+            aria-label="Open user profile menu"
           >
-            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-semibold text-primary">
-              {avatarUrl ? (
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary shadow-xs">
+              {profile?.avatarUrl ? (
                 <img
-                  src={avatarUrl}
-                  alt="Student profile"
+                  src={profile.avatarUrl}
+                  alt={profile.fullName}
                   className="h-full w-full object-cover"
                 />
               ) : (
-                "S"
+                profile?.fullName?.[0]?.toUpperCase() || "S"
               )}
             </div>
 
-            <div className="hidden text-left md:block">
-              <p className="text-sm font-medium text-foreground">
-                Student
+            <div className="hidden text-left sm:block">
+              <p className="max-w-[120px] truncate text-xs font-semibold text-foreground">
+                {profile?.fullName || "Student"}
               </p>
-
-              <p className="text-xs text-muted-foreground">
-                My Profile
-              </p>
+              <p className="text-[10px] text-muted-foreground">My Account</p>
             </div>
-          </Link>
-
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            Logout
           </button>
+
+          {/* Large Profile Dropdown Card */}
+          {dropdownOpen && (
+            <div
+              className="absolute right-0 top-12 z-50 w-72 origin-top-right rounded-2xl border border-border bg-background p-5 shadow-2xl transition-all animate-in fade-in zoom-in-95"
+              role="menu"
+            >
+              <div className="flex flex-col items-center text-center">
+                {/* Large Profile Picture */}
+                <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-primary/20 bg-primary/10 text-2xl font-bold text-primary shadow-md">
+                  {profile?.avatarUrl ? (
+                    <img
+                      src={profile.avatarUrl}
+                      alt={profile.fullName}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    profile?.fullName?.[0]?.toUpperCase() || "S"
+                  )}
+                </div>
+
+                {/* Profile Details */}
+                <h3 className="mt-3 text-base font-bold text-foreground">
+                  {profile?.fullName || "Student"}
+                </h3>
+
+                <p className="mt-0.5 font-mono text-xs font-medium text-primary">
+                  ID: {profile?.studentId || "N/A"}
+                </p>
+
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {profile?.departmentName} • {profile?.batchName}
+                </p>
+
+                <p className="mt-0.5 max-w-[240px] truncate text-xs text-muted-foreground">
+                  {profile?.email}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="mt-5 space-y-2 border-t border-border pt-4">
+                <Link
+                  href="/profile"
+                  onClick={() => setDropdownOpen(false)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
+                >
+                  <User className="h-4 w-4" />
+                  <span>Go to Full Profile</span>
+                  <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-medium text-destructive transition hover:bg-destructive/10"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Desktop Direct Logout */}
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="hidden rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground sm:block"
+        >
+          Logout
+        </button>
       </div>
     </header>
   );
