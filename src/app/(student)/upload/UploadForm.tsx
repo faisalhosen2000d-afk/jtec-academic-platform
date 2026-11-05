@@ -213,10 +213,12 @@ export default function UploadForm({
       setDescription("");
       setTopic("");
       setFile(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[upload_form_error]", err);
       setError(
-        err?.message || "An unexpected error occurred during upload. Please try again.",
+        err instanceof Error && err.message
+          ? err.message
+          : "An unexpected error occurred during upload. Please try again.",
       );
     } finally {
       setSubmitting(false);
