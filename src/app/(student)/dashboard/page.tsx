@@ -414,6 +414,19 @@ export default async function StudentDashboardPage() {
                         View your academic results.
                       </p>
                     </Link>
+
+                    <Link
+                      href="/ranking"
+                      className="rounded-lg border border-border p-4 transition-colors hover:bg-muted"
+                    >
+                      <p className="font-medium text-foreground">
+                        Ranking
+                      </p>
+
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        View academic & contributor rankings.
+                      </p>
+                    </Link>
                   </div>
                 </div>
 
