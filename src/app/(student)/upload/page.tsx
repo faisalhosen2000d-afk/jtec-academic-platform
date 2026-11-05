@@ -1,4 +1,4 @@
-﻿import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { getAcademicTermNavigation } from "@/lib/academic-terms";
 import { redirect } from "next/navigation";
 import UploadForm from "./UploadForm";
@@ -36,14 +36,6 @@ export default async function UploadPage() {
     supabase.from("terms").select("id, level_id, name, sort_order").order("sort_order"),
   ]);
 
-  if (levelsResult.error) {
-    console.error("[upload][levels]", levelsResult.error);
-  }
-
-  if (termsResult.error) {
-    console.error("[upload][terms]", termsResult.error);
-  }
-
   const termNavigation = getAcademicTermNavigation(
     levelsResult.data ?? [],
     termsResult.data ?? [],
@@ -56,9 +48,19 @@ export default async function UploadPage() {
     redirect("/dashboard");
   }
 
-  const allowedTermIds = termNavigation.currentAndPreviousTerms.map(
-    (term) => term.id,
-  );
+  const allowedTerms = termNavigation.currentAndPreviousTerms;
+  const allowedTermIds = allowedTerms.map((term) => term.id);
+
+  const termOptions = allowedTerms.map((term) => {
+    const level = (levelsResult.data ?? []).find(
+      (item) => item.id === term.level_id,
+    );
+
+    return {
+      id: term.id,
+      label: `${level?.name ?? "Level"} - ${term.name}`,
+    };
+  });
 
   const { data: subjects, error: subjectsError } = await supabase
     .from("subjects")
@@ -116,7 +118,11 @@ export default async function UploadPage() {
                     Unable to load subjects. Please try again.
                   </p>
                 ) : (
-                  <UploadForm subjects={subjectsWithTermLabels} />
+                  <UploadForm
+                    subjects={subjectsWithTermLabels}
+                    terms={termOptions}
+                    currentTermId={profile.current_term_id}
+                  />
                 )}
               </section>
             </div>
@@ -126,5 +132,3 @@ export default async function UploadPage() {
     </div>
   );
 }
-
-

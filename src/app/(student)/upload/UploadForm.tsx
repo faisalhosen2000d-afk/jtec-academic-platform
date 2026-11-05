@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -13,11 +13,25 @@ type Subject = {
   term_name: string;
 };
 
-type UploadFormProps = {
-  subjects: Subject[];
+type TermOption = {
+  id: string;
+  label: string;
 };
 
-export default function UploadForm({ subjects }: UploadFormProps) {
+type UploadFormProps = {
+  subjects: Subject[];
+  terms: TermOption[];
+  currentTermId?: string;
+};
+
+export default function UploadForm({
+  subjects,
+  terms,
+  currentTermId,
+}: UploadFormProps) {
+  const [selectedTermFilter, setSelectedTermFilter] = useState(
+    currentTermId || "all",
+  );
   const [subjectSearch, setSubjectSearch] = useState("");
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [subjectDropdownOpen, setSubjectDropdownOpen] = useState(false);
@@ -65,23 +79,33 @@ export default function UploadForm({ subjects }: UploadFormProps) {
   }, []);
 
   const filteredSubjects = useMemo(() => {
-    const query = subjectSearch.trim().toLowerCase();
-
-    if (!query) {
-      return subjects;
-    }
-
     return subjects.filter((subject) => {
+      if (selectedTermFilter !== "all" && subject.term_id !== selectedTermFilter) {
+        return false;
+      }
+
+      const query = subjectSearch.trim().toLowerCase();
+      if (!query) {
+        return true;
+      }
+
       return (
         subject.subject_code.toLowerCase().includes(query) ||
         subject.subject_name.toLowerCase().includes(query)
       );
     });
-  }, [subjects, subjectSearch]);
+  }, [subjects, selectedTermFilter, subjectSearch]);
 
   const selectedSubject = subjects.find(
     (subject) => subject.id === selectedSubjectId,
   );
+
+  const handleTermChange = (termId: string) => {
+    setSelectedTermFilter(termId);
+    setSelectedSubjectId("");
+    setSubjectSearch("");
+    setSubjectDropdownOpen(false);
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -178,33 +202,21 @@ export default function UploadForm({ subjects }: UploadFormProps) {
 
       if (!finalizeResponse.ok) {
         throw new Error(
-          finalizeData?.error || "Material could not be saved.",
+          finalizeData?.error || "Upload finalization failed.",
         );
       }
 
-      setMessage(
-        finalizeData?.message ||
-          "Material submitted successfully. It is now pending review.",
-      );
-
-      setSubjectSearch("");
+      setMessage("Material uploaded successfully and submitted for approval!");
       setSelectedSubjectId("");
+      setSubjectSearch("");
       setTitle("");
       setDescription("");
       setTopic("");
       setFile(null);
-      setSubjectDropdownOpen(false);
-
-      const fileInput = document.getElementById(
-        "material-file",
-      ) as HTMLInputElement | null;
-
-      if (fileInput) {
-        fileInput.value = "";
-      }
-    } catch (err) {
+    } catch (err: any) {
+      console.error("[upload_form_error]", err);
       setError(
-        err instanceof Error ? err.message : "Something went wrong.",
+        err?.message || "An unexpected error occurred during upload. Please try again.",
       );
     } finally {
       setSubmitting(false);
@@ -225,13 +237,49 @@ export default function UploadForm({ subjects }: UploadFormProps) {
         </div>
       )}
 
-      <div ref={subjectContainerRef} className="space-y-2">
+      {/* Academic Term Filter */}
+      <div className="space-y-2">
         <label
-          htmlFor="subject-search"
+          htmlFor="term-filter"
           className="text-sm font-medium text-foreground"
         >
-          Subject
+          Select Academic Term / Level (Filter Subjects)
         </label>
+        <select
+          id="term-filter"
+          value={selectedTermFilter}
+          onChange={(e) => handleTermChange(e.target.value)}
+          className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        >
+          <option value="all">All Accessible Terms ({subjects.length} subjects)</option>
+          {terms.map((term) => {
+            const count = subjects.filter((s) => s.term_id === term.id).length;
+            const isCurrent = term.id === currentTermId;
+            return (
+              <option key={term.id} value={term.id}>
+                {term.label} {isCurrent ? "(Current Term)" : ""} ({count} subjects)
+              </option>
+            );
+          })}
+        </select>
+        <p className="text-xs text-muted-foreground">
+          Choose a term to narrow down the subject list, or select &quot;All Accessible Terms&quot;.
+        </p>
+      </div>
+
+      {/* Subject Selection */}
+      <div ref={subjectContainerRef} className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label
+            htmlFor="subject-search"
+            className="text-sm font-medium text-foreground"
+          >
+            Subject <span className="text-red-500">*</span>
+          </label>
+          <span className="text-xs text-muted-foreground">
+            {filteredSubjects.length} subjects available
+          </span>
+        </div>
 
         <div className="relative">
           <input
@@ -239,7 +287,7 @@ export default function UploadForm({ subjects }: UploadFormProps) {
             type="text"
             value={
               selectedSubject
-                ? `${selectedSubject.subject_code} — ${selectedSubject.subject_name}`
+                ? `${selectedSubject.subject_code} - ${selectedSubject.subject_name}`
                 : subjectSearch
             }
             onChange={(event) => {
@@ -248,8 +296,8 @@ export default function UploadForm({ subjects }: UploadFormProps) {
               setSubjectDropdownOpen(true);
             }}
             onFocus={() => setSubjectDropdownOpen(true)}
-            placeholder="Search and select your subject..."
-            className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none transition focus:border-primary"
+            placeholder="Click to view subjects or type code/name..."
+            className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             autoComplete="off"
           />
 
@@ -265,23 +313,24 @@ export default function UploadForm({ subjects }: UploadFormProps) {
                       setSubjectSearch("");
                       setSubjectDropdownOpen(false);
                     }}
-                    className="block w-full border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-muted"
+                    className="block w-full border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-muted/50 focus:bg-muted/50 focus:outline-none"
                   >
-                    <p className="text-sm font-medium text-foreground">
-                      {subject.subject_code}
-                    </p>
-
-                    <p className="mt-0.5 text-xs text-muted-foreground">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-primary">
+                        {subject.subject_code}
+                      </p>
+                      <span className="rounded bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        {subject.level_name} - {subject.term_name}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-foreground">
                       {subject.subject_name}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {subject.level_name} — {subject.term_name}
                     </p>
                   </button>
                 ))
               ) : (
                 <p className="px-4 py-3 text-sm text-muted-foreground">
-                  No subjects found.
+                  No subjects found for this term.
                 </p>
               )}
             </div>
@@ -296,14 +345,13 @@ export default function UploadForm({ subjects }: UploadFormProps) {
         >
           Material Title
         </label>
-
         <input
           id="material-title"
           type="text"
           value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          placeholder="Enter the title or name of this material..."
-          className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none transition focus:border-primary"
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. Chapter 3 Lecture Notes, Term Final Question Bank"
+          className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </div>
 
@@ -312,16 +360,15 @@ export default function UploadForm({ subjects }: UploadFormProps) {
           htmlFor="material-topic"
           className="text-sm font-medium text-foreground"
         >
-          Topic
+          Topic / Chapter (Optional)
         </label>
-
         <input
           id="material-topic"
           type="text"
           value={topic}
-          onChange={(event) => setTopic(event.target.value)}
-          placeholder="Enter the main topic or chapter..."
-          className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none transition focus:border-primary"
+          onChange={(e) => setTopic(e.target.value)}
+          placeholder="e.g. Differential Equations, Midterm Review"
+          className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </div>
 
@@ -330,16 +377,15 @@ export default function UploadForm({ subjects }: UploadFormProps) {
           htmlFor="material-description"
           className="text-sm font-medium text-foreground"
         >
-          Description
+          Description (Optional)
         </label>
-
         <textarea
           id="material-description"
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder="Briefly describe what this material contains..."
           rows={4}
-          className="w-full resize-y rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none transition focus:border-primary"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Briefly describe what this material covers..."
+          className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </div>
 
@@ -348,34 +394,26 @@ export default function UploadForm({ subjects }: UploadFormProps) {
           htmlFor="material-file"
           className="text-sm font-medium text-foreground"
         >
-          File
+          File Attachment
         </label>
-
         <input
           id="material-file"
           type="file"
-          accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.jpg,.jpeg,.png"
-          onChange={(event) => {
-            setFile(event.target.files?.[0] || null);
-          }}
-          className="block w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground"
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-1.5 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/20 focus:outline-none"
         />
-
         <p className="text-xs text-muted-foreground">
-          Maximum file size: 100 MB. XLS/XLSX files are not allowed.
+          Maximum allowed file size: 100 MB.
         </p>
       </div>
 
-      <div className="flex items-center justify-end">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {submitting ? "Uploading..." : "Upload Material"}
-        </button>
-      </div>
+      <button
+        type="submit"
+        disabled={submitting}
+        className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50"
+      >
+        {submitting ? "Uploading..." : "Upload Material"}
+      </button>
     </form>
   );
 }
-
