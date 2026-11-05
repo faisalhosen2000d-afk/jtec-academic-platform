@@ -296,14 +296,7 @@ export function StudentHeader() {
           )}
         </div>
 
-        {/* Desktop Direct Logout */}
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="hidden rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground sm:block"
-        >
-          Logout
-        </button>
+
       </div>
     </header>
   );
