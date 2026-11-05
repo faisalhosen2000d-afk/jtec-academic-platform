@@ -1,6 +1,7 @@
-﻿import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
+import { StudentHeader } from "@/components/dashboard/student-header";
 import StudentContactSettings from "@/components/student/StudentContactSettings";
 import StudentProfilePhoto from "@/components/student/StudentProfilePhoto";
 
@@ -58,17 +59,7 @@ export default async function StudentProfilePage() {
         <StudentSidebar />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-16 items-center border-b border-border bg-background px-6">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Student Portal
-              </p>
-
-              <h1 className="text-lg font-semibold text-foreground">
-                Profile
-              </h1>
-            </div>
-          </header>
+          <StudentHeader />
 
           <main className="flex-1 p-6">
             <div className="mx-auto max-w-3xl space-y-6">
