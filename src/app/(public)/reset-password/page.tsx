@@ -1,10 +1,13 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { resetPasswordSchema } from "@/lib/validation/auth";
 import { createRecoveryClient } from "@/lib/supabase/recovery-client";
 
 export default function ResetPasswordPage() {
+  const router = useRouter();
   const [ready, setReady] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -22,7 +25,7 @@ export default function ResetPasswordPage() {
 
       if (sessionError || !data.session) {
         setError(
-          "This password reset link is invalid or has expired. Please request a new reset link.",
+          "This password reset link is invalid or has expired. Please request a new reset link."
         );
         setReady(true);
         return;
@@ -76,7 +79,12 @@ export default function ResetPasswordPage() {
         return;
       }
 
+      await supabase.auth.signOut();
       setSuccess(true);
+
+      setTimeout(() => {
+        router.replace("/login");
+      }, 1200);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -137,19 +145,38 @@ export default function ResetPasswordPage() {
             Verifying password reset session...
           </p>
         ) : success ? (
-          <div
-            style={{
-              padding: "14px",
-              borderRadius: "8px",
-              background: "#ecfdf5",
-              border: "1px solid #a7f3d0",
-              color: "#047857",
-              fontSize: "14px",
-              lineHeight: "1.5",
-              marginBottom: "20px",
-            }}
-          >
-            Your password has been updated successfully.
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{
+                padding: "14px",
+                borderRadius: "8px",
+                background: "#ecfdf5",
+                border: "1px solid #a7f3d0",
+                color: "#047857",
+                fontSize: "14px",
+                lineHeight: "1.5",
+                marginBottom: "16px",
+              }}
+            >
+              Your password has been updated successfully. Redirecting to login page...
+            </div>
+            <Link
+              href="/login"
+              style={{
+                display: "inline-block",
+                width: "100%",
+                padding: "12px",
+                background: "#2563eb",
+                color: "#ffffff",
+                borderRadius: "8px",
+                fontSize: "15px",
+                fontWeight: "600",
+                textDecoration: "none",
+                boxSizing: "border-box",
+              }}
+            >
+              Go to Login Now
+            </Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
@@ -162,7 +189,7 @@ export default function ResetPasswordPage() {
                   fontWeight: "500",
                 }}
               >
-                New password
+                New Password
               </label>
 
               <input
@@ -171,7 +198,7 @@ export default function ResetPasswordPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your new password"
+                placeholder="Enter new password"
                 autoComplete="new-password"
                 required
                 style={{
@@ -252,6 +279,7 @@ export default function ResetPasswordPage() {
                   marginBottom: "18px",
                   color: "#dc2626",
                   fontSize: "14px",
+                  textAlign: "center",
                 }}
               >
                 {error}
@@ -264,16 +292,16 @@ export default function ResetPasswordPage() {
               style={{
                 width: "100%",
                 padding: "12px",
-                border: "none",
-                borderRadius: "8px",
                 background: isPending ? "#94a3b8" : "#2563eb",
                 color: "#ffffff",
+                border: "none",
+                borderRadius: "8px",
                 fontSize: "16px",
                 fontWeight: "600",
                 cursor: isPending ? "not-allowed" : "pointer",
               }}
             >
-              {isPending ? "Updating..." : "Update password"}
+              {isPending ? "Updating password..." : "Reset Password"}
             </button>
           </form>
         )}
