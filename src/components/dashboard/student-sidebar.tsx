@@ -3,19 +3,30 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  BookOpen,
+  Bookmark,
+  Upload,
+  GraduationCap,
+  Trophy,
+  MessageSquare,
+  Bell,
+  User,
+} from "lucide-react";
 import { useUnreadNotifications } from "@/lib/use-unread-notifications";
 import { useUnreadMessages } from "@/lib/use-unread-messages";
 
 const navigationItems = [
-  { label: "Dashboard", href: "/dashboard", icon: "\u2302" },
-  { label: "Materials", href: "/materials", icon: "\u25A3" },
-  { label: "Bookmarks", href: "/bookmarks", icon: "\u2605" },
-  { label: "Upload", href: "/upload", icon: "\u2191" },
-  { label: "Results", href: "/results", icon: "\u25A5" },
-  { label: "Ranking", href: "/ranking", icon: "\u265B" },
-  { label: "Conversations", href: "/messages", icon: "C" },
-  { label: "Notifications", href: "/notifications", icon: "\u25CC" },
-  { label: "Profile", href: "/profile", icon: "\u25CB" },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Materials", href: "/materials", icon: BookOpen },
+  { label: "Bookmarks", href: "/bookmarks", icon: Bookmark },
+  { label: "Upload", href: "/upload", icon: Upload },
+  { label: "Results", href: "/results", icon: GraduationCap },
+  { label: "Ranking", href: "/ranking", icon: Trophy },
+  { label: "Conversations", href: "/messages", icon: MessageSquare },
+  { label: "Notifications", href: "/notifications", icon: Bell },
+  { label: "Profile", href: "/profile", icon: User },
 ];
 
 export function StudentSidebar() {
@@ -39,7 +50,7 @@ export function StudentSidebar() {
           className="flex items-center gap-3"
           aria-label="JTEC Academic Platform"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground shadow-sm">
             J
           </div>
 
@@ -55,12 +66,13 @@ export function StudentSidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-5">
-        <p className="mb-3 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
           Student
         </p>
 
         <div className="space-y-1">
           {navigationItems.map((item) => {
+            const Icon = item.icon;
             const isActive =
               activePath === item.href ||
               (item.href !== "/dashboard" &&
@@ -80,34 +92,35 @@ export function StudentSidebar() {
                   }
                 }}
                 className={[
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
                   isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    ? "bg-primary/10 font-semibold text-primary shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 ].join(" ")}
               >
-                <span
+                <Icon
                   className={[
-                    "flex h-5 w-5 items-center justify-center text-sm",
-                    isActive ? "text-primary" : "text-muted-foreground",
+                    "h-4.5 w-4.5 shrink-0 transition-transform duration-150 group-hover:scale-105",
+                    isActive
+                      ? "text-primary"
+                      : "text-muted-foreground group-hover:text-foreground",
                   ].join(" ")}
+                  strokeWidth={isActive ? 2.2 : 1.8}
                   aria-hidden="true"
-                >
-                  {item.icon}
-                </span>
+                />
 
-                <span className="flex-1">{item.label}</span>
+                <span className="flex-1 tracking-tight">{item.label}</span>
 
                 {isNotifications && hasUnreadNotifications && (
                   <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full bg-destructive"
+                    className="h-2 w-2 shrink-0 rounded-full bg-destructive ring-2 ring-background"
                     aria-label="Unread notifications"
                   />
                 )}
 
                 {isConversations && hasUnreadMessages && (
                   <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full bg-destructive"
+                    className="h-2 w-2 shrink-0 rounded-full bg-destructive ring-2 ring-background"
                     aria-label="Unread messages"
                   />
                 )}
@@ -118,13 +131,13 @@ export function StudentSidebar() {
       </nav>
 
       <div className="border-t border-border p-3">
-        <div className="rounded-lg bg-muted/50 px-3 py-3">
-          <p className="text-xs font-medium text-foreground">
+        <div className="rounded-lg bg-muted/40 p-3">
+          <p className="text-xs font-semibold text-foreground">
             JTEC Academic Platform
           </p>
 
-          <p className="mt-1 text-xs text-muted-foreground">
-            Student access
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Student Portal v1.2
           </p>
         </div>
       </div>
