@@ -136,7 +136,7 @@ export default function ModernAuthCard({ initialRole = "student" }: { initialRol
                     <PasswordInput
                       id="home_student_password"
                       name="password"
-                      placeholder="••••••••"
+                      placeholder="ÔÇóÔÇóÔÇóÔÇóÔÇóÔÇóÔÇóÔÇó"
                       autoComplete="current-password"
                       required
                       className="pl-10 h-11 rounded-xl bg-muted/20 text-sm focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 transition-all"
@@ -205,7 +205,7 @@ export default function ModernAuthCard({ initialRole = "student" }: { initialRol
                     <PasswordInput
                       id="home_staff_password"
                       name="password"
-                      placeholder="••••••••"
+                      placeholder="ÔÇóÔÇóÔÇóÔÇóÔÇóÔÇóÔÇóÔÇó"
                       autoComplete="current-password"
                       required
                       className="pl-10 h-11 rounded-xl bg-muted/20 text-sm focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 transition-all"
@@ -246,7 +246,7 @@ export default function ModernAuthCard({ initialRole = "student" }: { initialRol
 
         {/* Footer info */}
         <p className="mt-6 text-center text-[11px] font-medium text-muted-foreground">
-          &copy; {new Date().getFullYear()} JTEC Academic Platform • All Rights Reserved
+          &copy; {new Date().getFullYear()} JTEC Academic Platform ÔÇó All Rights Reserved
         </p>
       </div>
     </main>
