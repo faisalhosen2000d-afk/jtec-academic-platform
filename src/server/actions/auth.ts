@@ -235,7 +235,7 @@ export async function createAdministrationAccountRequest(
   if (!resolvedEmail) {
     return {
       success: false,
-      error: GENERIC_ERROR,
+      error: "Student ID not found.",
     };
   }
 
@@ -250,11 +250,9 @@ export async function createAdministrationAccountRequest(
   if (signInError) {
     return {
       success: false,
-      error: GENERIC_ERROR,
+      error: "Incorrect password. Please try again.",
     };
   }
-
-  revalidatePath("/", "layout");
 
   redirect("/dashboard");
 }
@@ -303,7 +301,7 @@ export async function staffSignIn(
   if (signInError) {
     return {
       success: false,
-      error: GENERIC_ERROR,
+      error: "Incorrect password. Please try again.",
     };
   }
 
