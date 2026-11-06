@@ -28,7 +28,7 @@ export default async function SystemSettingsPage() {
 
   const serviceSupabase = createServiceRoleClient();
 
-  const { data: settingsRow } = await serviceSupabase
+  const { data: settingsRow } = await (serviceSupabase as any)
     .from("platform_settings")
     .select("registration_open, max_upload_size_mb, maintenance_mode, maintenance_message, updated_at")
     .eq("id", 1)

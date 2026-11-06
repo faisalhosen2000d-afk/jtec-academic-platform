@@ -38,7 +38,7 @@ export async function savePlatformSettings(formData: FormData): Promise<SaveSett
 
   const serviceSupabase = createServiceRoleClient();
 
-  const { error: upsertError } = await serviceSupabase
+  const { error: upsertError } = await (serviceSupabase as any)
     .from("platform_settings")
     .upsert({
       id: 1,
