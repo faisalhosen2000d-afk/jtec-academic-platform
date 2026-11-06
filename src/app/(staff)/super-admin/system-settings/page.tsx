@@ -10,6 +10,8 @@ type RawPlatformSettings = {
   max_upload_size_mb?: number;
   maintenance_mode?: boolean;
   maintenance_message?: string;
+  maintenance_start_time?: string | null;
+  maintenance_end_time?: string | null;
   updated_at?: string;
 };
 
@@ -49,6 +51,8 @@ export default async function SystemSettingsPage() {
     maintenance_message:
       settingsRow?.maintenance_message ??
       "The academic platform is currently undergoing scheduled maintenance. Please check back shortly.",
+    maintenance_start_time: settingsRow?.maintenance_start_time ?? null,
+    maintenance_end_time: settingsRow?.maintenance_end_time ?? null,
     updated_at: settingsRow?.updated_at ?? new Date().toISOString(),
   };
 
@@ -64,7 +68,7 @@ export default async function SystemSettingsPage() {
               System Settings
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Configure real-time registration gates, file upload limits, and maintenance state.
+              Configure real-time registration gates, file upload limits, and maintenance windows.
             </p>
           </div>
 

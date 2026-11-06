@@ -36,6 +36,9 @@ export async function savePlatformSettings(formData: FormData): Promise<SaveSett
     (formData.get("maintenance_message") as string)?.trim() ||
     "The academic platform is currently undergoing scheduled maintenance. Please check back shortly.";
 
+  const startTimeStr = (formData.get("maintenance_start_time") as string)?.trim() || null;
+  const endTimeStr = (formData.get("maintenance_end_time") as string)?.trim() || null;
+
   const rawServiceSupabase = createRawSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -46,6 +49,8 @@ export async function savePlatformSettings(formData: FormData): Promise<SaveSett
     p_max_upload_size_mb: maxUploadSizeMb,
     p_maintenance_mode: maintenanceMode,
     p_maintenance_message: maintenanceMessage,
+    p_maintenance_start_time: startTimeStr ? new Date(startTimeStr).toISOString() : null,
+    p_maintenance_end_time: endTimeStr ? new Date(endTimeStr).toISOString() : null,
   });
 
   if (rpcError) {
@@ -63,11 +68,15 @@ export async function savePlatformSettings(formData: FormData): Promise<SaveSett
       registration_open: registrationOpen,
       max_upload_size_mb: maxUploadSizeMb,
       maintenance_mode: maintenanceMode,
+      maintenance_start_time: startTimeStr,
+      maintenance_end_time: endTimeStr,
     },
   });
 
   revalidatePath("/super-admin/system-settings");
   revalidatePath("/super-admin/audit-logs");
+  revalidatePath("/register");
+  revalidatePath("/upload");
 
   return { success: true };
 }

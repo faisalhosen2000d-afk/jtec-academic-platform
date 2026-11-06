@@ -10,9 +10,22 @@ type SettingsFormProps = {
     max_upload_size_mb: number;
     maintenance_mode: boolean;
     maintenance_message: string;
+    maintenance_start_time: string | null;
+    maintenance_end_time: string | null;
     updated_at: string;
   };
 };
+
+function toLocalDatetimeString(isoString: string | null): string {
+  if (!isoString) return "";
+  try {
+    const d = new Date(isoString);
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+  } catch {
+    return "";
+  }
+}
 
 export default function SettingsForm({ initialSettings }: SettingsFormProps) {
   const [loading, setLoading] = useState(false);
@@ -23,6 +36,8 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
   const [maintenanceMode, setMaintenanceMode] = useState(initialSettings.maintenance_mode);
   const [maxUploadSize, setMaxUploadSize] = useState(initialSettings.max_upload_size_mb);
   const [maintenanceMessage, setMaintenanceMessage] = useState(initialSettings.maintenance_message);
+  const [startTime, setStartTime] = useState(toLocalDatetimeString(initialSettings.maintenance_start_time));
+  const [endTime, setEndTime] = useState(toLocalDatetimeString(initialSettings.maintenance_end_time));
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,7 +49,7 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
     const result = await savePlatformSettings(formData);
 
     if (result.success) {
-      setSuccess("System settings saved and applied successfully!");
+      setSuccess("System settings saved and applied successfully across the platform!");
       setTimeout(() => setSuccess(""), 4000);
     } else {
       setError(result.error);
@@ -74,7 +89,7 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
           </div>
 
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Allow new students to create verified accounts using valid registration codes. Turn this off after admission season.
+            Allow new students to register using valid department registration codes. Turn this off when admissions close.
           </p>
 
           <label className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-4 cursor-pointer hover:bg-muted/40 transition">
@@ -99,7 +114,7 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
           </div>
 
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Set the maximum single file size students and faculty can upload for lecture notes, books, and question banks.
+            Directly sets the max file upload size for all students on the upload material page and API endpoints.
           </p>
 
           <div className="space-y-2">
@@ -122,13 +137,13 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
           </div>
         </section>
 
-        {/* Maintenance Mode Control */}
+        {/* Scheduled Maintenance Mode Control with Start & End Time */}
         <section className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4 md:col-span-2">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-foreground">System Maintenance Mode</h2>
+              <h2 className="text-base font-bold text-foreground">Scheduled System Maintenance Mode</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Enable only during database migrations, system upgrades, or term-end scheduled maintenance.
+                Configure scheduled maintenance window with exact start time and estimated completion time.
               </p>
             </div>
             <span
@@ -143,7 +158,10 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
           </div>
 
           <label className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-4 cursor-pointer hover:bg-muted/40 transition">
-            <span className="text-sm font-medium text-foreground">Turn On Scheduled Maintenance Mode</span>
+            <div>
+              <span className="text-sm font-medium text-foreground block">Turn On Maintenance Window</span>
+              <span className="text-xs text-muted-foreground">Students see the notice below until maintenance is turned off or window ends.</span>
+            </div>
             <input
               type="checkbox"
               name="maintenance_mode"
@@ -153,7 +171,37 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
             />
           </label>
 
-          <div className="space-y-1.5">
+          <div className="grid gap-4 sm:grid-cols-2 pt-1">
+            <div className="space-y-1.5">
+              <label htmlFor="maintenance_start_time" className="text-xs font-semibold text-muted-foreground uppercase">
+                Maintenance Start Time
+              </label>
+              <input
+                id="maintenance_start_time"
+                name="maintenance_start_time"
+                type="datetime-local"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full h-11 px-3 rounded-xl border border-input bg-background text-xs text-foreground focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="maintenance_end_time" className="text-xs font-semibold text-muted-foreground uppercase">
+                Estimated Completion Time (End Time)
+              </label>
+              <input
+                id="maintenance_end_time"
+                name="maintenance_end_time"
+                type="datetime-local"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="w-full h-11 px-3 rounded-xl border border-input bg-background text-xs text-foreground focus:ring-2 focus:ring-primary"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5 pt-2">
             <label htmlFor="maintenance_message" className="text-xs font-semibold text-muted-foreground uppercase">
               Notice Shown to Students
             </label>

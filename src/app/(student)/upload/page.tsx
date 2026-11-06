@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getAcademicTermNavigation } from "@/lib/academic-terms";
 import { redirect } from "next/navigation";
 import UploadForm from "./UploadForm";
@@ -73,6 +74,15 @@ export default async function UploadPage() {
     console.error("[upload][subjects]", subjectsError);
   }
 
+    const serviceSupabase = createServiceRoleClient();
+  const { data: settingsRow } = await serviceSupabase
+    .from("platform_settings")
+    .select("max_upload_size_mb")
+    .eq("id", 1)
+    .maybeSingle();
+
+  const maxUploadSizeMb = settingsRow?.max_upload_size_mb ?? 100;
+
   const subjectsWithTermLabels = (subjects ?? []).map((subject) => {
     const level = (levelsResult.data ?? []).find(
       (item) => item.id === subject.level_id,
@@ -122,6 +132,7 @@ export default async function UploadPage() {
                     subjects={subjectsWithTermLabels}
                     terms={termOptions}
                     currentTermId={profile.current_term_id}
+                    maxUploadSizeMb={maxUploadSizeMb}
                   />
                 )}
               </section>

@@ -1,8 +1,21 @@
+import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { randomUUID } from "crypto";
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024;
+async function getMaxUploadSizeBytes(): Promise<{ maxBytes: number; maxMb: number }> {
+  try {
+    const rawSupabase = createRawSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
+    const { data } = await rawSupabase.rpc("get_platform_settings");
+    const mb = (data as any)?.max_upload_size_mb ?? 100;
+    return { maxBytes: mb * 1024 * 1024, maxMb: mb };
+  } catch {
+    return { maxBytes: 100 * 1024 * 1024, maxMb: 100 };
+  }
+}
 
 const ALLOWED_EXTENSIONS = new Set([
   "pdf",
