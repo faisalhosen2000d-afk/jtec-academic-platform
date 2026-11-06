@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import { getAcademicTermNavigation } from "@/lib/academic-terms";
 import { redirect } from "next/navigation";
 import UploadForm from "./UploadForm";
@@ -32,10 +32,19 @@ export default async function UploadPage() {
     redirect("/dashboard");
   }
 
-  const [levelsResult, termsResult] = await Promise.all([
+  const rawServiceSupabase = createRawSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+
+  const [levelsResult, termsResult, { data: settingsData }] = await Promise.all([
     supabase.from("levels").select("id, name, sort_order").order("sort_order"),
     supabase.from("terms").select("id, level_id, name, sort_order").order("sort_order"),
+    rawServiceSupabase.rpc("get_platform_settings"),
   ]);
+
+  const maxUploadSizeMb =
+    (settingsData as { max_upload_size_mb?: number } | null)?.max_upload_size_mb ?? 100;
 
   const termNavigation = getAcademicTermNavigation(
     levelsResult.data ?? [],
@@ -73,15 +82,6 @@ export default async function UploadPage() {
   if (subjectsError) {
     console.error("[upload][subjects]", subjectsError);
   }
-
-    const serviceSupabase = createServiceRoleClient();
-  const { data: settingsRow } = await serviceSupabase
-    .from("platform_settings")
-    .select("max_upload_size_mb")
-    .eq("id", 1)
-    .maybeSingle();
-
-  const maxUploadSizeMb = settingsRow?.max_upload_size_mb ?? 100;
 
   const subjectsWithTermLabels = (subjects ?? []).map((subject) => {
     const level = (levelsResult.data ?? []).find(

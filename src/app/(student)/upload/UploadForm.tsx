@@ -407,7 +407,7 @@ export default function UploadForm({
           className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-1.5 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/20 focus:outline-none"
         />
         <p className="text-xs text-muted-foreground">
-          {Maximum allowed file size:  MB.}
+          Maximum allowed file size: {maxUploadSizeMb} MB.
         </p>
       </div>
 
