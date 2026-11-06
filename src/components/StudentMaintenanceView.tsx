@@ -14,19 +14,15 @@ export function StudentMaintenanceView({ message, startTime, endTime }: Maintena
   const formatTime = (iso?: string | null) => {
     if (!iso) return null;
     try {
-      const cleaned = iso.replace(/(\+00:00|Z)$/, "");
-      const d = new Date(cleaned);
+      const d = new Date(iso);
       if (!isNaN(d.getTime())) {
         return d.toLocaleString("en-US", {
+          timeZone: "Asia/Dhaka",
           dateStyle: "medium",
           timeStyle: "short",
         });
       }
-      return new Date(iso).toLocaleString("en-US", {
-        timeZone: "Asia/Dhaka",
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
+      return iso;
     } catch {
       return iso;
     }
