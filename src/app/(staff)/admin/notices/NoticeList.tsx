@@ -99,7 +99,7 @@ export default function NoticeList({
 
         {canDelete && (
           <Link href="/admin/notices/bulk-delete" className="shrink-0">
-            <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs text-destructive hover:bg-destructive/10">
+            <Button variant="outline" className="w-full sm:w-auto h-8 px-3 text-xs text-destructive hover:bg-destructive/10">
               <Trash2 className="h-3.5 w-3.5 mr-1.5" />
               Bulk Delete Notices
             </Button>
