@@ -37,6 +37,7 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
   const [maintenanceMode, setMaintenanceMode] = useState(initialSettings.maintenance_mode);
   const [maxUploadSize, setMaxUploadSize] = useState(initialSettings.max_upload_size_mb);
   const [maintenanceMessage, setMaintenanceMessage] = useState(initialSettings.maintenance_message);
+  const [bypassStudentIds, setBypassStudentIds] = useState(initialSettings.maintenance_bypass_student_ids || "");
   const [startTime, setStartTime] = useState(toLocalDatetimeString(initialSettings.maintenance_start_time));
   const [endTime, setEndTime] = useState(toLocalDatetimeString(initialSettings.maintenance_end_time));
 
@@ -239,7 +240,7 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
           <input
             type="text"
             name="maintenance_bypass_student_ids"
-            defaultValue={initialSettings?.maintenance_bypass_student_ids || ""}
+            value={bypassStudentIds} onChange={(e) => setBypassStudentIds(e.target.value)}
             placeholder="e.g. 20210001042, 20210001999"
             className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
           />

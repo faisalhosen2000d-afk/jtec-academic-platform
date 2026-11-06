@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient as createServerAuthClient } from "@/lib/supabase/server";
 import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
+
 function normalizeBdTimestamp(val: string | null | undefined): string | null {
   if (!val || typeof val !== "string") return null;
   const trimmed = val.trim();
@@ -13,79 +14,94 @@ function normalizeBdTimestamp(val: string | null | undefined): string | null {
   return trimmed;
 }
 
-export type SaveSettingsResult =
-  | { success: true }
-  | { success: false; error: string };
+export interface SystemSettingsInput {
+  registration_open?: boolean;
+  max_upload_size_mb?: number;
+  maintenance_mode?: boolean;
+  maintenance_message?: string;
+  maintenance_start_time?: string | null;
+  maintenance_end_time?: string | null;
+  maintenance_bypass_student_ids?: string | null;
+}
 
-export async function savePlatformSettings(formData: FormData): Promise<SaveSettingsResult> {
+export async function savePlatformSettings(input: FormData | SystemSettingsInput) {
   const authSupabase = await createServerAuthClient();
-
   const {
     data: { user },
   } = await authSupabase.auth.getUser();
 
   if (!user) {
-    return { success: false, error: "Authentication required." };
+    return { success: false as const, error: "Unauthorized" };
   }
 
   const { data: profile } = await authSupabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .maybeSingle();
+    .single();
 
   if (!profile || profile.role !== "super_admin") {
-    return { success: false, error: "Only Super Admin can change system settings." };
+    return { success: false as const, error: "Only Super Admins can modify system settings." };
   }
 
-  const registrationOpen = formData.get("registration_open") === "on";
-  const maintenanceMode = formData.get("maintenance_mode") === "on";
-  const maxUploadSizeMb = parseInt(formData.get("max_upload_size_mb") as string, 10) || 100;
-  const maintenanceMessage =
-    (formData.get("maintenance_message") as string)?.trim() ||
-    "The academic platform is currently undergoing scheduled maintenance. Please check back shortly.";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const adminClient = createRawSupabaseClient(supabaseUrl, serviceKey);
 
-  const startTimeStr = (formData.get("maintenance_start_time") as string)?.trim() || null;
-  const endTimeStr = (formData.get("maintenance_end_time") as string)?.trim() || null;
+  let registration_open = false;
+  let max_upload_size_mb = 25;
+  let maintenance_mode = false;
+  let maintenance_message = "The academic platform is currently undergoing scheduled maintenance. Please check back shortly.";
+  let maintenance_start_time: string | null = null;
+  let maintenance_end_time: string | null = null;
+  let maintenance_bypass_student_ids: string | null = null;
 
-  const rawServiceSupabase = createRawSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-
-  const { error: rpcError } = await rawServiceSupabase.rpc("update_platform_settings", {
-    p_registration_open: registrationOpen,
-    p_max_upload_size_mb: maxUploadSizeMb,
-    p_maintenance_mode: maintenanceMode,
-    p_maintenance_message: maintenanceMessage,
-    p_maintenance_start_time: startTimeStr ? new Date(startTimeStr).toISOString() : null,
-    p_maintenance_end_time: endTimeStr ? new Date(endTimeStr).toISOString() : null,
-  });
-
-  if (rpcError) {
-    console.error("Platform settings update error:", rpcError);
-    return { success: false, error: rpcError.message };
+  if (input instanceof FormData) {
+    registration_open = input.get("registration_open") === "on" || input.get("registration_open") === "true";
+    max_upload_size_mb = Number(input.get("max_upload_size_mb")) || 25;
+    maintenance_mode = input.get("maintenance_mode") === "on" || input.get("maintenance_mode") === "true";
+    maintenance_message = String(input.get("maintenance_message") || maintenance_message);
+    maintenance_start_time = normalizeBdTimestamp(input.get("maintenance_start_time") as string);
+    maintenance_end_time = normalizeBdTimestamp(input.get("maintenance_end_time") as string);
+    const bypassRaw = input.get("maintenance_bypass_student_ids");
+    maintenance_bypass_student_ids = typeof bypassRaw === "string" && bypassRaw.trim() ? bypassRaw.trim() : null;
+  } else {
+    registration_open = Boolean(input.registration_open);
+    max_upload_size_mb = Number(input.max_upload_size_mb) || 25;
+    maintenance_mode = Boolean(input.maintenance_mode);
+    maintenance_message = input.maintenance_message || maintenance_message;
+    maintenance_start_time = normalizeBdTimestamp(input.maintenance_start_time);
+    maintenance_end_time = normalizeBdTimestamp(input.maintenance_end_time);
+    maintenance_bypass_student_ids = input.maintenance_bypass_student_ids ? input.maintenance_bypass_student_ids.trim() : null;
   }
 
-  await rawServiceSupabase.from("audit_logs").insert({
-    actor_id: user.id,
-    action: "system.settings_updated",
-    target_table: "platform_settings",
-    target_id: "1",
-    previous_state: null,
-    new_state: {
-      registration_open: registrationOpen,
-      max_upload_size_mb: maxUploadSizeMb,
-      maintenance_mode: maintenanceMode,
-      maintenance_start_time: startTimeStr,
-      maintenance_end_time: endTimeStr,
-    },
-  });
+  const payload = {
+    id: 1,
+    registration_open,
+    max_upload_size_mb,
+    maintenance_mode,
+    maintenance_message,
+    maintenance_start_time,
+    maintenance_end_time,
+    maintenance_bypass_student_ids,
+    updated_at: new Date().toISOString(),
+    updated_by: user.id,
+  };
+
+  const { error } = await adminClient
+    .from("platform_settings")
+    .upsert(payload, { onConflict: "id" });
+
+  if (error) {
+    return { success: false as const, error: error.message };
+  }
 
   revalidatePath("/super-admin/system-settings");
-  revalidatePath("/super-admin/audit-logs");
-  revalidatePath("/register");
+  revalidatePath("/dashboard");
   revalidatePath("/upload");
+  revalidatePath("/");
 
-  return { success: true };
+  return { success: true as const };
 }
+
+export const updateSystemSettings = savePlatformSettings;
