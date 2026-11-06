@@ -12,6 +12,7 @@ type SettingsFormProps = {
     maintenance_message: string;
     maintenance_start_time: string | null;
     maintenance_end_time: string | null;
+    maintenance_bypass_student_ids?: string | null;
     updated_at: string;
   };
 };
@@ -226,6 +227,23 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
           {loading ? "Applying Settings..." : "Save System Settings"}
         </Button>
       </div>
-    </form>
+    
+        <div className="space-y-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <label className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center justify-between">
+            <span>Authorized Test Student IDs (Maintenance Bypass)</span>
+            <span className="text-[11px] font-normal text-muted-foreground lowercase">comma-separated</span>
+          </label>
+          <p className="text-xs text-muted-foreground">
+            These student IDs can log in and view the full student portal even during maintenance for live testing.
+          </p>
+          <input
+            type="text"
+            name="maintenance_bypass_student_ids"
+            defaultValue={initialSettings?.maintenance_bypass_student_ids || ""}
+            placeholder="e.g. 20210001042, 20210001999"
+            className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+      </form>
   );
 }
