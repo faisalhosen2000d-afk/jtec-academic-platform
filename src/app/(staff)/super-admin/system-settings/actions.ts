@@ -1,25 +1,25 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createClient as createServerAuthClient } from "@/lib/supabase/server";
+import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 
 export type SaveSettingsResult =
   | { success: true }
   | { success: false; error: string };
 
 export async function savePlatformSettings(formData: FormData): Promise<SaveSettingsResult> {
-  const supabase = await createClient();
+  const authSupabase = await createServerAuthClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authSupabase.auth.getUser();
 
   if (!user) {
     return { success: false, error: "Authentication required." };
   }
 
-  const { data: profile } = await supabase
+  const { data: profile } = await authSupabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
@@ -36,7 +36,12 @@ export async function savePlatformSettings(formData: FormData): Promise<SaveSett
     (formData.get("maintenance_message") as string)?.trim() ||
     "The academic platform is currently undergoing scheduled maintenance. Please check back shortly.";
 
-  const { error: rpcError } = await supabase.rpc("update_platform_settings", {
+  const rawServiceSupabase = createRawSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+
+  const { error: rpcError } = await rawServiceSupabase.rpc("update_platform_settings", {
     p_registration_open: registrationOpen,
     p_max_upload_size_mb: maxUploadSizeMb,
     p_maintenance_mode: maintenanceMode,
@@ -48,8 +53,7 @@ export async function savePlatformSettings(formData: FormData): Promise<SaveSett
     return { success: false, error: rpcError.message };
   }
 
-  const serviceSupabase = createServiceRoleClient();
-  await serviceSupabase.from("audit_logs").insert({
+  await rawServiceSupabase.from("audit_logs").insert({
     actor_id: user.id,
     action: "system.settings_updated",
     target_table: "platform_settings",

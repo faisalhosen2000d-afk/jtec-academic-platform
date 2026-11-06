@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createServerAuthClient } from "@/lib/supabase/server";
+import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import SettingsForm from "./SettingsForm";
 
 type RawPlatformSettings = {
@@ -13,17 +14,17 @@ type RawPlatformSettings = {
 };
 
 export default async function SystemSettingsPage() {
-  const supabase = await createClient();
+  const authSupabase = await createServerAuthClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authSupabase.auth.getUser();
 
   if (!user) {
     redirect("/staff-login");
   }
 
-  const { data: profile } = await supabase
+  const { data: profile } = await authSupabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
@@ -33,8 +34,13 @@ export default async function SystemSettingsPage() {
     redirect("/");
   }
 
-  const { data: rpcData } = await supabase.rpc("get_platform_settings");
-  const settingsRow = (rpcData as unknown as RawPlatformSettings) || null;
+  const rawServiceSupabase = createRawSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+
+  const { data: rpcData } = await rawServiceSupabase.rpc("get_platform_settings");
+  const settingsRow = (rpcData as RawPlatformSettings) || null;
 
   const initialSettings = {
     registration_open: settingsRow?.registration_open ?? true,
