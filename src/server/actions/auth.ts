@@ -1,7 +1,7 @@
-import { getActivePlatformSettings, isMaintenanceCurrentlyActive } from "@/lib/platform-settings";
 "use server";
 
 import { redirect } from "next/navigation";
+import { getActivePlatformSettings, isMaintenanceCurrentlyActive, isStudentAuthorizedBypass } from "@/lib/platform-settings";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
