@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { Wrench, Clock, RefreshCw, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
 
 interface MaintenanceProps {
   message?: string | null;
@@ -14,13 +14,28 @@ export function StudentMaintenanceView({ message, startTime, endTime }: Maintena
   const formatTime = (iso?: string | null) => {
     if (!iso) return null;
     try {
+      const cleaned = iso.replace(/(\+00:00|Z)$/, "");
+      const d = new Date(cleaned);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleString("en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        });
+      }
       return new Date(iso).toLocaleString("en-US", {
+        timeZone: "Asia/Dhaka",
         dateStyle: "medium",
         timeStyle: "short",
       });
     } catch {
       return iso;
     }
+  };
+
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = "/";
   };
 
   const formattedStart = formatTime(startTime);
@@ -67,11 +82,9 @@ export function StudentMaintenanceView({ message, startTime, endTime }: Maintena
           <Button onClick={() => window.location.reload()} className="h-9 px-4 text-xs font-medium">
             <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh Status
           </Button>
-          <Link href="/login">
-            <Button variant="outline" className="w-full sm:w-auto h-9 px-4 text-xs font-medium text-slate-600">
-              <LogOut className="w-3.5 h-3.5 mr-1.5" /> Return to Login
-            </Button>
-          </Link>
+          <Button variant="outline" onClick={handleSignOut} className="w-full sm:w-auto h-9 px-4 text-xs font-medium text-slate-600">
+            <LogOut className="w-3.5 h-3.5 mr-1.5" /> Sign Out
+          </Button>
         </div>
 
         <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-6">

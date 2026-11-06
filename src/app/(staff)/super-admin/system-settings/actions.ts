@@ -3,6 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { createClient as createServerAuthClient } from "@/lib/supabase/server";
 import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
+function normalizeBdTimestamp(val: string | null | undefined): string | null {
+  if (!val || typeof val !== "string") return null;
+  const trimmed = val.trim();
+  if (!trimmed) return null;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+    return `${trimmed}+06:00`;
+  }
+  return trimmed;
+}
 
 export type SaveSettingsResult =
   | { success: true }
