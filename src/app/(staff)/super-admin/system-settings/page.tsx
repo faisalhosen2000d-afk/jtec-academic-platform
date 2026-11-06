@@ -1,84 +1,67 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { createClient as createServerAuthClient } from "@/lib/supabase/server";
-import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
+import { getActivePlatformSettings } from "@/lib/platform-settings";
 import SettingsForm from "./SettingsForm";
+import { Button } from "@/components/ui/button";
 
-type RawPlatformSettings = {
-  registration_open?: boolean;
-  max_upload_size_mb?: number;
-  maintenance_mode?: boolean;
-  maintenance_message?: string;
-  maintenance_start_time?: string | null;
-  maintenance_end_time?: string | null;
-  updated_at?: string;
-};
+export const dynamic = "force-dynamic";
 
 export default async function SystemSettingsPage() {
-  const authSupabase = await createServerAuthClient();
-
+  const supabase = await createClient();
   const {
     data: { user },
-  } = await authSupabase.auth.getUser();
+  } = await supabase.auth.getUser();
 
   if (!user) {
     redirect("/staff-login");
   }
 
-  const { data: profile } = await authSupabase
+  const { data: profile } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .maybeSingle();
+    .single();
 
   if (!profile || profile.role !== "super_admin") {
-    redirect("/");
+    redirect("/dashboard");
   }
 
-  const rawServiceSupabase = createRawSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-
-  const { data: rpcData } = await rawServiceSupabase.rpc("get_platform_settings");
-  const settingsRow = (rpcData as RawPlatformSettings) || null;
-
-  const initialSettings = {
-    registration_open: settingsRow?.registration_open ?? true,
-    max_upload_size_mb: settingsRow?.max_upload_size_mb ?? 100,
-    maintenance_mode: settingsRow?.maintenance_mode ?? false,
-    maintenance_message:
-      settingsRow?.maintenance_message ??
-      "The academic platform is currently undergoing scheduled maintenance. Please check back shortly.",
-    maintenance_start_time: settingsRow?.maintenance_start_time ?? null,
-    maintenance_end_time: settingsRow?.maintenance_end_time ?? null,
-    updated_at: settingsRow?.updated_at ?? new Date().toISOString(),
-  };
+  const activeSettings = await getActivePlatformSettings();
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="mb-1 text-sm font-medium text-muted-foreground">
-              Super Admin Control
-            </p>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              System Settings
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Configure real-time registration gates, file upload limits, and maintenance windows.
-            </p>
-          </div>
-
-          <Link href="/super-admin">
-            <Button variant="outline">Back to Super Admin</Button>
-          </Link>
+    <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
+      <div className="rounded-2xl border bg-card p-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Super Admin Control
+          </p>
+          <h1 className="text-2xl font-bold mt-1">System Settings</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            Configure real-time registration gates, file upload limits, and maintenance windows.
+          </p>
         </div>
-
-        <SettingsForm initialSettings={initialSettings} />
+        <Link href="/super-admin">
+          <Button variant="outline" className="rounded-xl">
+            Back to Super Admin
+          </Button>
+        </Link>
       </div>
-    </main>
+
+      <SettingsForm
+        initialSettings={{
+          registration_open: activeSettings.registration_open,
+          max_upload_size_mb: activeSettings.max_upload_size_mb,
+          maintenance_mode: activeSettings.maintenance_mode,
+          maintenance_message:
+            activeSettings.maintenance_message ||
+            "The academic platform is currently undergoing scheduled maintenance. Please check back shortly.",
+          maintenance_start_time: activeSettings.maintenance_start_time,
+          maintenance_end_time: activeSettings.maintenance_end_time,
+          maintenance_bypass_student_ids: activeSettings.maintenance_bypass_student_ids,
+          updated_at: new Date().toISOString(),
+        }}
+      />
+    </div>
   );
 }

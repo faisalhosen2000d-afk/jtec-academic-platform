@@ -7,6 +7,7 @@ export interface PlatformSettingsData {
   maintenance_start_time: string | null;
   maintenance_end_time: string | null;
   maintenance_message: string | null;
+  maintenance_bypass_student_ids: string | null;
 }
 
 interface RpcClient {
@@ -20,46 +21,13 @@ interface RpcClient {
   };
 }
 
-/**
- * Parses a timestamp string safely. If it lacks timezone offset (e.g. "2026-11-06T18:35"),
- * treats it as Bangladesh Standard Time (+06:00) so local inputs match server UTC comparisons.
- */
-export function parseBangladeshDateTime(raw?: string | null): Date | null {
-  if (!raw || typeof raw !== "string") return null;
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-
-  // Check if string has Z or +/-HH:MM timezone suffix, and whether it was stored as naive UTC
-  // When datetime-local "2026-11-06T18:35" is stored into Postgres timestamptz without offset,
-  // Postgres appends "+00:00" or "Z" to the local wall-clock hour.
-  const d = new Date(trimmed);
-  if (isNaN(d.getTime())) return null;
-  return d;
-}
-
 export async function getActivePlatformSettings(): Promise<PlatformSettingsData> {
   const supabase = (await createClient()) as unknown as RpcClient;
 
-  // Try SECURITY DEFINER RPC first (bypasses RLS for all roles including anon/student)
-  const { data: rpcData } = await supabase.rpc("get_platform_settings");
-  const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-
-  if (row && typeof row === "object") {
-    const r = row as Record<string, unknown>;
-    return {
-      registration_open: typeof r.registration_open === "boolean" ? r.registration_open : true,
-      max_upload_size_mb: typeof r.max_upload_size_mb === "number" ? r.max_upload_size_mb : 25,
-      maintenance_mode: typeof r.maintenance_mode === "boolean" ? r.maintenance_mode : false,
-      maintenance_start_time: typeof r.maintenance_start_time === "string" ? r.maintenance_start_time : null,
-      maintenance_end_time: typeof r.maintenance_end_time === "string" ? r.maintenance_end_time : null,
-      maintenance_message: typeof r.maintenance_message === "string" ? r.maintenance_message : null,
-    };
-  }
-
-  // Fallback to direct table query
+  // Query direct table first so all columns including maintenance_bypass_student_ids are guaranteed fresh
   const { data: tableData } = await supabase
     .from("platform_settings")
-    .select("registration_open, max_upload_size_mb, maintenance_mode, maintenance_start_time, maintenance_end_time, maintenance_message")
+    .select("registration_open, max_upload_size_mb, maintenance_mode, maintenance_start_time, maintenance_end_time, maintenance_message, maintenance_bypass_student_ids")
     .limit(1)
     .maybeSingle();
 
@@ -72,6 +40,23 @@ export async function getActivePlatformSettings(): Promise<PlatformSettingsData>
       maintenance_start_time: typeof r.maintenance_start_time === "string" ? r.maintenance_start_time : null,
       maintenance_end_time: typeof r.maintenance_end_time === "string" ? r.maintenance_end_time : null,
       maintenance_message: typeof r.maintenance_message === "string" ? r.maintenance_message : null,
+      maintenance_bypass_student_ids: typeof r.maintenance_bypass_student_ids === "string" ? r.maintenance_bypass_student_ids : null,
+    };
+  }
+
+  const { data: rpcData } = await supabase.rpc("get_platform_settings");
+  const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+
+  if (row && typeof row === "object") {
+    const r = row as Record<string, unknown>;
+    return {
+      registration_open: typeof r.registration_open === "boolean" ? r.registration_open : true,
+      max_upload_size_mb: typeof r.max_upload_size_mb === "number" ? r.max_upload_size_mb : 25,
+      maintenance_mode: typeof r.maintenance_mode === "boolean" ? r.maintenance_mode : false,
+      maintenance_start_time: typeof r.maintenance_start_time === "string" ? r.maintenance_start_time : null,
+      maintenance_end_time: typeof r.maintenance_end_time === "string" ? r.maintenance_end_time : null,
+      maintenance_message: typeof r.maintenance_message === "string" ? r.maintenance_message : null,
+      maintenance_bypass_student_ids: typeof r.maintenance_bypass_student_ids === "string" ? r.maintenance_bypass_student_ids : null,
     };
   }
 
@@ -82,7 +67,17 @@ export async function getActivePlatformSettings(): Promise<PlatformSettingsData>
     maintenance_start_time: null,
     maintenance_end_time: null,
     maintenance_message: null,
+    maintenance_bypass_student_ids: null,
   };
+}
+
+export function isStudentAuthorizedBypass(studentId: string | null | undefined, bypassList: string | null | undefined): boolean {
+  if (!studentId || !bypassList) return false;
+  const list = bypassList
+    .split(/[\s,]+/)
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return list.includes(studentId.trim().toLowerCase());
 }
 
 export function isMaintenanceCurrentlyActive(settings: PlatformSettingsData): boolean {
@@ -96,12 +91,17 @@ export function isMaintenanceCurrentlyActive(settings: PlatformSettingsData): bo
   }
 
   const nowUtcMs = Date.now();
-  // Also compute now in BD wall-clock in case naive datetime-local was stored directly as +00:00 in Postgres
   const bdOffsetMs = 6 * 60 * 60 * 1000;
   const nowBdAsUtcMs = nowUtcMs + bdOffsetMs;
 
   const startMs = startRaw ? new Date(startRaw).getTime() : null;
-  const endMs = endRaw ? new Date(endRaw).getTime() : null;
+  let endMs = endRaw ? new Date(endRaw).getTime() : null;
+
+  // Smart midnight rollover fix: if Admin entered 11:54 PM start and 12:05 AM end on the same calendar date,
+  // automatically add 24 hours to endMs so it represents 12:05 AM the next night!
+  if (startMs && endMs && endMs < startMs) {
+    endMs += 24 * 60 * 60 * 1000;
+  }
 
   const checkWindow = (currentMs: number) => {
     if (startMs && endMs) return currentMs >= startMs && currentMs <= endMs;
@@ -110,6 +110,5 @@ export function isMaintenanceCurrentlyActive(settings: PlatformSettingsData): bo
     return true;
   };
 
-  // Match if active under true UTC OR under naive BD wall-clock stored as UTC
   return checkWindow(nowUtcMs) || checkWindow(nowBdAsUtcMs);
 }
