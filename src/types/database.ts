@@ -1,13 +1,3 @@
-export type PlatformSettingsRow = {
-  id: number;
-  registration_open: boolean;
-  max_upload_size_mb: number;
-  maintenance_mode: boolean;
-  maintenance_message: string;
-  updated_at: string;
-  updated_by: string | null;
-};
-
 
 export type Json =
   | string
@@ -25,36 +15,6 @@ export type Database = {
   }
   graphql_public: {
     Tables: {
-      platform_settings: {
-        Row: {
-          id: number;
-          registration_open: boolean;
-          max_upload_size_mb: number;
-          maintenance_mode: boolean;
-          maintenance_message: string;
-          updated_at: string;
-          updated_by: string | null;
-        };
-        Insert: {
-          id?: number;
-          registration_open?: boolean;
-          max_upload_size_mb?: number;
-          maintenance_mode?: boolean;
-          maintenance_message?: string;
-          updated_at?: string;
-          updated_by?: string | null;
-        };
-        Update: {
-          id?: number;
-          registration_open?: boolean;
-          max_upload_size_mb?: number;
-          maintenance_mode?: boolean;
-          maintenance_message?: string;
-          updated_at?: string;
-          updated_by?: string | null;
-        };
-        Relationships: [];
-      };
       [_ in never]: never
     }
     Views: {
@@ -80,36 +40,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      platform_settings: {
-        Row: {
-          id: number;
-          registration_open: boolean;
-          max_upload_size_mb: number;
-          maintenance_mode: boolean;
-          maintenance_message: string;
-          updated_at: string;
-          updated_by: string | null;
-        };
-        Insert: {
-          id?: number;
-          registration_open?: boolean;
-          max_upload_size_mb?: number;
-          maintenance_mode?: boolean;
-          maintenance_message?: string;
-          updated_at?: string;
-          updated_by?: string | null;
-        };
-        Update: {
-          id?: number;
-          registration_open?: boolean;
-          max_upload_size_mb?: number;
-          maintenance_mode?: boolean;
-          maintenance_message?: string;
-          updated_at?: string;
-          updated_by?: string | null;
-        };
-        Relationships: [];
-      };
       administration_account_requests: {
         Row: {
           created_at: string
@@ -1801,36 +1731,6 @@ export type Database = {
   }
   storage: {
     Tables: {
-      platform_settings: {
-        Row: {
-          id: number;
-          registration_open: boolean;
-          max_upload_size_mb: number;
-          maintenance_mode: boolean;
-          maintenance_message: string;
-          updated_at: string;
-          updated_by: string | null;
-        };
-        Insert: {
-          id?: number;
-          registration_open?: boolean;
-          max_upload_size_mb?: number;
-          maintenance_mode?: boolean;
-          maintenance_message?: string;
-          updated_at?: string;
-          updated_by?: string | null;
-        };
-        Update: {
-          id?: number;
-          registration_open?: boolean;
-          max_upload_size_mb?: number;
-          maintenance_mode?: boolean;
-          maintenance_message?: string;
-          updated_at?: string;
-          updated_by?: string | null;
-        };
-        Relationships: [];
-      };
       buckets: {
         Row: {
           allowed_mime_types: string[] | null
