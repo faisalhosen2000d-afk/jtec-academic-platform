@@ -136,7 +136,7 @@ export default function UploadForm({
     }
 
     if (file.size > maxUploadSizeMb * 1024 * 1024) {
-      setError(""File size cannot exceed " + maxUploadSizeMb + " MB."");
+      setError(`File size cannot exceed ${maxUploadSizeMb} MB.`);
       return;
     }
 
