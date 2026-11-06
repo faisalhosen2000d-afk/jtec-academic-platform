@@ -75,7 +75,7 @@ export function StudentMaintenanceView({ message, startTime, endTime }: Maintena
         </div>
 
         <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-6">
-          Jhenaidah Textile Engineering College (JTEC) • Academic Services
+          Jhenaidah Textile Engineering College (JTEC) &bull; Academic Services
         </p>
       </div>
     </div>
