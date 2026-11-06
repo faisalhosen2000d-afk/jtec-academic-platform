@@ -40,11 +40,11 @@ const sections = [
     action: "Review Account Requests",
   },
   {
-    title: "Users",
+    title: "Pending Materials Review",
     description:
-      "Manage students, admins, moderators, and account-related controls.",
-    href: "/super-admin/users",
-    action: "Manage Users",
+      "Review, approve, or reject student-submitted academic materials waiting for moderation.",
+    href: "/admin/materials-review",
+    action: "Review Pending Materials",
   },
   {
     title: "Approved Materials",
@@ -52,6 +52,13 @@ const sections = [
       "Review approved academic materials and manage Super Admin deletion controls.",
     href: "/super-admin/approved-materials",
     action: "Manage Approved Materials",
+  },
+  {
+    title: "Users",
+    description:
+      "Manage students, admins, moderators, and account-related controls.",
+    href: "/super-admin/users",
+    action: "Manage Users",
   },
   {
     title: "Audit Logs",
@@ -154,4 +161,3 @@ export default function SuperAdminPage() {
     </main>
   );
 }
-
