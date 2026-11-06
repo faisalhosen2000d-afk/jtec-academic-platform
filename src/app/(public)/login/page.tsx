@@ -1,13 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useActionState } from "react";
-import { GraduationCap, ShieldCheck, ArrowRight } from "lucide-react";
+import { GraduationCap, ShieldCheck, ArrowRight, User, Lock } from "lucide-react";
 import { signIn, type AuthActionResult } from "@/server/actions/auth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
-import { FormField } from "@/components/ui/form-field";
 
 const initialState: AuthActionResult = {
   success: false,
@@ -15,9 +14,14 @@ const initialState: AuthActionResult = {
 };
 
 export default function LoginPage() {
+  const [typedStudentId, setTypedStudentId] = useState("");
+
   const [state, formAction, isPending] = useActionState(
-    async (_prevState: AuthActionResult, formData: FormData) =>
-      signIn(formData),
+    async (_prevState: AuthActionResult, formData: FormData) => {
+      const studentId = formData.get("student_id") as string;
+      if (studentId) setTypedStudentId(studentId);
+      return signIn(formData);
+    },
     initialState,
   );
 
@@ -25,7 +29,7 @@ export default function LoginPage() {
   const generalError = state.success ? undefined : state.error;
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50/60 px-4 py-12 dark:bg-slate-950/80">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50/70 px-4 py-12 dark:bg-slate-950/80">
       {/* Decorative ambient background glows */}
       <div
         className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-96 w-96 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
@@ -66,41 +70,58 @@ export default function LoginPage() {
             </h1>
 
             <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-              Sign in with your verified Student ID &amp; password
+              Sign in with your Student ID &amp; password
             </p>
           </div>
 
           <form action={formAction} className="mt-7 space-y-4" noValidate>
-            <FormField
-              label="Student ID"
-              htmlFor="student_id"
-              error={fieldErrors?.student_id?.[0]}
-            >
-              <Input
-                id="student_id"
-                name="student_id"
-                type="text"
-                placeholder="e.g. 2021...042"
-                autoComplete="username"
-                className="h-11 rounded-xl bg-muted/30 text-sm focus:bg-background focus:ring-4 focus:ring-primary/15 transition-all"
-                required
-              />
-            </FormField>
+            {/* Student ID with permanently visible user icon */}
+            <div>
+              <label htmlFor="student_id" className="block text-xs font-semibold text-foreground mb-1.5">
+                Student ID
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground z-10">
+                  <User className="h-4 w-4" />
+                </span>
+                <input
+                  id="student_id"
+                  name="student_id"
+                  type="text"
+                  placeholder="e.g. 2021...042"
+                  autoComplete="username"
+                  required
+                  defaultValue={typedStudentId}
+                  className="w-full h-11 pl-10 pr-4 rounded-xl border border-input bg-muted/20 text-sm text-foreground placeholder:text-muted-foreground/60 transition-all duration-200 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 focus:outline-none"
+                />
+              </div>
+              {fieldErrors?.student_id?.[0] && (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.student_id[0]}</p>
+              )}
+            </div>
 
-            <FormField
-              label="Password"
-              htmlFor="password"
-              error={fieldErrors?.password?.[0]}
-            >
-              <PasswordInput
-                id="password"
-                name="password"
-                autoComplete="current-password"
-                placeholder="••••••••"
-                className="h-11 rounded-xl bg-muted/30 text-sm focus:bg-background focus:ring-4 focus:ring-primary/15 transition-all"
-                required
-              />
-            </FormField>
+            {/* Password with permanently visible lock icon */}
+            <div>
+              <label htmlFor="password" className="block text-xs font-semibold text-foreground mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground z-10">
+                  <Lock className="h-4 w-4" />
+                </span>
+                <PasswordInput
+                  id="password"
+                  name="password"
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  required
+                  className="pl-10 h-11 rounded-xl bg-muted/20 text-sm focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 transition-all"
+                />
+              </div>
+              {fieldErrors?.password?.[0] && (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.password[0]}</p>
+              )}
+            </div>
 
             <div className="flex justify-end pt-0.5">
               <Link

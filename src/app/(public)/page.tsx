@@ -6,6 +6,7 @@ import { useActionState } from "react";
 import { GraduationCap, ShieldCheck, ArrowRight, Lock, User, Mail } from "lucide-react";
 import { signIn, staffSignIn, type AuthActionResult } from "@/server/actions/auth";
 import { Button } from "@/components/ui/button";
+import { PasswordInput } from "@/components/ui/password-input";
 
 const initialAuthState: AuthActionResult = {
   success: false,
@@ -14,14 +15,24 @@ const initialAuthState: AuthActionResult = {
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"student" | "staff">("student");
+  const [typedStudentId, setTypedStudentId] = useState("");
+  const [typedStaffEmail, setTypedStaffEmail] = useState("");
 
   const [studentState, studentFormAction, studentPending] = useActionState(
-    async (_prevState: AuthActionResult, formData: FormData) => signIn(formData),
+    async (_prevState: AuthActionResult, formData: FormData) => {
+      const studentId = formData.get("student_id") as string;
+      if (studentId) setTypedStudentId(studentId);
+      return signIn(formData);
+    },
     initialAuthState,
   );
 
   const [staffState, staffFormAction, staffPending] = useActionState(
-    async (_prevState: AuthActionResult, formData: FormData) => staffSignIn(formData),
+    async (_prevState: AuthActionResult, formData: FormData) => {
+      const email = formData.get("email") as string;
+      if (email) setTypedStaffEmail(email);
+      return staffSignIn(formData);
+    },
     initialAuthState,
   );
 
@@ -97,8 +108,10 @@ export default function HomePage() {
                   <label htmlFor="home_student_id" className="block text-xs font-semibold text-foreground mb-1.5">
                     Student ID
                   </label>
-                  <div className="relative group">
-                    <User className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition group-focus-within:text-primary" />
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground z-10">
+                      <User className="h-4 w-4" />
+                    </span>
                     <input
                       id="home_student_id"
                       name="student_id"
@@ -106,7 +119,8 @@ export default function HomePage() {
                       placeholder="e.g. 2021...042"
                       autoComplete="username"
                       required
-                      className="w-full h-11 pl-10 pr-4 rounded-xl border border-input bg-muted/20 text-sm text-foreground placeholder:text-muted-foreground/60 transition-all duration-200 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 focus:outline-none focus:scale-[1.005]"
+                      defaultValue={typedStudentId}
+                      className="w-full h-11 pl-10 pr-4 rounded-xl border border-input bg-muted/20 text-sm text-foreground placeholder:text-muted-foreground/60 transition-all duration-200 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -115,16 +129,17 @@ export default function HomePage() {
                   <label htmlFor="home_student_password" className="block text-xs font-semibold text-foreground mb-1.5">
                     Password
                   </label>
-                  <div className="relative group">
-                    <Lock className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition group-focus-within:text-primary" />
-                    <input
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground z-10">
+                      <Lock className="h-4 w-4" />
+                    </span>
+                    <PasswordInput
                       id="home_student_password"
                       name="password"
-                      type="password"
                       placeholder="••••••••"
                       autoComplete="current-password"
                       required
-                      className="w-full h-11 pl-10 pr-4 rounded-xl border border-input bg-muted/20 text-sm text-foreground placeholder:text-muted-foreground/60 transition-all duration-200 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 focus:outline-none focus:scale-[1.005]"
+                      className="pl-10 h-11 rounded-xl bg-muted/20 text-sm focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 transition-all"
                     />
                   </div>
                   <div className="flex justify-end pt-1">
@@ -162,8 +177,10 @@ export default function HomePage() {
                   <label htmlFor="home_staff_email" className="block text-xs font-semibold text-foreground mb-1.5">
                     Staff Email
                   </label>
-                  <div className="relative group">
-                    <Mail className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition group-focus-within:text-primary" />
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground z-10">
+                      <Mail className="h-4 w-4" />
+                    </span>
                     <input
                       id="home_staff_email"
                       name="email"
@@ -171,7 +188,8 @@ export default function HomePage() {
                       placeholder="name@example.com"
                       autoComplete="username"
                       required
-                      className="w-full h-11 pl-10 pr-4 rounded-xl border border-input bg-muted/20 text-sm text-foreground placeholder:text-muted-foreground/60 transition-all duration-200 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 focus:outline-none focus:scale-[1.005]"
+                      defaultValue={typedStaffEmail}
+                      className="w-full h-11 pl-10 pr-4 rounded-xl border border-input bg-muted/20 text-sm text-foreground placeholder:text-muted-foreground/60 transition-all duration-200 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -180,16 +198,17 @@ export default function HomePage() {
                   <label htmlFor="home_staff_password" className="block text-xs font-semibold text-foreground mb-1.5">
                     Password
                   </label>
-                  <div className="relative group">
-                    <Lock className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition group-focus-within:text-primary" />
-                    <input
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground z-10">
+                      <Lock className="h-4 w-4" />
+                    </span>
+                    <PasswordInput
                       id="home_staff_password"
                       name="password"
-                      type="password"
                       placeholder="••••••••"
                       autoComplete="current-password"
                       required
-                      className="w-full h-11 pl-10 pr-4 rounded-xl border border-input bg-muted/20 text-sm text-foreground placeholder:text-muted-foreground/60 transition-all duration-200 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 focus:outline-none focus:scale-[1.005]"
+                      className="pl-10 h-11 rounded-xl bg-muted/20 text-sm focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/15 transition-all"
                     />
                   </div>
                   <div className="flex justify-end pt-1">
