@@ -28,7 +28,7 @@ export default async function SystemSettingsPage() {
 
   const serviceSupabase = createServiceRoleClient();
 
-  const { data: settingsRow } = await (serviceSupabase as any)
+  const { data: settingsRow } = await serviceSupabase
     .from("platform_settings")
     .select("registration_open, max_upload_size_mb, maintenance_mode, maintenance_message, updated_at")
     .eq("id", 1)
@@ -47,7 +47,6 @@ export default async function SystemSettingsPage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
         <div className="mb-8 flex flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="mb-1 text-sm font-medium text-muted-foreground">

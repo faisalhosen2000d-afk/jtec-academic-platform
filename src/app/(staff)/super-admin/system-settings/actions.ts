@@ -38,7 +38,7 @@ export async function savePlatformSettings(formData: FormData): Promise<SaveSett
 
   const serviceSupabase = createServiceRoleClient();
 
-  const { error: upsertError } = await (serviceSupabase as any)
+  const { error: upsertError } = await serviceSupabase
     .from("platform_settings")
     .upsert({
       id: 1,
@@ -55,7 +55,6 @@ export async function savePlatformSettings(formData: FormData): Promise<SaveSett
     return { success: false, error: upsertError.message };
   }
 
-  // Record action in Audit Logs
   await serviceSupabase.from("audit_logs").insert({
     actor_id: user.id,
     action: "system.settings_updated",
