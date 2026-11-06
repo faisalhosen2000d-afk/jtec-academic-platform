@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import type { PlatformSettingsRow } from "@/types/database";
 
 export type SaveSettingsResult =
   | { success: true }
@@ -37,27 +36,19 @@ export async function savePlatformSettings(formData: FormData): Promise<SaveSett
     (formData.get("maintenance_message") as string)?.trim() ||
     "The academic platform is currently undergoing scheduled maintenance. Please check back shortly.";
 
-  const serviceSupabase = createServiceRoleClient();
+  const { error: rpcError } = await supabase.rpc("update_platform_settings", {
+    p_registration_open: registrationOpen,
+    p_max_upload_size_mb: maxUploadSizeMb,
+    p_maintenance_mode: maintenanceMode,
+    p_maintenance_message: maintenanceMessage,
+  });
 
-  const payload: PlatformSettingsRow = {
-    id: 1,
-    registration_open: registrationOpen,
-    max_upload_size_mb: maxUploadSizeMb,
-    maintenance_mode: maintenanceMode,
-    maintenance_message: maintenanceMessage,
-    updated_at: new Date().toISOString(),
-    updated_by: user.id,
-  };
-
-  const { error: upsertError } = await serviceSupabase
-    .from("platform_settings" as unknown as "profiles")
-    .upsert(payload as unknown as Record<string, unknown>);
-
-  if (upsertError) {
-    console.error("Platform settings upsert error:", upsertError);
-    return { success: false, error: upsertError.message };
+  if (rpcError) {
+    console.error("Platform settings update error:", rpcError);
+    return { success: false, error: rpcError.message };
   }
 
+  const serviceSupabase = createServiceRoleClient();
   await serviceSupabase.from("audit_logs").insert({
     actor_id: user.id,
     action: "system.settings_updated",
