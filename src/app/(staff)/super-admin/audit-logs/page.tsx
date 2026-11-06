@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import AuditLogsView from "./AuditLogsView";
 
 type AuditLogRow = {
   id: string;
@@ -56,10 +57,9 @@ export default async function AuditLogsPage() {
   }
 
   const auditLogs = (logs ?? []) as AuditLogRow[];
-
   const actorIds = Array.from(new Set(auditLogs.map((log) => log.actor_id).filter(Boolean)));
 
-  let actorMap = new Map<string, ActorProfile>();
+  const actorMap: Record<string, ActorProfile> = {};
   if (actorIds.length > 0) {
     const { data: actors } = await serviceSupabase
       .from("profiles")
@@ -67,7 +67,9 @@ export default async function AuditLogsPage() {
       .in("id", actorIds);
 
     if (actors) {
-      actorMap = new Map(actors.map((actor) => [actor.id, actor as ActorProfile]));
+      actors.forEach((actor) => {
+        actorMap[actor.id] = actor as ActorProfile;
+      });
     }
   }
 
@@ -124,91 +126,7 @@ export default async function AuditLogsPage() {
           </div>
         </section>
 
-        {/* Log Table */}
-        <section className="rounded-xl border border-border bg-card shadow-sm">
-          <div className="border-b border-border p-5">
-            <h2 className="text-lg font-semibold">Activity Stream</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              All logged administrative events in descending chronological order.
-            </p>
-          </div>
-
-          {auditLogs.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="font-semibold text-foreground">No audit logs recorded yet.</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Administrative actions (e.g. deleting approved materials) will automatically appear here.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-left text-sm">
-                <thead className="border-b border-border bg-muted/40">
-                  <tr>
-                    <th className="px-5 py-3 font-semibold">Date &amp; Time</th>
-                    <th className="px-5 py-3 font-semibold">Action Performed</th>
-                    <th className="px-5 py-3 font-semibold">Actor (Staff)</th>
-                    <th className="px-5 py-3 font-semibold">Target Entity</th>
-                    <th className="px-5 py-3 font-semibold">Details / Payload</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {auditLogs.map((log) => {
-                    const actor = actorMap.get(log.actor_id);
-                    const titleDetail =
-                      typeof log.previous_state?.title === "string"
-                        ? log.previous_state.title
-                        : log.target_id || "N/A";
-
-                    return (
-                      <tr key={log.id} className="transition-colors hover:bg-muted/20">
-                        <td className="px-5 py-4 whitespace-nowrap text-xs text-muted-foreground font-mono">
-                          {new Intl.DateTimeFormat("en-US", {
-                            timeZone: "Asia/Dhaka",
-                            dateStyle: "medium",
-                            timeStyle: "short",
-                          }).format(new Date(log.created_at))}
-                        </td>
-
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center rounded-md bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-                            {log.action}
-                          </span>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="font-medium text-foreground">
-                            {actor?.full_name || "Super Admin"}
-                          </div>
-                          <div className="text-xs text-muted-foreground">{actor?.email || log.actor_id}</div>
-                        </td>
-
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <span className="font-mono text-xs uppercase text-muted-foreground">
-                            {log.target_table}
-                          </span>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="max-w-md text-xs">
-                            <p className="font-medium text-foreground truncate">
-                              {titleDetail}
-                            </p>
-                            {log.previous_state && (
-                              <p className="mt-0.5 text-[11px] text-muted-foreground truncate">
-                                Prev: {JSON.stringify(log.previous_state)}
-                              </p>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        <AuditLogsView initialLogs={auditLogs} actors={actorMap} />
       </div>
     </main>
   );
