@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import type { PlatformSettingsRow } from "@/types/database";
 import SettingsForm from "./SettingsForm";
 
 export default async function SystemSettingsPage() {
@@ -28,11 +29,13 @@ export default async function SystemSettingsPage() {
 
   const serviceSupabase = createServiceRoleClient();
 
-  const { data: settingsRow } = await serviceSupabase
-    .from("platform_settings")
+  const { data: settingsData } = await serviceSupabase
+    .from("platform_settings" as unknown as "profiles")
     .select("registration_open, max_upload_size_mb, maintenance_mode, maintenance_message, updated_at")
-    .eq("id", 1)
+    .eq("id", 1 as unknown as string)
     .maybeSingle();
+
+  const settingsRow = settingsData as unknown as PlatformSettingsRow | null;
 
   const initialSettings = {
     registration_open: settingsRow?.registration_open ?? true,
