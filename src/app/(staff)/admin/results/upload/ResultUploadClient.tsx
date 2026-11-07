@@ -507,8 +507,8 @@ export default function ResultUploadClient({ departments, batches, levels, terms
 
       {/* Missing Roll Detection & Air Drop Confirmation Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-card border rounded-2xl shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 rounded-2xl shadow-2xl p-6 sm:p-7 space-y-5">
             <div className="flex items-start justify-between border-b pb-4">
               <div className="flex items-center gap-2.5 text-amber-600 dark:text-amber-400">
                 <ShieldAlert className="w-6 h-6 shrink-0 animate-pulse" />
@@ -534,10 +534,10 @@ export default function ResultUploadClient({ departments, batches, levels, terms
               {missingStudents.map((s) => {
                 const decision = missingDecisions[s.id];
                 return (
-                  <div key={s.id} className="p-3 rounded-lg border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div key={s.id} className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                     <div>
-                      <div className="font-bold text-foreground">{s.full_name}</div>
-                      <div className="font-mono text-muted-foreground">ID: {s.student_id} &bull; {s.email}</div>
+                      <div className="font-bold text-sm text-slate-900 dark:text-white">{s.full_name}</div>
+                      <div className="font-mono text-xs text-slate-600 dark:text-slate-300 font-semibold mt-0.5">Roll: {s.student_id} &bull; <span className="text-amber-600 dark:text-amber-400 font-bold">{s.email}</span></div>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
@@ -555,7 +555,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                             },
                           }));
                         }}
-                        className="h-8 px-2 rounded-lg border bg-background font-semibold"
+                        className="h-9 px-3 rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold text-xs focus:ring-2 focus:ring-blue-600"
                       >
                         <option value="air_drop">Year Drop (Migrate Batch)</option>
                         <option value="skip">Skip / Typo (Keep Current)</option>
@@ -576,7 +576,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                               },
                             }));
                           }}
-                          className="h-8 px-2 rounded-lg border bg-background"
+                          className="h-9 px-3 rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-semibold text-xs focus:ring-2 focus:ring-blue-600"
                         >
                           <option value="academic_failure">&ge; 5 Retakes</option>
                           <option value="missed_practical_lab">Missed Final Lab</option>
