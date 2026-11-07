@@ -161,7 +161,7 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
   if (termResultsPayload.length > 0) {
     const { error: upsertErr } = await adminClient
       .from("term_results")
-      .upsert(termResultsPayload, { onConflict: "student_id_code,level_id,term_id" });
+      .upsert(termResultsPayload, { onConflict: "student_id_code,department_id,batch_id,level_term_key" });
 
     if (upsertErr) {
       return { error: `Failed to save results: ${upsertErr.message}` };
@@ -203,7 +203,7 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
             remarks: `Year Dropped: ${decision.drop_reason}`,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: "student_id,level_id,term_id" }
+          { onConflict: "student_id_code,department_id,batch_id,level_term_key" }
         );
       }
     }
