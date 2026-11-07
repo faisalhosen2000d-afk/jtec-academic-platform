@@ -71,6 +71,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
   const isFirstTerm = levelTermKey === "1-1";
 
   // Parse tab-separated or comma-separated rows
+  // Parse official JTEC result rows: Sl. No | Exam. Roll | Name | GPA | [CGPA] | Result | Fail Subject(s)
   const parseRowsContent = (text: string) => {
     const lines = text.trim().split(/\r?\n/);
     const results: StudentResultEntry[] = [];
@@ -79,38 +80,58 @@ export default function ResultUploadClient({ departments, batches, levels, terms
       const line = rawLine.trim();
       if (!line) continue;
 
-      // Ignore header rows
       const lower = line.toLowerCase();
+      // Skip table header lines
       if (
-        lower.startsWith("student") ||
-        lower.startsWith("roll") ||
-        lower.startsWith("id") ||
-        lower.includes("gpa")
+        lower.includes("department:") ||
+        lower.includes("exam. roll") ||
+        lower.includes("name of examinee") ||
+        (lower.includes("sl.") && lower.includes("gpa"))
       ) {
         continue;
       }
 
-      // Split by tab (Excel copy), comma (CSV), or semicolon
-      const cols = line.split(/[\t,;|]+/).map((c) => c.trim().replace(/^["']|["']$/g, ""));
-      const studentId = cols[0] ?? "";
-      const gpa = parseFloat(cols[1] ?? "");
+      // 1. Extract 10-12 digit Student ID / Exam Roll
+      const rollMatch = line.match(/\b(2\d{9,11})\b/);
+      const studentId = rollMatch?.[1] ?? "";
+      if (!studentId) continue;
 
-      if (!studentId || isNaN(gpa)) continue;
+      // 2. Extract GPA and optional CGPA (decimal numbers between 1.00 and 4.00)
+      const afterRoll = line.substring(line.indexOf(studentId) + studentId.length);
+      const gpaMatches = Array.from(afterRoll.matchAll(/\b([1-4]\.\d{1,2}|0\.00)\b/g)).map((m) => parseFloat(m[1] ?? "0"));
 
-      // In 1-1, CGPA is null unless explicitly provided
-      // In 1-2+, if 3rd col is present it's CGPA, otherwise defaults to gpa
-      const cgpaParsed = cols[2] ? parseFloat(cols[2]) : (isFirstTerm ? null : gpa);
-      const cgpa = !isNaN(cgpaParsed as number) ? cgpaParsed : (isFirstTerm ? null : gpa);
+      const gpa = gpaMatches[0];
+      if (gpa === undefined || isNaN(gpa)) continue;
+      const secondGpa = gpaMatches[1];
+      const cgpa = !isFirstTerm && secondGpa !== undefined ? secondGpa : (isFirstTerm ? null : gpa);
 
-      // Retake count: either 4th col (if credit omitted) or 5th col
+      // 3. Extract Fail Subject(s) from the remainder of the line
       let retakeCount = 0;
-      if (cols[3] !== undefined) {
-        const val = parseInt(cols[3], 10);
-        if (!isNaN(val) && val <= 10) retakeCount = val;
+      let retakeSubjectsStr: string | null = null;
+
+      // Check after the last GPA or after "Promoted"
+      let tail = afterRoll;
+      if (tail.includes("Promoted")) {
+        tail = tail.substring(tail.indexOf("Promoted") + 8);
+      } else {
+        const lastGpaStr = String(gpaMatches[gpaMatches.length - 1]);
+        const gpaIdx = tail.lastIndexOf(lastGpaStr);
+        if (gpaIdx !== -1) tail = tail.substring(gpaIdx + lastGpaStr.length);
       }
-      if (cols[4] !== undefined) {
-        const val = parseInt(cols[4], 10);
-        if (!isNaN(val) && val <= 10) retakeCount = val;
+
+      const cleanTail = tail.trim().replace(/^[|,\t\s]+|[|,\t\s]+$/g, "");
+
+      // If it is "--" or empty or "none" or "0", no retakes
+      if (cleanTail && cleanTail !== "--" && cleanTail !== "-" && cleanTail !== "0" && cleanTail.toLowerCase() !== "none") {
+        const codes = cleanTail
+          .split(/[,;|]+/)
+          .map((s) => s.trim().replace(/^["']|["']$/g, "").toUpperCase())
+          .filter((s) => s && s !== "--" && s !== "-");
+
+        if (codes.length > 0) {
+          retakeCount = codes.length;
+          retakeSubjectsStr = codes.join(", ");
+        }
       }
 
       results.push({
@@ -119,6 +140,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
         cgpa,
         earned_credits: 20.0,
         term_retake_count: retakeCount,
+        retake_subjects: retakeSubjectsStr,
       });
     }
 
@@ -464,7 +486,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                     <td className="px-3 py-2">
                       {r.term_retake_count && r.term_retake_count > 0 ? (
                         <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold text-[10px]">
-                          {r.term_retake_count} Retake
+                          {r.retake_subjects ? `${r.retake_subjects} (${r.term_retake_count})` : `${r.retake_subjects ? `${r.retake_subjects} (${r.term_retake_count})` : `${r.term_retake_count} Retake`}`}
                         </span>
                       ) : (
                         <span className="text-emerald-600 font-medium">None</span>

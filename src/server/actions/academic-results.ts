@@ -19,6 +19,7 @@ export interface StudentResultEntry {
   cgpa?: number | null;
   earned_credits?: number;
   term_retake_count?: number;
+  retake_subjects?: string | null;
   grades?: CourseGradeRow[];
 }
 
@@ -35,7 +36,7 @@ export interface UploadBatchResultsInput {
   batch_id: string;
   level_id: string;
   term_id: string;
-  level_term_key: string; // e.g. "1-1", "1-2"
+  level_term_key: string;
   results: StudentResultEntry[];
   missing_decisions?: MissingStudentDecision[];
 }
@@ -59,7 +60,6 @@ export async function verifyMissingStudentsForBatch(input: {
     return { error: "Insufficient permissions." };
   }
 
-  // Fetch all registered students in this department and batch
   const { data: registeredStudents, error } = await authSupabase
     .from("profiles")
     .select("id, full_name, student_id, email, batch_id, department_id")
@@ -69,10 +69,10 @@ export async function verifyMissingStudentsForBatch(input: {
 
   if (error) return { error: error.message };
 
-  const presentNormalized = input.present_student_ids.map((s) => s.trim().toLowerCase());
+  const presentNormalized = input.present_student_ids.map((s) => s.trim().replace(/\.0+$/, "").toLowerCase());
   const missingStudents = (registeredStudents || []).filter((s) => {
     if (!s.student_id) return false;
-    return !presentNormalized.includes(s.student_id.trim().toLowerCase());
+    return !presentNormalized.includes(s.student_id.trim().replace(/\.0+$/, "").toLowerCase());
   });
 
   return { success: true, missingStudents };
@@ -97,7 +97,6 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const adminClient = createRawSupabaseClient(supabaseUrl, serviceKey);
 
-  // 1. Get next junior batch for air-drop migration if missing decisions exist
   let nextJuniorBatchId: string | null = null;
   const { data: currentBatch } = await adminClient
     .from("batches")
@@ -106,27 +105,17 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
     .single();
 
   if (currentBatch) {
-    const { data: nextBatch } = await adminClient
+    const { data: allBatches } = await adminClient
       .from("batches")
       .select("id, name")
-      .order("name", { ascending: true })
-      .gt("name", currentBatch.name || "")
-      .limit(1)
-      .maybeSingle();
+      .order("name", { ascending: true });
 
-    if (nextBatch) {
-      nextJuniorBatchId = nextBatch.id;
-    } else {
-      // Fallback: match by alphabetical name if year ordering not available
-      const { data: allBatches } = await adminClient.from("batches").select("id, name");
-      if (allBatches && allBatches.length > 1) {
-        const found = allBatches.find((b) => b.id !== currentBatch.id);
-        if (found) nextJuniorBatchId = found.id;
-      }
+    if (allBatches && allBatches.length > 1) {
+      const found = allBatches.find((b) => b.id !== currentBatch.id && b.name > currentBatch.name);
+      nextJuniorBatchId = found ? found.id : allBatches[allBatches.length - 1]?.id || null;
     }
   }
 
-  // 2. Fetch all registered students to map student_id_string to profile UUID
   const { data: allStudents } = await adminClient
     .from("profiles")
     .select("id, student_id")
@@ -134,20 +123,21 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
 
   const studentMap = new Map<string, string>();
   (allStudents || []).forEach((s) => {
-    if (s.student_id) studentMap.set(s.student_id.trim().toLowerCase(), s.id);
+    if (s.student_id) {
+      studentMap.set(s.student_id.trim().replace(/\.0+$/, "").toLowerCase(), s.id);
+    }
   });
 
-  // 3. Insert or update term results
   const termResultsPayload = [];
   for (const entry of input.results) {
-    const cleanId = entry.student_id_string.trim().toLowerCase();
+    const cleanId = entry.student_id_string.trim().replace(/\.0+$/, "").toLowerCase();
     const profileId = studentMap.get(cleanId);
     if (!profileId) continue;
 
-    // For 1-1, cgpa is null if not provided
     const cgpaVal = input.level_term_key === "1-1" ? (entry.cgpa ?? null) : (entry.cgpa ?? entry.gpa);
     const retakes = entry.term_retake_count || 0;
     const status = retakes > 0 ? "promoted_with_retake" : "passed";
+    const cleanRemarks = entry.retake_subjects ? "Retakes: " + entry.retake_subjects : null;
 
     termResultsPayload.push({
       student_id: profileId,
@@ -161,6 +151,7 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
       earned_credits: entry.earned_credits || 0,
       term_retake_count: retakes,
       cumulative_retake_count: retakes,
+      remarks: cleanRemarks,
       status,
       updated_at: new Date().toISOString(),
     });
@@ -176,17 +167,14 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
     }
   }
 
-  // 4. Process Air Drops for missing students
   if (input.missing_decisions && input.missing_decisions.length > 0 && nextJuniorBatchId) {
     for (const decision of input.missing_decisions) {
       if (decision.action === "air_drop") {
-        // Move student to next junior batch
         await adminClient
           .from("profiles")
           .update({ batch_id: nextJuniorBatchId })
           .eq("id", decision.profile_id);
 
-        // Record air drop history
         await adminClient.from("student_air_drop_history").insert({
           student_id: decision.profile_id,
           previous_batch_id: input.batch_id,
@@ -197,7 +185,6 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
           confirmed_by: user.id,
         });
 
-        // Insert dropped status record in term_results
         await adminClient.from("term_results").upsert(
           {
             student_id: decision.profile_id,
