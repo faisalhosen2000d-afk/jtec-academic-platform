@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { UploadCloud, AlertTriangle, CheckCircle, FileText, ShieldAlert, X } from "lucide-react";
+import { useState, useRef } from "react";
+import { UploadCloud, FileSpreadsheet, AlertTriangle, CheckCircle, FileText, ShieldAlert, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   verifyMissingStudentsForBatch,
@@ -24,13 +24,11 @@ interface DepartmentItem {
 interface LevelItem {
   id: string;
   name: string;
-  level_number?: number;
 }
 
 interface TermItem {
   id: string;
   name: string;
-  term_number?: number;
 }
 
 interface ResultUploadClientProps {
@@ -53,7 +51,8 @@ export default function ResultUploadClient({ departments, batches, levels, terms
   const [selectedLevel, setSelectedLevel] = useState(levels[0]?.id || "");
   const [selectedTerm, setSelectedTerm] = useState(terms[0]?.id || "");
 
-  const [rawCsvText, setRawCsvText] = useState("");
+  const [rawText, setRawText] = useState("");
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [parsedResults, setParsedResults] = useState<StudentResultEntry[]>([]);
   const [missingStudents, setMissingStudents] = useState<MissingStudentInfo[]>([]);
   const [missingDecisions, setMissingDecisions] = useState<Record<string, MissingStudentDecision>>({});
@@ -62,6 +61,8 @@ export default function ResultUploadClient({ departments, batches, levels, terms
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const currentLevelObj = levels.find((l) => l.id === selectedLevel);
   const currentTermObj = terms.find((t) => t.id === selectedTerm);
   const lvlNum = currentLevelObj?.name.match(/\d+/)?.[0] || "1";
@@ -69,54 +70,120 @@ export default function ResultUploadClient({ departments, batches, levels, terms
   const levelTermKey = `${lvlNum}-${trmNum}`;
   const isFirstTerm = levelTermKey === "1-1";
 
-  // Parse CSV format: StudentID, GPA, CGPA, Credits, Retakes
-  const handleParseCsv = () => {
-    setStatusMsg(null);
-    if (!rawCsvText.trim()) {
-      setStatusMsg({ type: "error", text: "Please paste CSV result rows or student entries." });
-      return;
-    }
-
-    const lines = rawCsvText.trim().split("\n");
+  // Parse tab-separated or comma-separated rows
+  const parseRowsContent = (text: string) => {
+    const lines = text.trim().split(/\r?\n/);
     const results: StudentResultEntry[] = [];
 
     for (const rawLine of lines) {
       const line = rawLine.trim();
-      if (!line || line.toLowerCase().startsWith("student") || line.toLowerCase().startsWith("roll")) continue;
+      if (!line) continue;
 
-      const cols = line.split(/[\t,;|]+/).map((c) => c.trim());
-      if (cols.length < 2) continue;
+      // Ignore header rows
+      const lower = line.toLowerCase();
+      if (
+        lower.startsWith("student") ||
+        lower.startsWith("roll") ||
+        lower.startsWith("id") ||
+        lower.includes("gpa")
+      ) {
+        continue;
+      }
 
+      // Split by tab (Excel copy), comma (CSV), or semicolon
+      const cols = line.split(/[\t,;|]+/).map((c) => c.trim().replace(/^["']|["']$/g, ""));
       const studentId = cols[0] ?? "";
       const gpa = parseFloat(cols[1] ?? "");
+
       if (!studentId || isNaN(gpa)) continue;
 
-      const cgpa = cols[2] ? parseFloat(cols[2]) : (isFirstTerm ? null : gpa);
-      const earnedCredits = cols[3] ? parseFloat(cols[3]) : 0;
-      const retakeCount = cols[4] ? parseInt(cols[4], 10) : (gpa < 2.0 ? 1 : 0);
+      // In 1-1, CGPA is null unless explicitly provided
+      // In 1-2+, if 3rd col is present it's CGPA, otherwise defaults to gpa
+      const cgpaParsed = cols[2] ? parseFloat(cols[2]) : (isFirstTerm ? null : gpa);
+      const cgpa = !isNaN(cgpaParsed as number) ? cgpaParsed : (isFirstTerm ? null : gpa);
+
+      // Retake count: either 4th col (if credit omitted) or 5th col
+      let retakeCount = 0;
+      if (cols[3] !== undefined) {
+        const val = parseInt(cols[3], 10);
+        if (!isNaN(val) && val <= 10) retakeCount = val;
+      }
+      if (cols[4] !== undefined) {
+        const val = parseInt(cols[4], 10);
+        if (!isNaN(val) && val <= 10) retakeCount = val;
+      }
 
       results.push({
         student_id_string: studentId,
         gpa,
-        cgpa: isNaN(cgpa as number) ? null : cgpa,
-        earned_credits: isNaN(earnedCredits) ? 0 : earnedCredits,
-        term_retake_count: isNaN(retakeCount) ? 0 : retakeCount,
+        cgpa,
+        earned_credits: 20.0,
+        term_retake_count: retakeCount,
       });
     }
 
+    return results;
+  };
+
+  const handleTextParse = () => {
+    setStatusMsg(null);
+    if (!rawText.trim()) {
+      setStatusMsg({ type: "error", text: "Please paste your result data or upload an Excel/CSV file." });
+      return;
+    }
+
+    const results = parseRowsContent(rawText);
     if (results.length === 0) {
-      setStatusMsg({ type: "error", text: "Could not parse valid student entries. Please check the format." });
+      setStatusMsg({ type: "error", text: "Could not parse student rows. Please ensure Student ID and GPA are present." });
       return;
     }
 
     setParsedResults(results);
-    setStatusMsg({ type: "success", text: `Successfully parsed ${results.length} student results! Now check missing students.` });
+    setStatusMsg({ type: "success", text: `Successfully parsed ${results.length} student results!` });
   };
 
-  // Step 1: Detect missing students against registered batch roster
+  // Handle direct file upload (CSV / TXT / Excel export)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadedFileName(file.name);
+    setStatusMsg(null);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = String(event.target?.result || "");
+      setRawText(content);
+      const results = parseRowsContent(content);
+      if (results.length > 0) {
+        setParsedResults(results);
+        setStatusMsg({ type: "success", text: `Loaded ${file.name} and parsed ${results.length} student results!` });
+      } else {
+        setStatusMsg({ type: "error", text: "File loaded but no valid student rows found. Please check column format." });
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Download Sample CSV template
+  const handleDownloadTemplate = () => {
+    const header = isFirstTerm ? "StudentID,TermGPA,Retakes" : "StudentID,TermGPA,CGPA,Retakes";
+    const sample1 = isFirstTerm ? "24060401001,3.75,0" : "24060401001,3.75,3.68,0";
+    const sample2 = isFirstTerm ? "24060401002,3.20,1" : "24060401002,3.20,3.35,1";
+    const csvContent = "data:text/csv;charset=utf-8," + [header, sample1, sample2].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `JTEC_Result_Template_${levelTermKey}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Step 1: Detect missing students against batch roster
   const handleDetectMissing = async () => {
     if (parsedResults.length === 0) {
-      setStatusMsg({ type: "error", text: "Please parse the result list first." });
+      setStatusMsg({ type: "error", text: "Please parse the result sheet first." });
       return;
     }
 
@@ -141,7 +208,6 @@ export default function ResultUploadClient({ departments, batches, levels, terms
     setMissingStudents(missing);
 
     if (missing.length > 0) {
-      // Initialize default decisions
       const initialDecisions: Record<string, MissingStudentDecision> = {};
       missing.forEach((s) => {
         initialDecisions[s.id] = {
@@ -154,12 +220,11 @@ export default function ResultUploadClient({ departments, batches, levels, terms
       setMissingDecisions(initialDecisions);
       setShowModal(true);
     } else {
-      // No missing students, directly proceed
       await handleCommitAll([]);
     }
   };
 
-  // Step 2: Final commit for results and confirmed air drops
+  // Step 2: Final commit for results and air-drop decisions
   const handleCommitAll = async (decisions: MissingStudentDecision[]) => {
     setLoading(true);
     setStatusMsg(null);
@@ -182,9 +247,10 @@ export default function ResultUploadClient({ departments, batches, levels, terms
     } else {
       setStatusMsg({
         type: "success",
-        text: `Term ${levelTermKey} results successfully published for ${res.count} students!`,
+        text: `Results for Term ${levelTermKey} successfully published for ${res.count} students!`,
       });
-      setRawCsvText("");
+      setRawText("");
+      setUploadedFileName(null);
       setParsedResults([]);
       setMissingStudents([]);
     }
@@ -209,7 +275,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
       <div className="bg-card border rounded-2xl p-6 shadow-sm space-y-4">
         <h2 className="text-base font-bold flex items-center gap-2">
           <FileText className="w-5 h-5 text-blue-600" />
-          Select Target Term & Batch
+          1. Select Target Department, Batch & Term
         </h2>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -218,7 +284,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
             <select
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl border bg-background text-sm font-medium"
+              className="w-full h-11 px-3 rounded-xl border bg-background text-sm font-medium"
             >
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -233,7 +299,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
             <select
               value={selectedBatch}
               onChange={(e) => setSelectedBatch(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl border bg-background text-sm font-medium"
+              className="w-full h-11 px-3 rounded-xl border bg-background text-sm font-medium"
             >
               {batches.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -248,7 +314,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
             <select
               value={selectedLevel}
               onChange={(e) => setSelectedLevel(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl border bg-background text-sm font-medium"
+              className="w-full h-11 px-3 rounded-xl border bg-background text-sm font-medium"
             >
               {levels.map((l) => (
                 <option key={l.id} value={l.id}>
@@ -263,7 +329,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
             <select
               value={selectedTerm}
               onChange={(e) => setSelectedTerm(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl border bg-background text-sm font-medium"
+              className="w-full h-11 px-3 rounded-xl border bg-background text-sm font-medium"
             >
               {terms.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -274,53 +340,93 @@ export default function ResultUploadClient({ departments, batches, levels, terms
           </div>
         </div>
 
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-semibold mt-2">
-          <span>Active Target: Level {lvlNum} Term {trmNum} (Key: {levelTermKey})</span>
-          {isFirstTerm && <span className="bg-blue-200 dark:bg-blue-800 text-blue-900 dark:text-blue-100 px-2 py-0.5 rounded-full text-[10px]">1-1 Initial GPA Only</span>}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-semibold">
+          <span>Targeting: Level {lvlNum} Term {trmNum} (Key: {levelTermKey})</span>
+          {isFirstTerm ? (
+            <span className="bg-blue-200 dark:bg-blue-800 text-blue-900 dark:text-blue-100 px-2 py-0.5 rounded-full text-[10px]">
+              Level 1 Term 1 (Requires Term GPA Only)
+            </span>
+          ) : (
+            <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full text-[10px]">
+              Term GPA + Cumulative CGPA
+            </span>
+          )}
         </div>
       </div>
 
-      {/* CSV / Sheet Data Input */}
-      <div className="bg-card border rounded-2xl p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
+      {/* Excel / CSV Upload Zone & Paste Area */}
+      <div className="bg-card border rounded-2xl p-6 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-bold flex items-center gap-2">
               <UploadCloud className="w-5 h-5 text-blue-600" />
-              Paste or Input Result Sheet Data
+              2. Upload Result Sheet or Paste Data
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Format: <span className="font-mono text-foreground font-semibold">StudentID, GPA, CGPA, EarnedCredits, RetakeCount</span> (or copy directly from Excel)
+              Accepted columns: <span className="font-mono font-semibold text-foreground">StudentID, Term GPA{isFirstTerm ? "" : ", CGPA"}, Retakes</span>
             </p>
           </div>
+
           <Button
             type="button"
             variant="outline"
-            onClick={() => {
-              setRawCsvText("24060401001, 3.85, 3.85, 20.5, 0\n24060401002, 3.42, 3.42, 17.5, 1\n24060401021, 3.92, 3.92, 20.5, 0");
-            }}
-            className="text-xs h-8 px-3"
+            onClick={handleDownloadTemplate}
+            className="text-xs h-9 px-3 gap-1.5 self-start sm:self-auto"
           >
-            Insert Sample Row
+            <Download className="w-4 h-4 text-muted-foreground" />
+            Download Excel Template (.csv)
           </Button>
         </div>
 
-        <textarea
-          rows={6}
-          value={rawCsvText}
-          onChange={(e) => setRawCsvText(e.target.value)}
-          placeholder="e.g.&#10;24060401001, 3.85, 3.85, 20.5, 0&#10;24060401002, 3.42, 3.42, 17.5, 1&#10;24060401021, 3.92, 3.92, 20.5, 0"
-          className="w-full p-4 rounded-xl border bg-background font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-        />
+        {/* Drag & Drop File Box */}
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 rounded-2xl p-6 text-center cursor-pointer transition bg-slate-50/50 dark:bg-slate-900/40"
+        >
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".csv,.txt,.tsv"
+            className="hidden"
+          />
+          <FileSpreadsheet className="w-10 h-10 mx-auto text-blue-600 mb-2" />
+          <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
+            {uploadedFileName ? `Selected: ${uploadedFileName}` : "Click to select or drop your Excel/CSV result file here"}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Supports CSV, TSV, or comma-separated exports directly from MS Excel or Google Sheets
+          </p>
+        </div>
+
+        {/* Text Area for Direct Copy-Paste from Excel */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-muted-foreground uppercase flex items-center justify-between">
+            <span>Or Copy & Paste directly from Excel</span>
+            <span className="text-[11px] font-normal lowercase">Tabs, commas or lines are auto-detected</span>
+          </label>
+          <textarea
+            rows={5}
+            value={rawText}
+            onChange={(e) => setRawText(e.target.value)}
+            placeholder={
+              isFirstTerm
+                ? "StudentID\tGPA\tRetakes\n24060401001\t3.85\t0\n24060401002\t3.42\t1\n24060401021\t3.92\t0"
+                : "StudentID\tGPA\tCGPA\tRetakes\n24060401001\t3.85\t3.80\t0\n24060401002\t3.42\t3.45\t1\n24060401021\t3.92\t3.90\t0"
+            }
+            className="w-full p-4 rounded-xl border bg-background font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+          />
+        </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-          <Button onClick={handleParseCsv} variant="outline" className="text-xs h-9 px-4">
-            Parse Sheet Rows ({parsedResults.length} Ready)
+          <Button onClick={handleTextParse} variant="outline" className="text-xs h-10 px-4">
+            Parse Sheet ({parsedResults.length} Ready)
           </Button>
 
           <Button
             onClick={handleDetectMissing}
             disabled={parsedResults.length === 0 || loading}
-            className="h-9 px-5 bg-blue-700 hover:bg-blue-800 text-white font-semibold text-xs"
+            className="h-10 px-6 bg-blue-700 hover:bg-blue-800 text-white font-semibold text-xs"
           >
             {loading ? "Checking Roster..." : `Verify & Publish Results (${parsedResults.length})`}
           </Button>
@@ -343,7 +449,6 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                   <th className="px-3 py-2.5">Student ID</th>
                   <th className="px-3 py-2.5">Term GPA</th>
                   <th className="px-3 py-2.5">CGPA</th>
-                  <th className="px-3 py-2.5">Earned Credits</th>
                   <th className="px-3 py-2.5">Retakes</th>
                 </tr>
               </thead>
@@ -353,8 +458,9 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                     <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
                     <td className="px-3 py-2 font-mono font-bold">{r.student_id_string}</td>
                     <td className="px-3 py-2 font-semibold text-blue-600">{r.gpa.toFixed(2)}</td>
-                    <td className="px-3 py-2">{r.cgpa !== null && r.cgpa !== undefined ? r.cgpa.toFixed(2) : "N/A (1-1)"}</td>
-                    <td className="px-3 py-2">{r.earned_credits}</td>
+                    <td className="px-3 py-2">
+                      {isFirstTerm ? "N/A (1-1)" : r.cgpa !== null && r.cgpa !== undefined ? r.cgpa.toFixed(2) : "Same as GPA"}
+                    </td>
                     <td className="px-3 py-2">
                       {r.term_retake_count && r.term_retake_count > 0 ? (
                         <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold text-[10px]">
@@ -389,7 +495,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                     Missing Students Detected ({missingStudents.length})
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    These registered students were omitted from the uploaded official result sheet.
+                    These registered students were omitted from this term result sheet.
                   </p>
                 </div>
               </div>
@@ -399,7 +505,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
             </div>
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Official JTEC result sheets omit students who received an Air Drop. Please review each missing student below and select whether they should be migrated to the junior batch or excluded (e.g. in case of typos):
+              Official JTEC result sheets omit students who received an Air Drop. Please review each missing student below and select whether they should be migrated to the junior batch or excluded:
             </p>
 
             <div className="max-h-64 overflow-y-auto space-y-2.5 rounded-xl border p-3 bg-muted/20">
@@ -409,7 +515,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                   <div key={s.id} className="p-3 rounded-lg border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                     <div>
                       <div className="font-bold text-foreground">{s.full_name}</div>
-                      <div className="font-mono text-muted-foreground">ID: {s.student_id} • {s.email}</div>
+                      <div className="font-mono text-muted-foreground">ID: {s.student_id} &bull; {s.email}</div>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
@@ -420,8 +526,10 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                           setMissingDecisions((prev) => ({
                             ...prev,
                             [s.id]: {
-                              profile_id: s.id, student_id_string: s.student_id,
+                              profile_id: s.id,
+                              student_id_string: s.student_id,
                               action: act,
+                              drop_reason: prev[s.id]?.drop_reason || "academic_failure",
                             },
                           }));
                         }}
