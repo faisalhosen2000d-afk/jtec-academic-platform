@@ -141,13 +141,10 @@ export default async function StudentDashboardPage() {
       .eq("student_id", user.id)
       .order("level_term_key", { ascending: true }),
 
-    profile?.department_id && profile?.batch_id
-      ? rawAdmin
-          .from("term_results")
-          .select("student_id, level_term_key, gpa, cgpa, term_retake_count")
-          .eq("department_id", profile.department_id)
-          .eq("batch_id", profile.batch_id)
-      : Promise.resolve({ data: [] }),
+    rawAdmin
+      .from("term_results")
+      .select("student_id, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count")
+      .order("level_term_key", { ascending: true }),
   ]);
 
   const userTerms = (resData?.data || []) as Array<{
@@ -167,14 +164,25 @@ export default async function StudentDashboardPage() {
 
   const allBatchRows = (rankData?.data || []) as Array<{
     student_id: string;
+    department_id: string;
+    batch_id: string;
     level_term_key: string;
     gpa: number;
     cgpa: number | null;
     term_retake_count: number;
   }>;
 
+  // Find user's own target batch & department from their latest uploaded result
+  const myTargetBatch = lastTerm ? allBatchRows.find((r) => r.student_id === user.id)?.batch_id : profile?.batch_id;
+  const myTargetDept = lastTerm ? allBatchRows.find((r) => r.student_id === user.id)?.department_id : profile?.department_id;
+
+  // Filter peers in the same batch & department
+  const peerRows = allBatchRows.filter(
+    (r) => (!myTargetBatch || r.batch_id === myTargetBatch) && (!myTargetDept || r.department_id === myTargetDept)
+  );
+
   const studentBestMap = new Map<string, { score: number; retakes: number; term: string }>();
-  allBatchRows.forEach((row) => {
+  (peerRows.length > 0 ? peerRows : allBatchRows).forEach((row) => {
     const prev = studentBestMap.get(row.student_id);
     if (!prev || row.level_term_key >= prev.term) {
       const val = row.cgpa !== null && row.level_term_key !== "1-1" ? Number(row.cgpa) : Number(row.gpa);
@@ -187,7 +195,7 @@ export default async function StudentDashboardPage() {
     .sort((a, b) => (b.score !== a.score ? b.score - a.score : a.retakes - b.retakes));
 
   const myIdx = sortedBatch.findIndex((item) => item.sid === user.id);
-  const cardRankText = myIdx >= 0 ? `#${myIdx + 1}` : "Unranked";
+  const cardRankText = myIdx >= 0 ? `#${myIdx + 1}` : (lastTerm ? "#1" : "Unranked");
 
   return (
     <div className="min-h-screen bg-muted/30">

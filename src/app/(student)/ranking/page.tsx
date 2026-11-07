@@ -38,12 +38,12 @@ export default async function StudentRankingPage() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const rawClient = createRawSupabaseClient(supabaseUrl, serviceKey);
 
-  // Fetch all students in the user's batch & department for merit comparison
+  // Fetch all students and published term results for merit comparison
   const [
     { data: dept },
     { data: batch },
-    { data: batchProfiles },
-    { data: batchResults },
+    { data: allProfiles },
+    { data: allResultsData },
   ] = await Promise.all([
     profile.department_id
       ? supabase.from("departments").select("name, code").eq("id", profile.department_id).maybeSingle()
@@ -51,22 +51,38 @@ export default async function StudentRankingPage() {
     profile.batch_id
       ? supabase.from("batches").select("name").eq("id", profile.batch_id).maybeSingle()
       : Promise.resolve({ data: null }),
-    profile.batch_id && profile.department_id
-      ? rawClient
-          .from("profiles")
-          .select("id, full_name, student_id")
-          .eq("role", "student")
-          .eq("department_id", profile.department_id)
-          .eq("batch_id", profile.batch_id)
-      : Promise.resolve({ data: [] }),
-    profile.batch_id && profile.department_id
-      ? rawClient
-          .from("term_results")
-          .select("student_id, level_term_key, gpa, cgpa, earned_credits, term_retake_count")
-          .eq("department_id", profile.department_id)
-          .eq("batch_id", profile.batch_id)
-      : Promise.resolve({ data: [] }),
+    rawClient
+      .from("profiles")
+      .select("id, full_name, student_id, batch_id, department_id")
+      .eq("role", "student"),
+    rawClient
+      .from("term_results")
+      .select("student_id, department_id, batch_id, level_term_key, gpa, cgpa, earned_credits, term_retake_count")
+      .order("level_term_key", { ascending: true }),
   ]);
+
+  const allResults = (allResultsData || []) as Array<{
+    student_id: string;
+    department_id: string;
+    batch_id: string;
+    level_term_key: string;
+    gpa: number;
+    cgpa: number | null;
+    earned_credits: number;
+    term_retake_count: number;
+  }>;
+
+  const userLatest = allResults.filter((r) => r.student_id === user.id).pop();
+  const targetBatchId = userLatest?.batch_id || profile.batch_id;
+  const targetDeptId = userLatest?.department_id || profile.department_id;
+
+  const batchResults = allResults.filter(
+    (r) => (!targetBatchId || r.batch_id === targetBatchId) && (!targetDeptId || r.department_id === targetDeptId)
+  );
+
+  const batchProfiles = (allProfiles || []).filter(
+    (p: { id: string; full_name: string | null; student_id: string | null; batch_id: string | null; department_id: string | null }) => (!targetBatchId || p.batch_id === targetBatchId) && (!targetDeptId || p.department_id === targetDeptId)
+  );
 
   const profileMap = new Map<string, { full_name: string; student_id: string }>();
   (batchProfiles || []).forEach((p: { id: string; full_name: string | null; student_id: string | null }) => {
