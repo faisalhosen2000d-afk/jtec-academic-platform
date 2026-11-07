@@ -198,31 +198,24 @@ export default async function StudentResultsPage() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3 text-center">
-                      <div className="rounded-xl bg-muted/40 p-3">
-                        <div className="text-[11px] text-muted-foreground font-medium">Term GPA</div>
-                        <div className="text-xl font-bold text-blue-600 mt-0.5">
+                    <div className="grid grid-cols-2 gap-3 text-center">
+                      <div className="rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 p-3.5">
+                        <div className="text-[11px] text-blue-700 dark:text-blue-300 font-semibold uppercase tracking-wider">Term GPA</div>
+                        <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 mt-0.5">
                           {Number(r.gpa).toFixed(2)}
                         </div>
                       </div>
 
-                      <div className="rounded-xl bg-muted/40 p-3">
-                        <div className="text-[11px] text-muted-foreground font-medium">CGPA</div>
-                        <div className="text-xl font-bold text-emerald-600 mt-0.5">
+                      <div className="rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 p-3.5">
+                        <div className="text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold uppercase tracking-wider">CGPA</div>
+                        <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
                           {is11 ? (
-                            <span className="text-xs font-semibold text-muted-foreground">N/A (1-1)</span>
+                            <span className="text-sm font-semibold text-muted-foreground">N/A (1-1)</span>
                           ) : r.cgpa !== null ? (
                             Number(r.cgpa).toFixed(2)
                           ) : (
                             Number(r.gpa).toFixed(2)
                           )}
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl bg-muted/40 p-3">
-                        <div className="text-[11px] text-muted-foreground font-medium">Credits</div>
-                        <div className="text-xl font-bold text-foreground mt-0.5">
-                          {Number(r.earned_credits || 0).toFixed(1)}
                         </div>
                       </div>
                     </div>
