@@ -26,7 +26,10 @@ function getCodes(remarks: string | null): string[] {
   if (!remarks) return [];
   const c = remarks.replace(/^Retakes:\s*/i, "").trim();
   if (!c || c === "0" || c.toLowerCase() === "none" || c.startsWith("Year Dropped")) return [];
-  return c.split(/[,;|]+/).map((s) => s.trim()).filter(Boolean);
+  return c
+    .split(/[,;|]+/)
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
 }
 
 export default async function StudentResultsPage() {
@@ -82,8 +85,27 @@ export default async function StudentResultsPage() {
     return { rank: idx >= 0 ? idx + 1 : null, total: list.length };
   };
 
-  const totalRetakes = results.reduce((a, r) => a + (Number(r.term_retake_count) || 0), 0);
-  const pct = Math.min(100, Math.round((totalRetakes / 5) * 100));
+  // UNIQUE SUBJECT TRACKING: strictly count unique subjects so carried-over retakes are not duplicated
+  const uniqueSubjectsSet = new Set<string>();
+  const freshMap = new Map<string, string[]>();
+
+  results.forEach((r) => {
+    if (r.status === "air_dropped") return;
+    const codes = getCodes(r.remarks);
+    const freshForThis: string[] = [];
+    codes.forEach((code) => {
+      if (!uniqueSubjectsSet.has(code)) {
+        uniqueSubjectsSet.add(code);
+        freshForThis.push(code);
+      }
+    });
+    freshMap.set(r.level_term_key, freshForThis);
+  });
+
+  const isAirDropped = results.some((r) => r.status === "air_dropped");
+  const totalRetakes = isAirDropped ? 5 : uniqueSubjectsSet.size;
+  const riskCap = 5;
+  const pct = Math.min(100, Math.round((totalRetakes / riskCap) * 100));
   const latestCgpa = latest?.level_term_key === "1-1" ? null : latest?.cgpa ?? latest?.gpa ?? null;
 
   return (
@@ -119,38 +141,58 @@ export default async function StudentResultsPage() {
           <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {totalRetakes >= 4 ? <ShieldAlert className="w-5 h-5 text-red-600" /> : totalRetakes > 0 ? <AlertTriangle className="w-5 h-5 text-amber-500" /> : <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+                {isAirDropped || totalRetakes >= 4 ? (
+                  <ShieldAlert className="w-5 h-5 text-red-600 animate-pulse" />
+                ) : totalRetakes > 0 ? (
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                )}
                 <h2 className="text-base font-bold">Academic Standing & Retake Risk Meter</h2>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-bold ${totalRetakes > 0 ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-700"}`}>
-                {totalRetakes} / 5 Retakes
+              <span className={`px-3 py-1 rounded-full text-xs font-bold ${isAirDropped || totalRetakes >= 5 ? "bg-red-100 text-red-700" : totalRetakes > 0 ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-700"}`}>
+                {isAirDropped ? "5 / 5 — YEAR DROPPED" : `${totalRetakes} / ${riskCap} Retakes`}
               </span>
             </div>
             <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-              <div className={`h-full rounded-full ${totalRetakes >= 4 ? "bg-red-600" : totalRetakes >= 2 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: totalRetakes === 0 ? "0%" : `${pct}%` }} />
+              <div className={`h-full rounded-full transition-all duration-500 ${isAirDropped || totalRetakes >= 4 ? "bg-red-600" : totalRetakes >= 2 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: totalRetakes === 0 ? "0%" : `${pct}%` }} />
             </div>
+            <p className="text-xs text-muted-foreground">
+              {isAirDropped
+                ? "CRITICAL STATUS: Year Drop confirmed. You have been migrated to the junior batch."
+                : totalRetakes === 0
+                ? "Clear academic standing! You have 0 pending retakes across your completed terms."
+                : `You currently have ${totalRetakes} unique uncleared retake subject(s). Accumulating 5 or more in a level triggers a Year Drop.`}
+            </p>
 
             {results.length > 0 && (
               <div className="pt-3 border-t space-y-2.5">
-                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Term-wise Retake Subject Breakdown</div>
+                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Term-wise Retake Breakdown</div>
                 <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
                   {results.map((r) => {
                     const codes = getCodes(r.remarks);
-                    const has = r.term_retake_count > 0 || codes.length > 0;
+                    const freshList = freshMap.get(r.level_term_key) || [];
+                    const isNew = freshList.length > 0;
+                    const isCarried = codes.length > 0 && !isNew;
+
                     return (
-                      <div key={r.id} className={`rounded-xl border p-3 text-xs space-y-1.5 ${has ? "bg-amber-50/70 border-amber-200" : "bg-muted/20 border-border"}`}>
+                      <div key={r.id} className={`rounded-xl border p-3 text-xs space-y-1.5 ${isNew ? "bg-amber-50/70 border-amber-200" : "bg-muted/20 border-border"}`}>
                         <div className="flex items-center justify-between font-bold">
                           <span>Term {r.level_term_key}</span>
-                          <span className={has ? "text-amber-700" : "text-emerald-600"}>{has ? `${r.term_retake_count} Retake` : "Clear"}</span>
+                          <span className={isNew ? "text-amber-700 font-bold" : isCarried ? "text-muted-foreground" : "text-emerald-600"}>
+                            {isNew ? `${freshList.length} New Retake` : isCarried ? "Carried Over" : "Clear"}
+                          </span>
                         </div>
-                        {codes.length > 0 ? (
+                        {isNew ? (
                           <div className="flex flex-wrap gap-1 pt-0.5">
-                            {codes.map((c, i) => (
+                            {freshList.map((c, i) => (
                               <span key={i} className="px-2 py-0.5 rounded bg-amber-200 text-amber-950 font-mono font-bold text-[10px]">{c}</span>
                             ))}
                           </div>
+                        ) : isCarried ? (
+                          <div className="text-[11px] text-muted-foreground">Uncleared: {codes.join(", ")}</div>
                         ) : (
-                          <div className="text-[11px] text-muted-foreground">{has ? `${r.term_retake_count} Retake` : "All passed (--)"}</div>
+                          <div className="text-[11px] text-muted-foreground">All passed (--)</div>
                         )}
                       </div>
                     );
@@ -172,6 +214,9 @@ export default async function StudentResultsPage() {
                 const [lvl, trm] = r.level_term_key.split("-");
                 const codes = getCodes(r.remarks);
                 const rkInfo = getRank(r.level_term_key);
+                const freshList = freshMap.get(r.level_term_key) || [];
+                const isDropped = r.status === "air_dropped";
+
                 return (
                   <div key={r.id} className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
                     <div className="flex items-center justify-between border-b pb-3">
@@ -180,10 +225,10 @@ export default async function StudentResultsPage() {
                         <h3 className="text-lg font-bold mt-0.5">Term {r.level_term_key} Examination</h3>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${r.term_retake_count === 0 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
-                          {r.term_retake_count === 0 ? "Promoted (Clear)" : `Promoted (${r.term_retake_count} Retake)`}
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${isDropped ? "bg-red-100 text-red-700 font-bold" : codes.length === 0 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
+                          {isDropped ? "Year Dropped" : codes.length === 0 ? "Promoted (Clear)" : `Promoted (${codes.length} Retake)`}
                         </span>
-                        {rkInfo.rank && (
+                        {rkInfo.rank && !isDropped && (
                           <Link href={`/ranking?term=${r.level_term_key}`} className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 hover:underline">
                             <Trophy className="w-3 h-3" /> Term Rank: #{rkInfo.rank} of {rkInfo.total}
                           </Link>
@@ -204,9 +249,14 @@ export default async function StudentResultsPage() {
                     </div>
                     {codes.length > 0 ? (
                       <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 space-y-1.5">
-                        <div className="text-[11px] font-bold text-amber-800 flex items-center gap-1.5">
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Retake Subject(s) in Term {r.level_term_key}:</span>
+                        <div className="text-[11px] font-bold text-amber-800 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Retake Subject(s):</span>
+                          </span>
+                          {freshList.length === 0 && (
+                            <span className="text-[10px] text-muted-foreground font-normal">(Carried over from prior term)</span>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {codes.map((c, idx) => (
