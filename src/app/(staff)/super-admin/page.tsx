@@ -124,22 +124,23 @@ export default function SuperAdminPage() {
           </div>
 
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <Link
-          href="/admin/results/upload"
-          className="group rounded-xl border bg-card p-6 shadow-sm transition-all hover:border-primary hover:shadow-md"
-        >
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold group-hover:text-primary">
+        <div className="rounded-xl border border-border bg-background p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">
               Publish Term Results & Air Drops
             </h2>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-              Exam Office
-            </span>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Upload official term GPA/CGPA sheets, detect missing student rolls, and manage air drop batch migrations with automated tracking.
+            </p>
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Upload official term GPA/CGPA sheets, detect missing student rolls, and manage air drop batch migrations with automated tracking.
-          </p>
-        </Link>
+          <div className="mt-4">
+            <Link href="/admin/results/upload">
+              <Button className="w-full sm:w-auto">
+                Manage Results & Air Drops
+              </Button>
+            </Link>
+          </div>
+        </div>
             {sections.map((section) => (
               <div
                 key={section.href}

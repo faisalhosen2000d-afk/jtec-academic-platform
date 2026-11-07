@@ -49,9 +49,9 @@ export default async function AdminResultUploadPage() {
             Upload official term results, verify missing student rolls, and handle air drop batch migrations with automated audit tracking.
           </p>
         </div>
-        <Link href="/admin">
+        <Link href={profile.role === "super_admin" ? "/super-admin" : "/admin"}>
           <Button variant="outline" className="rounded-xl text-xs">
-            Back to Admin Panel
+            {profile.role === "super_admin" ? "Back to Super Admin" : "Back to Admin Panel"}
           </Button>
         </Link>
       </div>
