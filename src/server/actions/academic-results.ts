@@ -36,7 +36,7 @@ export interface UploadBatchResultsInput {
   batch_id: string;
   level_id: string;
   term_id: string;
-  level_term_key: string;
+  level_term_key?: string;
   results: StudentResultEntry[];
   missing_decisions?: MissingStudentDecision[];
 }
@@ -44,6 +44,7 @@ export interface UploadBatchResultsInput {
 export async function verifyMissingStudentsForBatch(input: {
   department_id: string;
   batch_id: string;
+  level_term_key?: string;
   present_student_ids: string[];
 }) {
   const authSupabase = await createServerAuthClient();
@@ -60,19 +61,66 @@ export async function verifyMissingStudentsForBatch(input: {
     return { error: "Insufficient permissions." };
   }
 
-  const { data: registeredStudents, error } = await authSupabase
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const adminClient = createRawSupabaseClient(supabaseUrl, serviceKey);
+
+  // 1. Fetch registered student profiles in this batch
+  const { data: registeredStudents } = await adminClient
     .from("profiles")
     .select("id, full_name, student_id, email, batch_id, department_id")
     .eq("role", "student")
     .eq("department_id", input.department_id)
     .eq("batch_id", input.batch_id);
 
-  if (error) return { error: error.message };
+  // 2. Fetch all student rolls that had results in ANY previous term in this batch (unregistered sheet rolls included)
+  const { data: previousTermRows } = await adminClient
+    .from("term_results")
+    .select("student_id, student_id_code, status")
+    .eq("department_id", input.department_id)
+    .eq("batch_id", input.batch_id)
+    .neq("status", "air_dropped");
+
+  const rosterMap = new Map<string, { id?: string; student_id: string; full_name?: string }>();
+
+  // Add previously known sheet rolls
+  (previousTermRows || []).forEach((r) => {
+    const roll = (r.student_id_code || "").trim();
+    if (roll) {
+      rosterMap.set(roll.toLowerCase(), {
+        id: r.student_id || undefined,
+        student_id: roll,
+        full_name: "Roll " + roll,
+      });
+    }
+  });
+
+  // Overwrite with real profile names if registered
+  (registeredStudents || []).forEach((s) => {
+    if (s.student_id) {
+      const roll = s.student_id.trim();
+      rosterMap.set(roll.toLowerCase(), {
+        id: s.id,
+        student_id: roll,
+        full_name: s.full_name || "Roll " + roll,
+      });
+    }
+  });
 
   const presentNormalized = input.present_student_ids.map((s) => s.trim().replace(/\.0+$/, "").toLowerCase());
-  const missingStudents = (registeredStudents || []).filter((s) => {
-    if (!s.student_id) return false;
-    return !presentNormalized.includes(s.student_id.trim().replace(/\.0+$/, "").toLowerCase());
+
+  // Detect missing students who were in the roster but omitted from this current term sheet!
+  const missingStudents: Array<{ id: string; full_name: string; student_id: string; email: string }> = [];
+
+  rosterMap.forEach((studentInfo, rollKey) => {
+    if (!presentNormalized.includes(rollKey)) {
+      missingStudents.push({
+        id: studentInfo.id || "unregistered_" + studentInfo.student_id,
+        full_name: studentInfo.full_name || "Roll " + studentInfo.student_id,
+        student_id: studentInfo.student_id,
+        email: studentInfo.id ? "Registered Student" : "Unregistered Sheet Roll",
+      });
+    }
   });
 
   return { success: true, missingStudents };
@@ -97,6 +145,7 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const adminClient = createRawSupabaseClient(supabaseUrl, serviceKey);
 
+  // Recursive Next Junior Batch lookup: find the next batch in chronological order
   let nextJuniorBatchId: string | null = null;
   const { data: currentBatch } = await adminClient
     .from("batches")
@@ -168,27 +217,47 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
     }
   }
 
-  if (input.missing_decisions && input.missing_decisions.length > 0 && nextJuniorBatchId) {
+  // Process Air Drops for missing rolls
+  if (input.missing_decisions && input.missing_decisions.length > 0) {
     for (const decision of input.missing_decisions) {
       if (decision.action === "air_drop") {
-        await adminClient
-          .from("profiles")
-          .update({ batch_id: nextJuniorBatchId })
-          .eq("id", decision.profile_id);
+        const isRegistered = !decision.profile_id.startsWith("unregistered_");
 
-        await adminClient.from("student_air_drop_history").insert({
-          student_id: decision.profile_id,
-          previous_batch_id: input.batch_id,
-          migrated_batch_id: nextJuniorBatchId,
-          dropped_at_level_term: input.level_term_key,
-          drop_reason: decision.drop_reason || "academic_failure",
-          notes: decision.notes || "Migrated to junior batch on result upload",
-          confirmed_by: user.id,
-        });
+        if (isRegistered && nextJuniorBatchId) {
+          await adminClient
+            .from("profiles")
+            .update({ batch_id: nextJuniorBatchId })
+            .eq("id", decision.profile_id);
 
+          await adminClient.from("student_air_drop_history").insert({
+            student_id: decision.profile_id,
+            student_id_code: decision.student_id_string,
+            previous_batch_id: input.batch_id,
+            migrated_batch_id: nextJuniorBatchId,
+            dropped_at_level_term: input.level_term_key,
+            drop_reason: decision.drop_reason || "academic_failure",
+            notes: decision.notes || "Omitted from official result sheet - Air Drop confirmed",
+            confirmed_by: user.id,
+          });
+        } else if (nextJuniorBatchId) {
+          // Record air drop history for unregistered student by student_id_code!
+          await adminClient.from("student_air_drop_history").insert({
+            student_id: null,
+            student_id_code: decision.student_id_string,
+            previous_batch_id: input.batch_id,
+            migrated_batch_id: nextJuniorBatchId,
+            dropped_at_level_term: input.level_term_key,
+            drop_reason: decision.drop_reason || "academic_failure",
+            notes: "Omitted from official result sheet - Unregistered Air Drop confirmed",
+            confirmed_by: user.id,
+          });
+        }
+
+        // Record Year Drop status in term_results so their transcript shows Year Dropped!
         await adminClient.from("term_results").upsert(
           {
-            student_id: decision.profile_id,
+            student_id: isRegistered ? decision.profile_id : null,
+            student_id_code: decision.student_id_string,
             department_id: input.department_id,
             batch_id: input.batch_id,
             level_id: input.level_id,
@@ -200,7 +269,7 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
             term_retake_count: 5,
             cumulative_retake_count: 5,
             status: "air_dropped",
-            remarks: `Year Dropped: ${decision.drop_reason}`,
+            remarks: `Year Dropped: ${decision.drop_reason || "academic_failure"}`,
             updated_at: new Date().toISOString(),
           },
           { onConflict: "student_id_code,department_id,batch_id,level_term_key" }

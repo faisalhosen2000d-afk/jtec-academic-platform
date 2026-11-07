@@ -129,10 +129,31 @@ export default async function StudentDashboardPage() {
   const termName = term?.name || "Not assigned";
 
     // Real-time Results & Ranking computation
+    // Auto-check if this student has an unreversed Air Drop record and sync their batch seamlessly!
+  
+
   const rawAdmin = createRawSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
+
+  if (profile?.student_id) {
+    try {
+      await rawAdmin.rpc("check_and_sync_air_dropped_student", {
+        target_user_id: user.id,
+        target_student_id: profile.student_id,
+      });
+    } catch {
+      // Gracefully continue
+    }
+  }
+
+  
+
+  // Auto-check if this student has an unreversed Air Drop record and sync their batch seamlessly!
+  
+
+  
 
   const [resData, rankData] = await Promise.all([
     rawAdmin
