@@ -1,4 +1,4 @@
-
+﻿
 export type Json =
   | string
   | number
@@ -1626,6 +1626,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      update_own_student_full_name: {
+        Args: { p_new_name: string }
+        Returns: undefined
+      }
       aggregate_material_stats: { Args: never; Returns: undefined }
       approve_administration_account_request: {
         Args: { p_request_id: string }

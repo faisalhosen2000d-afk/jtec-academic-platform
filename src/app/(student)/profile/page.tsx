@@ -1,9 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
 import StudentContactSettings from "@/components/student/StudentContactSettings";
 import StudentProfilePhoto from "@/components/student/StudentProfilePhoto";
+import StudentFullNameEditor from "@/components/student/StudentFullNameEditor";
 
 export default async function StudentProfilePage() {
   const supabase = await createClient();
@@ -75,14 +76,8 @@ export default async function StudentProfilePage() {
                 </div>
 
                 <div className="grid gap-5 sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      Full Name
-                    </p>
-
-                    <p className="mt-1 font-medium text-foreground">
-                      {fullName}
-                    </p>
+                  <div className="sm:col-span-2">
+                    <StudentFullNameEditor initialName={fullName} />
                   </div>
 
                   <div>
