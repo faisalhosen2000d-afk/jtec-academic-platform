@@ -256,6 +256,67 @@ export default async function StudentDashboardPage() {
   const myRankIdx = rankedStudents.findIndex((item) => item.sid === user.id);
   const liveRankBadge = myRankIdx >= 0 ? `#${myRankIdx + 1}` : "Unranked";
 
+    // Real-time Results & Ranking computation
+  const rawAdmin = createRawSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const [resData, rankData] = await Promise.all([
+    rawAdmin
+      .from("term_results")
+      .select("level_term_key, gpa, cgpa, status, term_retake_count")
+      .eq("student_id", user.id)
+      .order("level_term_key", { ascending: true }),
+
+    profile?.department_id && profile?.batch_id
+      ? rawAdmin
+          .from("term_results")
+          .select("student_id, level_term_key, gpa, cgpa, term_retake_count")
+          .eq("department_id", profile.department_id)
+          .eq("batch_id", profile.batch_id)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const userTerms = (resData?.data || []) as Array<{
+    level_term_key: string;
+    gpa: number;
+    cgpa: number | null;
+    term_retake_count: number;
+  }>;
+  const lastTerm = userTerms.length > 0 ? userTerms[userTerms.length - 1] : null;
+  const cardScoreText = lastTerm
+    ? lastTerm.level_term_key === "1-1"
+      ? `${Number(lastTerm.gpa).toFixed(2)} GPA`
+      : `${Number(lastTerm.cgpa ?? lastTerm.gpa).toFixed(2)} CGPA`
+    : "No Results";
+
+  const totalPendingRetakes = userTerms.reduce((sum, item) => sum + (Number(item.term_retake_count) || 0), 0);
+
+  const allBatchRows = (rankData?.data || []) as Array<{
+    student_id: string;
+    level_term_key: string;
+    gpa: number;
+    cgpa: number | null;
+    term_retake_count: number;
+  }>;
+
+  const studentBestMap = new Map<string, { score: number; retakes: number; term: string }>();
+  allBatchRows.forEach((row) => {
+    const prev = studentBestMap.get(row.student_id);
+    if (!prev || row.level_term_key >= prev.term) {
+      const val = row.cgpa !== null && row.level_term_key !== "1-1" ? Number(row.cgpa) : Number(row.gpa);
+      studentBestMap.set(row.student_id, { score: val, retakes: Number(row.term_retake_count) || 0, term: row.level_term_key });
+    }
+  });
+
+  const sortedBatch = Array.from(studentBestMap.entries())
+    .map(([sid, d]) => ({ sid, ...d }))
+    .sort((a, b) => (b.score !== a.score ? b.score - a.score : a.retakes - b.retakes));
+
+  const myIdx = sortedBatch.findIndex((item) => item.sid === user.id);
+  const cardRankText = myIdx >= 0 ? `#${myIdx + 1}` : "Unranked";
+
   return (
     <div className="min-h-screen bg-muted/30">
       <div className="flex min-h-screen">
