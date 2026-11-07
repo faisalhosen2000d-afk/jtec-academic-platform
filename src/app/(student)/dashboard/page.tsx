@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
@@ -126,6 +127,69 @@ export default async function StudentDashboardPage() {
   const batchName = batch?.name || "Not assigned";
   const levelName = level?.name || "Not assigned";
   const termName = term?.name || "Not assigned";
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const rawAdminClient = createRawSupabaseClient(supabaseUrl, serviceKey);
+
+  const [userResultsRes, batchRankingsRes] = await Promise.all([
+    rawAdminClient
+      .from("term_results")
+      .select("level_term_key, gpa, cgpa, status, term_retake_count")
+      .eq("student_id", user.id)
+      .order("level_term_key", { ascending: true }),
+
+    profile?.department_id && profile?.batch_id
+      ? rawAdminClient
+          .from("term_results")
+          .select("student_id, level_term_key, gpa, cgpa, term_retake_count")
+          .eq("department_id", profile.department_id)
+          .eq("batch_id", profile.batch_id)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const userResults = (userResultsRes?.data || []) as Array<{
+    level_term_key: string;
+    gpa: number;
+    cgpa: number | null;
+    status: string;
+    term_retake_count: number;
+  }>;
+  const latestResult = userResults.length > 0 ? userResults[userResults.length - 1] : null;
+  const latestDisplayScore = latestResult
+    ? latestResult.level_term_key === "1-1"
+      ? `${Number(latestResult.gpa).toFixed(2)} GPA`
+      : `${Number(latestResult.cgpa ?? latestResult.gpa).toFixed(2)} CGPA`
+    : "No Results";
+
+  const totalRetakes = userResults.reduce((acc, r) => acc + (Number(r.term_retake_count) || 0), 0);
+
+  const batchRows = (batchRankingsRes?.data || []) as Array<{
+    student_id: string;
+    level_term_key: string;
+    gpa: number;
+    cgpa: number | null;
+    term_retake_count: number;
+  }>;
+
+  const latestPerStudent = new Map<string, { score: number; retakes: number; term: string }>();
+  batchRows.forEach((r) => {
+    const existing = latestPerStudent.get(r.student_id);
+    if (!existing || r.level_term_key >= existing.term) {
+      const score = r.cgpa !== null && r.level_term_key !== "1-1" ? Number(r.cgpa) : Number(r.gpa);
+      latestPerStudent.set(r.student_id, { score, retakes: Number(r.term_retake_count) || 0, term: r.level_term_key });
+    }
+  });
+
+  const sortedLeaderboard = Array.from(latestPerStudent.entries())
+    .map(([sid, data]) => ({ sid, ...data }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.retakes - b.retakes;
+    });
+
+  const rankIndex = sortedLeaderboard.findIndex((item) => item.sid === user.id);
+  const liveMeritRank = rankIndex >= 0 ? `#${rankIndex + 1}` : "Unranked";
 
   return (
     <div className="min-h-screen bg-muted/30">
