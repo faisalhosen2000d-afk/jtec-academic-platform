@@ -99,11 +99,32 @@ export default async function StudentRankingPage() {
     (r) => (!targetBatchId || r.batch_id === targetBatchId) && (!targetDeptId || r.department_id === targetDeptId)
   );
 
-  // Group by unique student roll (student_id_code) so all 27 students are ranked
+  // Detect regular batch prefix (majority 3-digit roll prefix, e.g. "240" for 8th batch) to exclude irregular/air-dropped seniors from merit ranking
+  const prefixCounts = new Map<string, number>();
+  batchResults.forEach((r) => {
+    const rk = (r.student_id_code || "").trim();
+    if (rk.length >= 3) {
+      const pfx = rk.slice(0, 3);
+      prefixCounts.set(pfx, (prefixCounts.get(pfx) || 0) + 1);
+    }
+  });
+  let regularPrefix = "";
+  let maxCount = 0;
+  prefixCounts.forEach((cnt, pfx) => {
+    if (cnt > maxCount) {
+      maxCount = cnt;
+      regularPrefix = pfx;
+    }
+  });
+
+  // Group by unique student roll for regular batch students only
   const latestByRoll = new Map<string, RawResultRow>();
   batchResults.forEach((r) => {
     const rollKey = (r.student_id_code || idToAccountMap.get(r.student_id || "")?.student_id || r.student_id || "").trim();
     if (!rollKey) return;
+    // Exclude irregular/dropped students (whose roll prefix differs from the batch's regular prefix) from merit ranking
+    if (regularPrefix && rollKey.length >= 3 && !rollKey.startsWith(regularPrefix)) return;
+
     const existing = latestByRoll.get(rollKey);
     if (!existing || r.level_term_key >= existing.level_term_key) {
       latestByRoll.set(rollKey, { ...r, student_id_code: rollKey });

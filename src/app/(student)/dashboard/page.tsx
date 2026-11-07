@@ -181,8 +181,20 @@ export default async function StudentDashboardPage() {
     (r) => (!myTargetBatch || r.batch_id === myTargetBatch) && (!myTargetDept || r.department_id === myTargetDept)
   );
 
+  const activeRows = peerRows.length > 0 ? peerRows : allBatchRows;
+  const pfxMap = new Map<string, number>();
+  activeRows.forEach((row) => {
+    const rk = ((row as { student_id_code?: string }).student_id_code || "").trim();
+    if (rk.length >= 3) pfxMap.set(rk.slice(0, 3), (pfxMap.get(rk.slice(0, 3)) || 0) + 1);
+  });
+  let regPfx = "";
+  let maxPfx = 0;
+  pfxMap.forEach((c, p) => { if (c > maxPfx) { maxPfx = c; regPfx = p; } });
+
   const studentBestMap = new Map<string, { score: number; retakes: number; term: string }>();
-  (peerRows.length > 0 ? peerRows : allBatchRows).forEach((row) => {
+  activeRows.forEach((row) => {
+    const rk = ((row as { student_id_code?: string }).student_id_code || "").trim();
+    if (regPfx && rk.length >= 3 && !rk.startsWith(regPfx)) return;
     const rKey = (row as { student_id_code?: string }).student_id_code || row.student_id; const prev = studentBestMap.get(rKey);
     if (!prev || row.level_term_key >= prev.term) {
       const val = row.cgpa !== null && row.level_term_key !== "1-1" ? Number(row.cgpa) : Number(row.gpa);
