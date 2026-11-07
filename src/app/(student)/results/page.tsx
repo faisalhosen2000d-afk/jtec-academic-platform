@@ -190,10 +190,16 @@ export default async function StudentResultsPage() {
                             : "bg-emerald-50/70 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900"
                         }`}
                       >
-                        <div className="flex items-center justify-between font-bold">
-                          <span>Term {r.level_term_key}</span>
-                          <span className={isNew ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}>
-                            {isNew ? `${freshList.length} New Retake` : isCarriedOnly ? "Cleared (Backlog Carried)" : "All Clear"}
+                        <div className="flex items-center justify-between gap-1.5 font-bold">
+                          <span className="whitespace-nowrap shrink-0">Term {r.level_term_key}</span>
+                          <span className={`text-[11px] px-2 py-0.5 rounded-md whitespace-nowrap ${
+                            isNew
+                              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200"
+                              : isCarriedOnly
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200"
+                              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200"
+                          }`}>
+                            {isNew ? `${freshList.length} New Retake` : isCarriedOnly ? "Carried Over" : "All Clear"}
                           </span>
                         </div>
                         {isNew ? (
