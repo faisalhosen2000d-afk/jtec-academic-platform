@@ -463,7 +463,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
             <span className="text-xs font-normal text-muted-foreground">Ready to commit to database</span>
           </h3>
 
-          <div className="overflow-x-auto rounded-xl border">
+          <div className="overflow-x-auto max-h-96 overflow-y-auto rounded-xl border shadow-inner">
             <table className="w-full text-xs text-left">
               <thead className="bg-muted text-muted-foreground uppercase font-semibold">
                 <tr>
@@ -475,7 +475,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {parsedResults.slice(0, 10).map((r, i) => (
+                {parsedResults.map((r, i) => (
                   <tr key={i} className="hover:bg-muted/40">
                     <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
                     <td className="px-3 py-2 font-mono font-bold">{r.student_id_string}</td>
@@ -497,7 +497,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
               </tbody>
             </table>
           </div>
-          {parsedResults.length > 10 && (
+          {false && (
             <p className="text-center text-xs text-muted-foreground">
               Showing first 10 of {parsedResults.length} parsed records
             </p>
