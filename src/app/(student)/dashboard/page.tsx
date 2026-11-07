@@ -158,7 +158,7 @@ export default async function StudentDashboardPage() {
   const [resData, rankData] = await Promise.all([
     rawAdmin
       .from("term_results")
-      .select("level_term_key, gpa, cgpa, status, term_retake_count")
+      .select("level_term_key, gpa, cgpa, status, term_retake_count, fail_subjects, remarks")
       .eq("student_id", user.id)
       .order("level_term_key", { ascending: true }),
 
@@ -181,7 +181,20 @@ export default async function StudentDashboardPage() {
       : `${Number(lastTerm.cgpa ?? lastTerm.gpa).toFixed(2)} CGPA`
     : "No Results";
 
-  const totalPendingRetakes = userTerms.reduce((sum, item) => sum + (Number(item.term_retake_count) || 0), 0);
+  const unclearedRetakesSet = new Set<string>();
+    userTerms.forEach((item) => {
+      const raw = (((item as unknown as { fail_subjects?: string; remarks?: string }).fail_subjects) || ((item as unknown as { fail_subjects?: string; remarks?: string }).remarks) || "")
+        .replace(/Retakes?:/gi, "")
+        .replace(/Year Dropped:[^,]*/gi, "")
+        .replace(/--/g, "")
+        .split(/[,/ ]+/)
+        .map((s) => s.trim().toUpperCase())
+        .filter((s) => s && s !== "0" && s !== "NONE" && s !== "--");
+      raw.forEach((c) => unclearedRetakesSet.add(c));
+    });
+    const totalPendingRetakes = unclearedRetakesSet.size > 0 
+      ? unclearedRetakesSet.size 
+      : (Number(lastTerm?.term_retake_count) || 0);
 
   const allBatchRows = (rankData?.data || []) as Array<{
     student_id: string;
@@ -223,9 +236,11 @@ export default async function StudentDashboardPage() {
     }
   });
 
-  const sortedBatch = Array.from(studentBestMap.entries())
-    .map(([sid, d]) => ({ sid, ...d }))
-    .sort((a, b) => (b.score !== a.score ? b.score - a.score : a.retakes - b.retakes));
+  const currentBatchTerm = lastTerm?.level_term_key || "2-1";
+    const sortedBatch = Array.from(studentBestMap.entries())
+      .filter(([_, d]) => !currentBatchTerm || d.term === currentBatchTerm)
+      .map(([sid, d]) => ({ sid, ...d }))
+      .sort((a, b) => (b.score !== a.score ? b.score - a.score : a.retakes - b.retakes));
 
   const myIdx = sortedBatch.findIndex((item) => item.sid === user.id || item.sid === profile?.student_id);
   const cardRankText = myIdx >= 0 ? `#${myIdx + 1}` : (lastTerm ? "#1" : "Unranked");
