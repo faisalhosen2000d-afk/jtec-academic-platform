@@ -353,7 +353,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
               onChange={(e) => setSelectedTerm(e.target.value)}
               className="w-full h-11 px-3 rounded-xl border bg-background text-sm font-medium"
             >
-              {terms.map((t) => (
+              {Array.from(new Map(terms.map((t) => [t.name.trim(), t])).values()).map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                 </option>
