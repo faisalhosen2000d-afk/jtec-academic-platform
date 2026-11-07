@@ -143,7 +143,7 @@ export default async function StudentDashboardPage() {
 
     rawAdmin
       .from("term_results")
-      .select("student_id, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count")
+      .select("student_id, student_id_code, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count")
       .order("level_term_key", { ascending: true }),
   ]);
 
@@ -183,10 +183,10 @@ export default async function StudentDashboardPage() {
 
   const studentBestMap = new Map<string, { score: number; retakes: number; term: string }>();
   (peerRows.length > 0 ? peerRows : allBatchRows).forEach((row) => {
-    const prev = studentBestMap.get(row.student_id);
+    const rKey = (row as { student_id_code?: string }).student_id_code || row.student_id; const prev = studentBestMap.get(rKey);
     if (!prev || row.level_term_key >= prev.term) {
       const val = row.cgpa !== null && row.level_term_key !== "1-1" ? Number(row.cgpa) : Number(row.gpa);
-      studentBestMap.set(row.student_id, { score: val, retakes: Number(row.term_retake_count) || 0, term: row.level_term_key });
+      studentBestMap.set((row as { student_id_code?: string }).student_id_code || row.student_id, { score: val, retakes: Number(row.term_retake_count) || 0, term: row.level_term_key });
     }
   });
 
@@ -194,7 +194,7 @@ export default async function StudentDashboardPage() {
     .map(([sid, d]) => ({ sid, ...d }))
     .sort((a, b) => (b.score !== a.score ? b.score - a.score : a.retakes - b.retakes));
 
-  const myIdx = sortedBatch.findIndex((item) => item.sid === user.id);
+  const myIdx = sortedBatch.findIndex((item) => item.sid === user.id || item.sid === profile?.student_id);
   const cardRankText = myIdx >= 0 ? `#${myIdx + 1}` : (lastTerm ? "#1" : "Unranked");
 
   return (

@@ -130,9 +130,9 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
 
   const termResultsPayload = [];
   for (const entry of input.results) {
-    const cleanId = entry.student_id_string.trim().replace(/\.0+$/, "").toLowerCase();
-    const profileId = studentMap.get(cleanId);
-    if (!profileId) continue;
+    const rawRoll = entry.student_id_string.trim().replace(/\.0+$/, "");
+    const cleanId = rawRoll.toLowerCase();
+    const profileId = studentMap.get(cleanId) || null;
 
     const cgpaVal = input.level_term_key === "1-1" ? (entry.cgpa ?? null) : (entry.cgpa ?? entry.gpa);
     const retakes = entry.term_retake_count || 0;
@@ -141,6 +141,7 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
 
     termResultsPayload.push({
       student_id: profileId,
+      student_id_code: rawRoll,
       department_id: input.department_id,
       batch_id: input.batch_id,
       level_id: input.level_id,
@@ -160,7 +161,7 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
   if (termResultsPayload.length > 0) {
     const { error: upsertErr } = await adminClient
       .from("term_results")
-      .upsert(termResultsPayload, { onConflict: "student_id,level_id,term_id" });
+      .upsert(termResultsPayload, { onConflict: "student_id_code,level_id,term_id" });
 
     if (upsertErr) {
       return { error: `Failed to save results: ${upsertErr.message}` };

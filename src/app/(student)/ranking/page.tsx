@@ -7,13 +7,21 @@ import { Trophy, Medal, Award, Users } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-interface RawRankingRow {
-  student_id: string;
+interface RawResultRow {
+  student_id: string | null;
+  student_id_code: string | null;
+  department_id: string;
+  batch_id: string;
   level_term_key: string;
   gpa: number;
   cgpa: number | null;
-  earned_credits: number;
   term_retake_count: number;
+}
+
+interface RegisteredStudent {
+  profile_id: string;
+  student_id: string;
+  full_name: string | null;
 }
 
 export default async function StudentRankingPage() {
@@ -38,11 +46,10 @@ export default async function StudentRankingPage() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const rawClient = createRawSupabaseClient(supabaseUrl, serviceKey);
 
-  // Fetch all students and published term results for merit comparison
   const [
     { data: dept },
     { data: batch },
-    { data: allProfiles },
+    { data: regStudentsRpc },
     { data: allResultsData },
   ] = await Promise.all([
     profile.department_id
@@ -51,64 +58,74 @@ export default async function StudentRankingPage() {
     profile.batch_id
       ? supabase.from("batches").select("name").eq("id", profile.batch_id).maybeSingle()
       : Promise.resolve({ data: null }),
-    rawClient
-      .from("profiles")
-      .select("id, full_name, student_id, batch_id, department_id")
-      .eq("role", "student"),
+    rawClient.rpc("get_registered_student_names"),
     rawClient
       .from("term_results")
-      .select("student_id, department_id, batch_id, level_term_key, gpa, cgpa, earned_credits, term_retake_count")
+      .select("student_id, student_id_code, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count")
       .order("level_term_key", { ascending: true }),
   ]);
 
-  const allResults = (allResultsData || []) as Array<{
-    student_id: string;
-    department_id: string;
-    batch_id: string;
-    level_term_key: string;
-    gpa: number;
-    cgpa: number | null;
-    earned_credits: number;
-    term_retake_count: number;
-  }>;
+  // Map student_id_code (Roll) -> Registered Account Name
+  const rollToAccountMap = new Map<string, { full_name: string; profile_id: string }>();
+  const idToAccountMap = new Map<string, { full_name: string; student_id: string }>();
 
-  const userLatest = allResults.filter((r) => r.student_id === user.id).pop();
-  const targetBatchId = userLatest?.batch_id || profile.batch_id;
-  const targetDeptId = userLatest?.department_id || profile.department_id;
+  ((regStudentsRpc || []) as RegisteredStudent[]).forEach((s) => {
+    if (s.student_id) {
+      const cleanRoll = s.student_id.trim().toLowerCase();
+      rollToAccountMap.set(cleanRoll, {
+        full_name: s.full_name || "Student",
+        profile_id: s.profile_id,
+      });
+    }
+    if (s.profile_id) {
+      idToAccountMap.set(s.profile_id, {
+        full_name: s.full_name || "Student",
+        student_id: s.student_id || "",
+      });
+    }
+  });
+
+  const allResults = (allResultsData || []) as RawResultRow[];
+  const myRollClean = (profile.student_id || "").trim().toLowerCase();
+
+  // Find user's batch from their result or profile
+  const myResultRow = allResults.find(
+    (r) => r.student_id === user.id || (r.student_id_code && r.student_id_code.trim().toLowerCase() === myRollClean)
+  );
+  const targetBatchId = myResultRow?.batch_id || profile.batch_id;
+  const targetDeptId = myResultRow?.department_id || profile.department_id;
 
   const batchResults = allResults.filter(
     (r) => (!targetBatchId || r.batch_id === targetBatchId) && (!targetDeptId || r.department_id === targetDeptId)
   );
 
-  const batchProfiles = (allProfiles || []).filter(
-    (p: { id: string; full_name: string | null; student_id: string | null; batch_id: string | null; department_id: string | null }) => (!targetBatchId || p.batch_id === targetBatchId) && (!targetDeptId || p.department_id === targetDeptId)
-  );
-
-  const profileMap = new Map<string, { full_name: string; student_id: string }>();
-  (batchProfiles || []).forEach((p: { id: string; full_name: string | null; student_id: string | null }) => {
-    profileMap.set(p.id, {
-      full_name: p.full_name || "Student",
-      student_id: p.student_id || "N/A",
-    });
-  });
-
-  // Aggregate latest GPA/CGPA per student in the batch
-  const latestByStudent = new Map<string, RawRankingRow>();
-  ((batchResults || []) as RawRankingRow[]).forEach((r) => {
-    const existing = latestByStudent.get(r.student_id);
+  // Group by unique student roll (student_id_code) so all 27 students are ranked
+  const latestByRoll = new Map<string, RawResultRow>();
+  batchResults.forEach((r) => {
+    const rollKey = (r.student_id_code || idToAccountMap.get(r.student_id || "")?.student_id || r.student_id || "").trim();
+    if (!rollKey) return;
+    const existing = latestByRoll.get(rollKey);
     if (!existing || r.level_term_key >= existing.level_term_key) {
-      latestByStudent.set(r.student_id, r);
+      latestByRoll.set(rollKey, { ...r, student_id_code: rollKey });
     }
   });
 
-  const leaderboard = Array.from(latestByStudent.values())
+  const leaderboard = Array.from(latestByRoll.values())
     .map((r) => {
-      const studentInfo = profileMap.get(r.student_id) || { full_name: "Student", student_id: "N/A" };
+      const rollStr = (r.student_id_code || "").trim();
+      const accountInfo =
+        rollToAccountMap.get(rollStr.toLowerCase()) ||
+        (r.student_id ? idToAccountMap.get(r.student_id) : undefined);
+
+      const isRegistered = Boolean(accountInfo);
+      const displayName = accountInfo ? accountInfo.full_name : null;
       const score = r.cgpa !== null && r.level_term_key !== "1-1" ? Number(r.cgpa) : Number(r.gpa);
+
       return {
         ...r,
-        full_name: studentInfo.full_name,
-        student_id_code: studentInfo.student_id,
+        roll_code: rollStr || "N/A",
+        isRegistered,
+        displayName,
         rankingScore: score,
       };
     })
@@ -117,7 +134,9 @@ export default async function StudentRankingPage() {
       return a.term_retake_count - b.term_retake_count;
     });
 
-  const myRankIndex = leaderboard.findIndex((item) => item.student_id === user.id);
+  const myRankIndex = leaderboard.findIndex(
+    (item) => item.student_id === user.id || item.roll_code.toLowerCase() === myRollClean
+  );
   const myRank = myRankIndex >= 0 ? myRankIndex + 1 : null;
 
   return (
@@ -177,10 +196,10 @@ export default async function StudentRankingPage() {
                   <tbody className="divide-y divide-border">
                     {leaderboard.map((row, idx) => {
                       const rank = idx + 1;
-                      const isMe = row.student_id === user.id;
+                      const isMe = row.student_id === user.id || row.roll_code.toLowerCase() === myRollClean;
                       return (
                         <tr
-                          key={row.student_id}
+                          key={row.roll_code + idx}
                           className={`${
                             isMe ? "bg-blue-50/70 dark:bg-blue-950/40 font-semibold" : "hover:bg-muted/40"
                           }`}
@@ -194,14 +213,18 @@ export default async function StudentRankingPage() {
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            {row.full_name}
+                            {row.displayName ? (
+                              <span className="text-foreground font-medium">{row.displayName}</span>
+                            ) : (
+                              <span className="text-muted-foreground/60 italic text-xs">Not registered yet</span>
+                            )}
                             {isMe && (
                               <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px]">
                                 You
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 font-mono text-xs">{row.student_id_code}</td>
+                          <td className="px-4 py-3 font-mono text-xs font-semibold">{row.roll_code}</td>
                           <td className="px-4 py-3">Term {row.level_term_key}</td>
                           <td className="px-4 py-3 font-semibold text-blue-600">{Number(row.gpa).toFixed(2)}</td>
                           <td className="px-4 py-3 font-bold text-emerald-600">

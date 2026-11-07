@@ -56,7 +56,7 @@ export default async function StudentResultsPage() {
     rawClient
       .from("term_results")
       .select("id, level_term_key, gpa, cgpa, earned_credits, term_retake_count, cumulative_retake_count, status, remarks, published_at")
-      .eq("student_id", user.id)
+      .or(`student_id.eq.${user.id},student_id_code.eq.${profile.student_id || "NONE"}`)
       .order("level_term_key", { ascending: true }),
   ]);
 
