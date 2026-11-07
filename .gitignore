@@ -67,3 +67,5 @@ backups/
 _*/
 supabase/drafts/
 supabase/_drafts/
+.vercel
+.env*

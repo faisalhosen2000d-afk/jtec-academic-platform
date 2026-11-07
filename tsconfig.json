@@ -1,4 +1,4 @@
-﻿{
+{
     "compilerOptions":  {
                             "target":  "ES2022",
                             "lib":  [
@@ -41,6 +41,9 @@
                     "supabase/functions",
                     "_mobile_responsive_backup",
                     "_password_recovery_backup",
-                    "_loading_ux_backup"
+                    "_loading_ux_backup",
+                    "src/app/(staff)/super-admin/users/students/accounts/_academic_progression_backup_20261010-095631",
+                    "backup",
+                    "backups"
                 ]
 }
