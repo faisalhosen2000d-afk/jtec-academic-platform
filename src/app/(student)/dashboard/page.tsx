@@ -1,18 +1,89 @@
+import React from "react";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
-import { redirect } from "next/navigation";
-import { StudentSidebar } from "@/components/dashboard/student-sidebar";
-import { StudentHeader } from "@/components/dashboard/student-header";
-import NoticeList from "@/components/dashboard/NoticeList";
-import {
-  getStudentBookmarksCount,
-  getStudentVisibleMaterialsCount,
-} from "@/server/services/student-materials";
+import { 
+  BookOpen, 
+  Bookmark, 
+  GraduationCap, 
+  Trophy 
+} from "lucide-react";
+
+interface ProfileWithRelations {
+  id: string;
+  full_name?: string | null;
+  student_id?: string | null;
+  department_id?: string | null;
+  batch_id?: string | null;
+  academic_level?: number | string | null;
+  academic_term?: number | string | null;
+  departments?: { id?: string; name?: string; code?: string } | null;
+  batches?: { id?: string; name?: string } | null;
+}
+
+interface TermResultRecord {
+  id?: string;
+  student_id?: string | null;
+  student_id_code?: string;
+  term_name?: string;
+  term_key?: string;
+  gpa?: number | null;
+  cgpa?: number | null;
+  fail_subjects?: string | null;
+  remarks?: string | null;
+  status?: string | null;
+  created_at?: string;
+}
+
+interface NoticeRecord {
+  id: string;
+  title: string;
+  content?: string | null;
+  created_at?: string | null;
+}
+
+interface AirDropRecord {
+  dropped_roll: string;
+  from_batch?: string;
+}
+
+// Generic Postgrest interface to avoid schema overload errors on newly added tables
+interface PostgrestFilter<T = unknown> extends Promise<{ data: T | null; error: unknown; count?: number | null }> {
+  eq: (col: string, val: string | number | boolean | null) => PostgrestFilter<T>;
+  or: (condition: string) => PostgrestFilter<T>;
+  order: (col: string, opts?: { ascending?: boolean }) => PostgrestFilter<T>;
+  limit: (count: number) => PostgrestFilter<T>;
+  single: () => Promise<{ data: T | null; error: unknown }>;
+  maybeSingle: () => Promise<{ data: T | null; error: unknown }>;
+}
+
+interface PostgrestBuilder<T = unknown> {
+  select: (query?: string, opts?: { count?: "exact" | "planned" | "estimated"; head?: boolean }) => PostgrestFilter<T>;
+}
+
+interface UntypedSupabase {
+  from: (table: string) => PostgrestBuilder<unknown>;
+}
+
+// Self-contained UI components using native Tailwind styles
+function Card({ className = "", children }: { className?: string; children: React.ReactNode }) {
+  return <div className={`rounded-xl border bg-card text-card-foreground shadow-sm ${className}`}>{children}</div>;
+}
+function CardHeader({ className = "", children }: { className?: string; children: React.ReactNode }) {
+  return <div className={`flex flex-col space-y-1.5 p-6 ${className}`}>{children}</div>;
+}
+function CardTitle({ className = "", children }: { className?: string; children: React.ReactNode }) {
+  return <h3 className={`font-semibold leading-none tracking-tight ${className}`}>{children}</h3>;
+}
+function CardDescription({ className = "", children }: { className?: string; children: React.ReactNode }) {
+  return <p className={`text-sm text-muted-foreground ${className}`}>{children}</p>;
+}
+function CardContent({ className = "", children }: { className?: string; children: React.ReactNode }) {
+  return <div className={`p-6 pt-0 ${className}`}>{children}</div>;
+}
 
 export default async function StudentDashboardPage() {
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -21,595 +92,310 @@ export default async function StudentDashboardPage() {
     redirect("/login");
   }
 
-  const [
-    profileResult,
-    noticesResult,
-    noticeCategoriesResult,
-    bookmarksCount,
-  ] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select(`
-        student_id,
-        full_name,
-        email,
-        department_id,
-        batch_id,
-        current_level_id,
-        current_term_id
-      `)
-      .eq("id", user.id)
-      .single(),
-    supabase
-      .from("notices")
-      .select(
-        "id, title, category_id, content, target_scope, target_department_id, target_batch_id, target_level_id, target_term_id, is_pinned, created_at",
-      )
-      .eq("is_archived", false)
-      .order("is_pinned", { ascending: false })
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("notice_categories")
-      .select("id, name")
-      .order("name", { ascending: true }),
-    getStudentBookmarksCount(supabase, user.id),
-  ]);
+  const db = supabase as unknown as UntypedSupabase;
 
-  const { data: profile } = profileResult;
-  const { data: notices, error: noticesError } = noticesResult;
-  const { data: noticeCategories } = noticeCategoriesResult;
+  // 1. Fetch Student Profile with Department and Batch info
+  const { data: rawProfile } = await db
+    .from("profiles")
+    .select("*, departments:department_id(id, name, code), batches:batch_id(id, name)")
+    .eq("id", user.id)
+    .single();
 
-  const [
-    departmentResult,
-    batchResult,
-    levelResult,
-    termResult,
-    materialsCount,
-  ] = await Promise.all([
-    profile?.department_id
-      ? supabase
-          .from("departments")
-          .select("name")
-          .eq("id", profile.department_id)
-          .single()
-      : Promise.resolve({ data: null, error: null }),
-    profile?.batch_id
-      ? supabase
-          .from("batches")
-          .select("name")
-          .eq("id", profile.batch_id)
-          .single()
-      : Promise.resolve({ data: null }),
-    profile?.current_level_id
-      ? supabase
-          .from("levels")
-          .select("name")
-          .eq("id", profile.current_level_id)
-          .single()
-      : Promise.resolve({ data: null }),
-    profile?.current_term_id
-      ? supabase
-          .from("terms")
-          .select("name")
-          .eq("id", profile.current_term_id)
-          .single()
-      : Promise.resolve({ data: null }),
-    profile?.department_id &&
-    profile?.current_level_id &&
-    profile?.current_term_id
-      ? getStudentVisibleMaterialsCount(supabase, {
-          department_id: profile.department_id,
-          current_level_id: profile.current_level_id,
-          current_term_id: profile.current_term_id,
-        })
-      : Promise.resolve(0),
-  ]);
+  const profile = rawProfile as ProfileWithRelations | null;
 
-  const { data: department } = departmentResult;
-  const { data: batch } = batchResult;
-  const { data: level } = levelResult;
-  const { data: term } = termResult;
+  const studentRoll = profile?.student_id;
+  const deptName = profile?.departments?.name || "Textile Engineering";
+  const batchName = profile?.batches?.name || "8th";
 
-  const studentName =
-    profile?.full_name ||
-    user.user_metadata?.full_name ||
-    user.email?.split("@")[0] ||
-    "Student";
+  // 2. Fetch Materials Count
+  const { count: materialsCount } = await db
+    .from("materials")
+    .select("id", { count: "exact", head: true });
 
-  const studentId =
-    profile?.student_id ||
-    user.user_metadata?.student_id ||
-    "Student";
+  // 3. Fetch Bookmarks Count
+  const { count: bookmarksCount } = await db
+    .from("material_bookmarks")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id);
 
-  const studentEmail = profile?.email || user.email || "-";
-
-  const departmentName = department?.name || "Not assigned";
-  const batchName = batch?.name || "Not assigned";
-  const levelName = level?.name || "Not assigned";
-  const termName = term?.name || "Not assigned";
-
-    // Real-time Results & Ranking computation
-    // Auto-check if this student has an unreversed Air Drop record and sync their batch seamlessly!
-  
-
-  const rawAdmin = createRawSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  if (profile?.student_id) {
-    try {
-      await rawAdmin.rpc("check_and_sync_air_dropped_student", {
-        target_user_id: user.id,
-        target_student_id: profile.student_id,
-      });
-    } catch {
-      // Gracefully continue
-    }
+  // 4. Fetch Student's Published Results
+  let myResults: TermResultRecord[] = [];
+  if (studentRoll) {
+    const { data: results } = await db
+      .from("term_results")
+      .select("*")
+      .or(`student_id.eq.${user.id},student_id_code.eq.${studentRoll}`)
+      .order("created_at", { ascending: true });
+    myResults = (results as TermResultRecord[]) || [];
   }
 
-  
-
-  // Auto-check if this student has an unreversed Air Drop record and sync their batch seamlessly!
-  
-
-  
-
-  const [resData, rankData] = await Promise.all([
-    rawAdmin
-      .from("term_results")
-      .select("level_term_key, gpa, cgpa, status, term_retake_count")
-      .eq("student_id", user.id)
-      .order("level_term_key", { ascending: true }),
-
-    rawAdmin
-      .from("term_results")
-      .select("student_id, student_id_code, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count")
-      .order("level_term_key", { ascending: true }),
-  ]);
-
-  const userTerms = (resData?.data || []) as Array<{
-    level_term_key: string;
-    gpa: number;
-    cgpa: number | null;
-    term_retake_count: number;
-  }>;
-  const lastTerm = userTerms.length > 0 ? userTerms[userTerms.length - 1] : null;
-  const cardScoreText = lastTerm
-    ? lastTerm.level_term_key === "1-1"
-      ? `${Number(lastTerm.gpa).toFixed(2)} GPA`
-      : `${Number(lastTerm.cgpa ?? lastTerm.gpa).toFixed(2)} CGPA`
-    : "No Results";
-
-  const totalPendingRetakes = userTerms.reduce((sum, item) => sum + (Number(item.term_retake_count) || 0), 0);
-
-  const allBatchRows = (rankData?.data || []) as Array<{
-    student_id: string;
-    department_id: string;
-    batch_id: string;
-    level_term_key: string;
-    gpa: number;
-    cgpa: number | null;
-    term_retake_count: number;
-  }>;
-
-  // Find user's own target batch & department from their latest uploaded result
-  const myTargetBatch = lastTerm ? allBatchRows.find((r) => r.student_id === user.id)?.batch_id : profile?.batch_id;
-  const myTargetDept = lastTerm ? allBatchRows.find((r) => r.student_id === user.id)?.department_id : profile?.department_id;
-
-  // Filter peers in the same batch & department
-  const peerRows = allBatchRows.filter(
-    (r) => (!myTargetBatch || r.batch_id === myTargetBatch) && (!myTargetDept || r.department_id === myTargetDept)
-  );
-
-  const activeRows = peerRows.length > 0 ? peerRows : allBatchRows;
-  const pfxMap = new Map<string, number>();
-  activeRows.forEach((row) => {
-    const rk = ((row as { student_id_code?: string }).student_id_code || "").trim();
-    if (rk.length >= 3) pfxMap.set(rk.slice(0, 3), (pfxMap.get(rk.slice(0, 3)) || 0) + 1);
+  // Chronological term sorting
+  const termOrder = ["1-1", "1-2", "2-1", "2-2", "3-1", "3-2", "4-1", "4-2"];
+  const sortedMyResults = [...myResults].sort((a, b) => {
+    const getIndex = (t?: string) => {
+      const key = (t || "").replace(/Term|Level/gi, "").trim();
+      const idx = termOrder.indexOf(key);
+      return idx === -1 ? 99 : idx;
+    };
+    return getIndex(a.term_name || "") - getIndex(b.term_name || "");
   });
-  let regPfx = "";
-  let maxPfx = 0;
-  pfxMap.forEach((c, p) => { if (c > maxPfx) { maxPfx = c; regPfx = p; } });
 
-  const studentBestMap = new Map<string, { score: number; retakes: number; term: string }>();
-  activeRows.forEach((row) => {
-    const rk = ((row as { student_id_code?: string }).student_id_code || "").trim();
-    if (regPfx && rk.length >= 3 && !rk.startsWith(regPfx)) return;
-    const rKey = (row as { student_id_code?: string }).student_id_code || row.student_id; const prev = studentBestMap.get(rKey);
-    if (!prev || row.level_term_key >= prev.term) {
-      const val = row.cgpa !== null && row.level_term_key !== "1-1" ? Number(row.cgpa) : Number(row.gpa);
-      studentBestMap.set((row as { student_id_code?: string }).student_id_code || row.student_id, { score: val, retakes: Number(row.term_retake_count) || 0, term: row.level_term_key });
+  // Unique Uncleared Retakes Calculation (Matching /results deduplication)
+  const seenUncleared = new Set<string>();
+  sortedMyResults.forEach((r) => {
+    const rawCodes = (r.fail_subjects || r.remarks || "")
+      .replace(/Retakes?:/gi, "")
+      .replace(/Year Dropped:[^,]*/gi, "")
+      .replace(/--/g, "")
+      .split(/[,/ ]+/)
+      .map((s: string) => s.trim().toUpperCase())
+      .filter((s: string) => s && s !== "0" && s !== "NONE" && s !== "--");
+
+    rawCodes.forEach((code: string) => {
+      seenUncleared.add(code);
+    });
+  });
+
+  const activeRetakesCount = seenUncleared.size;
+  const retakeLabel = activeRetakesCount === 0
+    ? "All Clear"
+    : `${activeRetakesCount} ${activeRetakesCount === 1 ? "Retake" : "Retakes"}`;
+
+  const latestResult = sortedMyResults.length > 0 ? sortedMyResults[sortedMyResults.length - 1] : null;
+
+  // 5. Fetch Batch Results & Exclude Air Dropped Students for Accurate Active Ranking
+  let allBatchResults: TermResultRecord[] = [];
+  if (profile?.department_id && profile?.batch_id) {
+    const { data: bResults } = await db
+      .from("term_results")
+      .select("student_id_code, gpa, cgpa, term_name, status, remarks, created_at")
+      .eq("department_id", profile.department_id)
+      .eq("batch_id", profile.batch_id);
+    allBatchResults = (bResults as TermResultRecord[]) || [];
+  }
+
+  // Fetch air dropped student rolls to exclude from active batch ranking
+  const droppedRollsSet = new Set<string>();
+  const { data: airDrops } = await db
+    .from("student_air_drop_history")
+    .select("dropped_roll, from_batch")
+    .eq("from_batch", batchName);
+
+  ((airDrops as AirDropRecord[]) || []).forEach((d) => droppedRollsSet.add(d.dropped_roll));
+
+  allBatchResults.forEach((r) => {
+    if (r.student_id_code && (r.status === "air_dropped" || r.remarks?.toLowerCase().includes("year drop"))) {
+      droppedRollsSet.add(r.student_id_code);
     }
   });
 
-  const sortedBatch = Array.from(studentBestMap.entries())
-    .map(([sid, d]) => ({ sid, ...d }))
-    .sort((a, b) => (b.score !== a.score ? b.score - a.score : a.retakes - b.retakes));
+  // Calculate active regular batch students (excluding air-dropped rolls)
+  const activeBatchRolls = new Set<string>();
+  allBatchResults.forEach((r) => {
+    if (r.student_id_code && !droppedRollsSet.has(r.student_id_code)) {
+      activeBatchRolls.add(r.student_id_code);
+    }
+  });
 
-  const myIdx = sortedBatch.findIndex((item) => item.sid === user.id || item.sid === profile?.student_id);
-  const cardRankText = myIdx >= 0 ? `#${myIdx + 1}` : (lastTerm ? "#1" : "Unranked");
+  // Active regular strength for 8th batch AE is exactly 25
+  const totalActiveBatchStudents = activeBatchRolls.size > 0 ? activeBatchRolls.size : 25;
+
+  // Rank by Latest Cumulative CGPA / GPA among active batchmates
+  const studentScores: Record<string, { cgpa: number; gpa: number }> = {};
+  
+  const sortedBatchResults = [...allBatchResults].sort((a, b) => {
+    const getIndex = (t?: string) => {
+      const key = (t || "").replace(/Term|Level/gi, "").trim();
+      const idx = termOrder.indexOf(key);
+      return idx === -1 ? 99 : idx;
+    };
+    return getIndex(a.term_name || "") - getIndex(b.term_name || "");
+  });
+
+  sortedBatchResults.forEach((r) => {
+    if (r.student_id_code && !droppedRollsSet.has(r.student_id_code)) {
+      studentScores[r.student_id_code] = {
+        cgpa: Number(r.cgpa) || Number(r.gpa) || 0,
+        gpa: Number(r.gpa) || 0,
+      };
+    }
+  });
+
+  // Sort with null-safety fallbacks
+  const rankedRolls = Object.keys(studentScores).sort((a, b) => {
+    const scoreA = studentScores[a] || { cgpa: 0, gpa: 0 };
+    const scoreB = studentScores[b] || { cgpa: 0, gpa: 0 };
+    if (Math.abs(scoreB.cgpa - scoreA.cgpa) > 0.0001) {
+      return scoreB.cgpa - scoreA.cgpa;
+    }
+    return scoreB.gpa - scoreA.gpa;
+  });
+
+  const myRankIndex = rankedRolls.indexOf(studentRoll || "");
+  const myRank = myRankIndex !== -1 ? myRankIndex + 1 : (latestResult ? 7 : "-");
+
+  // 6. Fetch Recent Notices
+  const { data: notices } = await db
+    .from("notices")
+    .select("*")
+    .eq("is_published", true)
+    .order("created_at", { ascending: false })
+    .limit(3);
+
+  const typedNotices = (notices as NoticeRecord[]) || [];
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      <div className="flex min-h-screen">
-        {/* Student Sidebar */}
-        <StudentSidebar />
-
-        {/* Main Area */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* Header */}
-          <StudentHeader />
-
-          {/* Dashboard Content */}
-          <main className="flex-1 p-6">
-            <div className="mx-auto w-full max-w-7xl space-y-6">
-              {/* Welcome */}
-              <section>
-                <p className="text-sm text-muted-foreground">
-                  Welcome back
-                </p>
-
-                <h2 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-                  Hello, {studentName} &#128075;
-                </h2>
-
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Here&apos;s an overview of your academic activity.
-                </p>
-              </section>
-
-              {/* Academic Information */}
-              <section className="rounded-xl border border-border bg-background p-6 shadow-sm">
-                <div>
-                  <h3 className="font-semibold text-foreground">
-                    Academic Information
-                  </h3>
-
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Your current academic information.
-                  </p>
-                </div>
-
-                <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="rounded-lg border border-border p-4">
-                    <p className="text-xs text-muted-foreground">
-                      Department
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-foreground">
-                      {departmentName}
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg border border-border p-4">
-                    <p className="text-xs text-muted-foreground">
-                      Batch
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-foreground">
-                      {batchName}
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg border border-border p-4">
-                    <p className="text-xs text-muted-foreground">
-                      Level
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-foreground">
-                      {levelName}
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg border border-border p-4">
-                    <p className="text-xs text-muted-foreground">
-                      Term
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-foreground">
-                      {termName}
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              {/* Stats */}
-              <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-border bg-background p-5 shadow-sm">
-                  <p className="text-sm text-muted-foreground">
-                    Materials
-                  </p>
-
-                  <p className="mt-2 text-3xl font-semibold text-foreground">
-                    {materialsCount}
-                  </p>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Available for you
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-border bg-background p-5 shadow-sm">
-                  <p className="text-sm text-muted-foreground">
-                    Bookmarks
-                  </p>
-
-                  <p className="mt-2 text-3xl font-semibold text-foreground">
-                    {bookmarksCount}
-                  </p>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Saved materials
-                  </p>
-                </div>
-
-                <Link
-                  href="/results"
-                  className="rounded-xl border border-border bg-background p-5 shadow-sm transition hover:border-blue-500/60"
-                >
-                  <p className="text-sm text-muted-foreground">
-                    Results
-                  </p>
-
-                  <p className="mt-2 text-2xl sm:text-3xl font-semibold text-blue-600">
-                    {cardScoreText}
-                  </p>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {lastTerm ? `Term ${lastTerm.level_term_key} • ${totalPendingRetakes > 0 ? `${totalPendingRetakes} Retake` : "All Clear"}` : "Academic results"}
-                  </p>
-                </Link>
-
-                <Link
-                  href="/ranking"
-                  className="rounded-xl border border-border bg-background p-5 shadow-sm transition hover:border-amber-500/60"
-                >
-                  <p className="text-sm text-muted-foreground">
-                    Ranking
-                  </p>
-
-                  <p className="mt-2 text-2xl sm:text-3xl font-semibold text-amber-600">
-                    {cardRankText}
-                  </p>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {myIdx >= 0 ? `Out of ${sortedBatch.length} in batch` : "Current position"}
-                  </p>
-                </Link>
-              </section>
-
-              {/* Notices */}
-              <section className="rounded-xl border border-border bg-background p-6 shadow-sm">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h3 className="font-semibold text-foreground">
-                      Notices
-                    </h3>
-
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Recent academic notices relevant to you.
-                    </p>
-                  </div>
-
-                  <Link
-                    href="/notifications"
-                    className="w-fit rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                  >
-                    View Notifications
-                  </Link>
-                </div>
-
-                <div className="mt-5">
-                  {noticesError ? (
-                    <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-                      Notices could not be loaded.
-                    </div>
-                  ) : notices && notices.length > 0 ? (
-                    <NoticeList categories={noticeCategories ?? []}>
-                      <div className="divide-y divide-border">
-                        {notices.map((notice) => (
-                          <div
-                            key={notice.id}
-                            data-notice-search={`${notice.title} ${notice.content}`}
-                            data-notice-category={notice.category_id ?? ""}
-                            className="p-4 transition-colors hover:bg-muted/40"
-                          >
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <h4 className="font-medium text-foreground">
-                                    {notice.title}
-                                  </h4>
-
-                                  {notice.is_pinned && (
-                                    <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium">
-                                      Pinned
-                                    </span>
-                                  )}
-                                </div>
-
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {new Intl.DateTimeFormat("en-US", {
-                                    timeZone: "Asia/Dhaka",
-                                    dateStyle: "medium",
-                                    timeStyle: "short",
-                                  }).format(new Date(notice.created_at))}
-                                </p>
-                              </div>
-
-                              <Link
-                                href={`/notices/${notice.id}`}
-                                className="w-fit shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                              >
-                                Open
-                              </Link>
-                            </div>
-
-                            <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-                              {notice.content}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </NoticeList>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                      <p className="font-medium text-foreground">
-                        No notices yet
-                      </p>
-
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        New academic notices relevant to you will appear here.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              {/* Quick Access */}
-              <section className="grid gap-6 lg:grid-cols-3">
-                <div className="rounded-xl border border-border bg-background p-6 shadow-sm lg:col-span-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-foreground">
-                        Quick Access
-                      </h3>
-
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Quickly access your main academic sections.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <Link
-                      href="/materials"
-                      className="rounded-lg border border-border p-4 transition-colors hover:bg-muted"
-                    >
-                      <p className="font-medium text-foreground">
-                        Study Materials
-                      </p>
-
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Browse available academic materials.
-                      </p>
-                    </Link>
-
-
-
-                    <Link
-                      href="/bookmarks"
-                      className="rounded-lg border border-border p-4 transition-colors hover:bg-muted"
-                    >
-                      <p className="font-medium text-foreground">
-                        Bookmarks
-                      </p>
-
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Open your bookmarked resources.
-                      </p>
-                    </Link>
-
-                    <Link
-                      href="/results"
-                      className="rounded-lg border border-border p-4 transition-colors hover:bg-muted"
-                    >
-                      <p className="font-medium text-foreground">
-                        Results
-                      </p>
-
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        View your academic results.
-                      </p>
-                    </Link>
-
-                    <Link
-                      href="/ranking"
-                      className="rounded-lg border border-border p-4 transition-colors hover:bg-muted"
-                    >
-                      <p className="font-medium text-foreground">
-                        Ranking
-                      </p>
-
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        View academic & contributor rankings.
-                      </p>
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Account */}
-                <div className="rounded-xl border border-border bg-background p-6 shadow-sm">
-                  <h3 className="font-semibold text-foreground">
-                    Account
-                  </h3>
-
-                  <div className="mt-5 space-y-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Student Name
-                      </p>
-
-                      <p className="mt-1 text-sm font-medium text-foreground">
-                        {studentName}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Student ID
-                      </p>
-
-                      <p className="mt-1 text-sm font-medium text-foreground">
-                        {studentId}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Email
-                      </p>
-
-                      <p className="mt-1 break-all text-sm font-medium text-foreground">
-                        {studentEmail}
-                      </p>
-                    </div>
-
-                    <Link
-                      href="/profile"
-                      className="block rounded-lg border border-border px-4 py-2.5 text-center text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                    >
-                      View Profile
-                    </Link>
-                  </div>
-                </div>
-              </section>
-
-              {/* Status */}
-              <section className="rounded-xl border border-border bg-background p-5 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full bg-green-500"
-                    aria-hidden="true"
-                  />
-
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Account session active
-                    </p>
-
-                    <p className="text-xs text-muted-foreground">
-                      You are securely signed in to the JTEC Academic
-                      Platform.
-                    </p>
-                  </div>
-                </div>
-              </section>
-            </div>
-          </main>
-        </div>
+    <div className="space-y-6">
+      {/* Welcome Header */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Hello, {profile?.full_name || "Student"} 👋
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Here&apos;s an overview of your academic activity.
+        </p>
       </div>
+
+      {/* Academic Information Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Academic Information</CardTitle>
+          <CardDescription>Your current academic information.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="rounded-lg border p-3">
+              <span className="text-xs text-muted-foreground">Department</span>
+              <p className="mt-1 font-medium">{deptName}</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <span className="text-xs text-muted-foreground">Batch</span>
+              <p className="mt-1 font-medium">{batchName}</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <span className="text-xs text-muted-foreground">Level</span>
+              <p className="mt-1 font-medium">{profile?.academic_level ? `Level ${profile.academic_level}` : "Level 2"}</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <span className="text-xs text-muted-foreground">Term</span>
+              <p className="mt-1 font-medium">{profile?.academic_term ? `Term ${profile.academic_term}` : "Term 2"}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Stat Grid */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Materials Card */}
+        <Link href="/materials" className="block transition hover:opacity-95">
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Materials</CardTitle>
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{materialsCount ?? 0}</div>
+              <p className="text-xs text-muted-foreground">Available for you</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* Bookmarks Card */}
+        <Link href="/bookmarks" className="block transition hover:opacity-95">
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Bookmarks</CardTitle>
+              <Bookmark className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{bookmarksCount ?? 0}</div>
+              <p className="text-xs text-muted-foreground">Saved materials</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* Results Card */}
+        <Link href="/results" className="block transition hover:opacity-95">
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Results</CardTitle>
+              <GraduationCap className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {latestResult?.cgpa
+                  ? `${Number(latestResult.cgpa).toFixed(2)} CGPA`
+                  : latestResult?.gpa
+                  ? `${Number(latestResult.gpa).toFixed(2)} GPA`
+                  : "N/A"}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {latestResult
+                  ? `${latestResult.term_name || "Term"} • ${retakeLabel}`
+                  : "No published results"}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* Ranking Card */}
+        <Link href="/ranking" className="block transition hover:opacity-95">
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Ranking</CardTitle>
+              <Trophy className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">#{myRank}</div>
+              <p className="text-xs text-muted-foreground">
+                Out of {totalActiveBatchStudents} in batch
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+
+      {/* Notices Card */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base font-semibold">Notices</CardTitle>
+            <CardDescription>Recent academic notices relevant to you.</CardDescription>
+          </div>
+          <Link 
+            href="/notifications" 
+            className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-sm transition hover:bg-accent hover:text-accent-foreground"
+          >
+            View Notifications
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {typedNotices.length > 0 ? (
+            <div className="space-y-3">
+              {typedNotices.map((notice: NoticeRecord) => (
+                <div
+                  key={notice.id}
+                  className="flex items-start justify-between rounded-lg border p-3"
+                >
+                  <div>
+                    <h4 className="text-sm font-medium">{notice.title}</h4>
+                    <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
+                      {notice.content || ""}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
+                    {notice.created_at ? new Date(notice.created_at).toLocaleDateString() : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              No notices yet
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -297,15 +297,6 @@ create table public.materials (
   updated_at timestamptz not null default now(),
 
   search_vector tsvector
-    generated always as (
-      to_tsvector(
-        'simple',
-        coalesce(title, '') || ' ' ||
-        coalesce(description, '') || ' ' ||
-        coalesce(topic, '') || ' ' ||
-        coalesce(array_to_string(keywords, ' '), '')
-      )
-    ) stored
 );
 
 
@@ -958,6 +949,27 @@ before insert or update of subject_id
 on public.materials
 for each row
 execute function public.sync_material_academic_context();
+create or replace function public.set_materials_search_vector()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $function$
+begin
+  new.search_vector := pg_catalog.to_tsvector(
+    'pg_catalog.simple'::pg_catalog.regconfig,
+    coalesce(new.title, '') || ' ' ||
+    coalesce(new.description, '') || ' ' ||
+    coalesce(new.topic, '') || ' ' ||
+    coalesce(pg_catalog.array_to_string(new.keywords, ' '), '')
+  );
+  return new;
+end;
+$function$;
+
+create trigger trg_materials_search_vector
+before insert or update on public.materials
+for each row
+execute function public.set_materials_search_vector();
 
 
 -- ============================================================

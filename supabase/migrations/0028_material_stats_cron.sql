@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
 select cron.schedule(
   'aggregate-material-stats-every-minute',
   '* * * * *',

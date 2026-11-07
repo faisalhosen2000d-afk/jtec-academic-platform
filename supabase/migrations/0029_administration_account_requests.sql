@@ -1,4 +1,4 @@
-﻿create table if not exists public.administration_account_requests (
+create table if not exists public.administration_account_requests (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
   full_name text not null,

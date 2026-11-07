@@ -1,4 +1,4 @@
-﻿create or replace function public.approve_administration_account_request(
+create or replace function public.approve_administration_account_request(
   p_request_id uuid
 )
 returns void
