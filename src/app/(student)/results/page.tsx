@@ -145,7 +145,7 @@ export default async function StudentResultsPage() {
                     ? "bg-amber-500"
                     : "bg-emerald-500"
                 }`}
-                style={{ width: `${Math.max(4, riskPercent)}%` }}
+                style={{ width: totalRetakes === 0 ? "0%" : `${Math.max(8, riskPercent)}%` }}
               />
             </div>
 

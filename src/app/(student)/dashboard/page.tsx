@@ -191,6 +191,71 @@ export default async function StudentDashboardPage() {
   const rankIndex = sortedLeaderboard.findIndex((item) => item.sid === user.id);
   const liveMeritRank = rankIndex >= 0 ? `#${rankIndex + 1}` : "Unranked";
 
+    // Live results and ranking calculation for student dashboard
+  const dashAdminClient = createRawSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const [studentResultsData, batchRankingsData] = await Promise.all([
+    dashAdminClient
+      .from("term_results")
+      .select("level_term_key, gpa, cgpa, status, term_retake_count")
+      .eq("student_id", user.id)
+      .order("level_term_key", { ascending: true }),
+
+    profile?.department_id && profile?.batch_id
+      ? dashAdminClient
+          .from("term_results")
+          .select("student_id, level_term_key, gpa, cgpa, term_retake_count")
+          .eq("department_id", profile.department_id)
+          .eq("batch_id", profile.batch_id)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const userTermResults = (studentResultsData?.data || []) as Array<{
+    level_term_key: string;
+    gpa: number;
+    cgpa: number | null;
+    status: string;
+    term_retake_count: number;
+  }>;
+  const latestTerm = userTermResults.length > 0 ? userTermResults[userTermResults.length - 1] : null;
+  const dashDisplayScore = latestTerm
+    ? latestTerm.level_term_key === "1-1"
+      ? `${Number(latestTerm.gpa).toFixed(2)} GPA`
+      : `${Number(latestTerm.cgpa ?? latestTerm.gpa).toFixed(2)} CGPA`
+    : "No Results";
+
+  const totalRetakeCount = userTermResults.reduce((acc, r) => acc + (Number(r.term_retake_count) || 0), 0);
+
+  const batchResultsList = (batchRankingsData?.data || []) as Array<{
+    student_id: string;
+    level_term_key: string;
+    gpa: number;
+    cgpa: number | null;
+    term_retake_count: number;
+  }>;
+
+  const latestScoreMap = new Map<string, { score: number; retakes: number; term: string }>();
+  batchResultsList.forEach((r) => {
+    const existing = latestScoreMap.get(r.student_id);
+    if (!existing || r.level_term_key >= existing.term) {
+      const score = r.cgpa !== null && r.level_term_key !== "1-1" ? Number(r.cgpa) : Number(r.gpa);
+      latestScoreMap.set(r.student_id, { score, retakes: Number(r.term_retake_count) || 0, term: r.level_term_key });
+    }
+  });
+
+  const rankedStudents = Array.from(latestScoreMap.entries())
+    .map(([sid, data]) => ({ sid, ...data }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.retakes - b.retakes;
+    });
+
+  const myRankIdx = rankedStudents.findIndex((item) => item.sid === user.id);
+  const liveRankBadge = myRankIdx >= 0 ? `#${myRankIdx + 1}` : "Unranked";
+
   return (
     <div className="min-h-screen bg-muted/30">
       <div className="flex min-h-screen">
