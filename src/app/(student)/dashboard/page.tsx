@@ -195,19 +195,27 @@ export default async function StudentDashboardPage() {
     }
   }
 
-  if (firstDropTerm && firstDropTerm.level_id && firstDropTerm.term_id) {
-    if (profile && (profile.current_level_id !== firstDropTerm.level_id || profile.current_term_id !== firstDropTerm.term_id)) {
+  const passedUserTerms = userTerms.filter((t) => t.status !== "air_dropped");
+
+  if (firstDropTerm && !passedUserTerms.some((p) => p.level_term_key === firstDropTerm?.level_term_key)) {
+    const [dLvlNum, dTrmNum] = (firstDropTerm.level_term_key || "1-2").split("-");
+    const [{ data: allLvls }, { data: allTrms }] = await Promise.all([
+      rawAdmin.from("levels").select("id, name"),
+      rawAdmin.from("terms").select("id, name"),
+    ]);
+    const targetLvl = (allLvls || []).find((l: { id: string; name: string }) => l.name.includes(dLvlNum || "1"));
+    const targetTrm = (allTrms || []).find((t: { id: string; name: string }) => t.name.includes(dTrmNum || "2"));
+
+    if (targetLvl && targetTrm && profile && (profile.current_level_id !== targetLvl.id || profile.current_term_id !== targetTrm.id)) {
       await rawAdmin
         .from("profiles")
         .update({
-          current_level_id: firstDropTerm.level_id,
-          current_term_id: firstDropTerm.term_id,
+          current_level_id: targetLvl.id,
+          current_term_id: targetTrm.id,
         })
         .eq("id", user.id);
     }
   }
-
-  const passedUserTerms = userTerms.filter((t) => t.status !== "air_dropped");
   const lastPassedTerm = passedUserTerms.length > 0 ? passedUserTerms[passedUserTerms.length - 1] : null;
   const lastTerm = lastPassedTerm || (userTerms.length > 0 ? userTerms[userTerms.length - 1] : null);
 

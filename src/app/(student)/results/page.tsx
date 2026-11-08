@@ -62,15 +62,22 @@ export default async function StudentResultsPage() {
     (r) => r.student_id === user.id || (r.student_id_code && r.student_id_code.trim().toLowerCase() === myRoll)
   );
 
+  // If a student later passes a term with their junior batch (e.g. passes 1-2 with 9th batch), let the passed result override the old 8th batch air_dropped row for that term!
+  const passedTermKeys = new Set(
+    rawUserResults.filter((r) => r.status !== "air_dropped" && Number(r.gpa) > 0).map((r) => r.level_term_key)
+  );
+
   let seenDrop = false;
   const results: TermResultRecord[] = [];
   for (const r of rawUserResults) {
     if (r.status === "air_dropped") {
+      if (passedTermKeys.has(r.level_term_key)) {
+        continue; // Already re-taken and passed with junior batch!
+      }
       if (!seenDrop) {
         seenDrop = true;
         results.push(r);
       } else {
-        // Automatically clean up accidental duplicate air_dropped record in later term
         await rawClient.from("term_results").delete().eq("id", r.id);
       }
     } else {
