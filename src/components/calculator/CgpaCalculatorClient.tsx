@@ -358,13 +358,13 @@ export function CgpaCalculatorClient({
             <div className="overflow-x-auto">
               <table className="w-full text-xs sm:text-sm text-left">
                 <thead className="bg-muted/60 text-muted-foreground uppercase text-[11px] font-semibold">
-                  <tr>
-                    <th className="px-4 py-3">Include</th>
+                  <tr className="whitespace-nowrap">
+                    <th className="px-3 py-3 w-12 text-center">Include</th>
                     <th className="px-4 py-3">Term</th>
-                    <th className="px-4 py-3">Credits</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Term GPA</th>
-                    <th className="px-4 py-3">Quality Points</th>
+                    <th className="px-3 py-3">Credits</th>
+                    <th className="px-3 py-3">Status</th>
+                    <th className="px-3 py-3">Term GPA</th>
+                    <th className="px-3 py-3">Quality Points</th>
                     <th className="px-4 py-3 text-right">Course Detail</th>
                   </tr>
                 </thead>
@@ -374,7 +374,7 @@ export function CgpaCalculatorClient({
                     const qualityPoints = (t.gpa * t.credits).toFixed(2);
                     return (
                       <tr key={t.termKey} className={`transition ${!t.isIncluded ? "opacity-50 bg-muted/20" : "hover:bg-muted/40"}`}>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3 text-center whitespace-nowrap">
                           <input
                             type="checkbox"
                             checked={t.isIncluded}
@@ -387,22 +387,22 @@ export function CgpaCalculatorClient({
                             className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
                         </td>
-                        <td className="px-4 py-3 font-bold">
-                          <span className="inline-flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 text-xs flex items-center justify-center font-bold">
+                        <td className="px-4 py-3 font-bold whitespace-nowrap">
+                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <span className="w-6 h-6 shrink-0 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 text-xs flex items-center justify-center font-bold">
                               {idx + 1}
                             </span>
-                            Level {t.termKey.split("-")[0]} Term {t.termKey.split("-")[1]} ({t.termKey})
+                            <span>Level {t.termKey.split("-")[0]} Term {t.termKey.split("-")[1]} ({t.termKey})</span>
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-semibold">{t.credits} Cr</td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3 font-semibold whitespace-nowrap">{t.credits} Cr</td>
+                        <td className="px-3 py-3 whitespace-nowrap">
                           {isPublished ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-400">
-                              <CheckCircle2 className="w-3 h-3" /> Published Result
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-400">
+                              <CheckCircle2 className="w-3 h-3 shrink-0" /> Published Result
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-400">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-400">
                               Target / Projected
                             </span>
                           )}
@@ -442,7 +442,7 @@ export function CgpaCalculatorClient({
                               setSelectedTermKey(t.termKey);
                               setActiveMode("term");
                             }}
-                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-semibold"
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-semibold whitespace-nowrap"
                           >
                             Calculate by Courses <ArrowRight className="w-3.5 h-3.5" />
                           </button>
