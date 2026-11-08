@@ -52,7 +52,10 @@ export function CgpaCalculatorClient({
   const [selectedTermKey, setSelectedTermKey] = useState<string>("1-1");
   const [inputFormat, setInputFormat] = useState<"point" | "letter" | "marks">("point");
   const [courseGradeMap, setCourseGradeMap] = useState<Record<string, number>>({});
+  const [courseMarksMap, setCourseMarksMap] = useState<Record<string, string>>({});
   const [targetGoalCgpa, setTargetGoalCgpa] = useState<string>("3.60");
+
+  const isOwnDepartment = selectedDeptId === defaultDepartmentId;
 
   const currentCurriculum: DepartmentCurriculum = useMemo(() => {
     return (ALL_CURRICULA[selectedDeptId] || ALL_CURRICULA.ae)!;
@@ -60,9 +63,11 @@ export function CgpaCalculatorClient({
 
   const publishedMap = useMemo(() => {
     const map = new Map<string, number>();
-    publishedResults.forEach((r) => map.set(r.termKey, r.gpa));
+    if (isOwnDepartment) {
+      publishedResults.forEach((r) => map.set(r.termKey, r.gpa));
+    }
     return map;
-  }, [publishedResults]);
+  }, [publishedResults, isOwnDepartment]);
 
   const [termPlanner, setTermPlanner] = useState<TermPlannerState[]>([]);
 
@@ -116,7 +121,7 @@ export function CgpaCalculatorClient({
   const applyTermGpaToPlanner = () => {
     setTermPlanner((prev) =>
       prev.map((t) =>
-        t.termKey === selectedTermKey ? { ...t, gpa: Number(termCalculation.termGpa.toFixed(2)) } : t
+        t.termKey === selectedTermKey ? { ...t, gpa: Number(termCalculation.termGpa.toFixed(2)), isIncluded: true } : t
       )
     );
     setActiveMode("cgpa");
@@ -125,9 +130,12 @@ export function CgpaCalculatorClient({
   const cgpaCalculation = useMemo(() => {
     let completedPoints = 0;
     let completedCredits = 0;
-    let projectedPoints = 0;
-    let projectedCredits = 0;
+    let futurePoints = 0;
     let remainingCredits = 0;
+
+    const hasModifiedPublished = termPlanner.some(
+      (t) => t.isPublished && Math.abs(t.gpa - (publishedMap.get(t.termKey) || 0)) > 0.001
+    );
 
     termPlanner.forEach((t) => {
       if (!t.isIncluded) return;
@@ -137,38 +145,52 @@ export function CgpaCalculatorClient({
         completedPoints += points;
         completedCredits += t.credits;
       } else {
+        futurePoints += points;
         remainingCredits += t.credits;
       }
-
-      projectedPoints += points;
-      projectedCredits += t.credits;
     });
 
-        const latestPublishedWithCgpa = [...publishedResults].reverse().find((r) => r.cgpa !== null && r.cgpa > 0);
-    const currentCgpa = latestPublishedWithCgpa && latestPublishedWithCgpa.cgpa
+    const latestPublishedWithCgpa = isOwnDepartment
+      ? [...publishedResults].reverse().find((r) => r.cgpa !== null && r.cgpa > 0)
+      : undefined;
+
+    const useOfficialCgpa = Boolean(
+      isOwnDepartment && !hasModifiedPublished && latestPublishedWithCgpa && latestPublishedWithCgpa.cgpa
+    );
+
+    const currentCgpa = useOfficialCgpa && latestPublishedWithCgpa?.cgpa
       ? latestPublishedWithCgpa.cgpa
       : (completedCredits > 0 ? completedPoints / completedCredits : 0);
-    const projectedFinalCgpa = projectedCredits > 0 ? projectedPoints / projectedCredits : 0;
+
+    const effectiveCompletedPoints = useOfficialCgpa && latestPublishedWithCgpa?.cgpa
+      ? latestPublishedWithCgpa.cgpa * completedCredits
+      : completedPoints;
+
+    const totalIncludedCredits = completedCredits + remainingCredits;
+    const totalProjectedPoints = effectiveCompletedPoints + futurePoints;
+    const projectedFinalCgpa = totalIncludedCredits > 0 ? totalProjectedPoints / totalIncludedCredits : 0;
 
     const target = parseFloat(targetGoalCgpa) || 3.50;
-    const requiredTotalPoints = target * projectedCredits;
-    const neededRemainingPoints = requiredTotalPoints - completedPoints;
+    const requiredTotalPoints = target * totalIncludedCredits;
+    const neededRemainingPoints = requiredTotalPoints - effectiveCompletedPoints;
     const neededAverageGpa = remainingCredits > 0 ? neededRemainingPoints / remainingCredits : 0;
 
     return {
       completedCredits,
       totalCredits: currentCurriculum.totalCredits,
-      completedPoints,
+      totalIncludedCredits,
+      completedPoints: effectiveCompletedPoints,
       currentCgpa,
       projectedFinalCgpa,
       remainingCredits,
       neededAverageGpa,
       isGoalFeasible: neededAverageGpa <= 4.00,
     };
-  }, [termPlanner, currentCurriculum, targetGoalCgpa, publishedResults]);
+  }, [termPlanner, currentCurriculum, targetGoalCgpa, publishedResults, isOwnDepartment, publishedMap]);
 
   const resetAllCourses = () => {
     setCourseGradeMap({});
+    setCourseMarksMap({});
   };
 
   const reloadPublishedResults = () => {
@@ -179,6 +201,7 @@ export function CgpaCalculatorClient({
         return {
           ...t,
           gpa: hasPublished ? pubGpa : 3.50,
+          isIncluded: true,
           isPublished: hasPublished,
         };
       })
@@ -263,7 +286,7 @@ export function CgpaCalculatorClient({
                 {cgpaCalculation.projectedFinalCgpa > 0 ? cgpaCalculation.projectedFinalCgpa.toFixed(2) : "N/A"}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Overall completed + target future terms
+                Across {cgpaCalculation.totalIncludedCredits} included credits
               </p>
             </div>
 
@@ -301,7 +324,7 @@ export function CgpaCalculatorClient({
                 {cgpaCalculation.remainingCredits > 0 ? (
                   cgpaCalculation.isGoalFeasible ? (
                     <span>
-                      Target <b>{targetGoalCgpa}</b> পৌঁছাতে বাকি {cgpaCalculation.remainingCredits} ক্রেডিটে গড়ে <b>{cgpaCalculation.neededAverageGpa.toFixed(2)}</b> GPA প্রয়োজন!
+                      Target <b>{targetGoalCgpa}</b> পৌঁছাতে বাকি {cgpaCalculation.remainingCredits} ক্রেডিটে গড়ে <b>{Math.max(0, cgpaCalculation.neededAverageGpa).toFixed(2)}</b> GPA প্রয়োজন!
                     </span>
                   ) : (
                     <span className="text-red-600 dark:text-red-400 font-semibold">
@@ -309,7 +332,7 @@ export function CgpaCalculatorClient({
                     </span>
                   )
                 ) : (
-                  <span>সবগুলো টার্ম ইতিমধ্যে সম্পন্ন হয়েছে!</span>
+                  <span>সবগুলো সিলেক্টেড টার্ম ইতিমধ্যে সম্পন্ন হয়েছে!</span>
                 )}
               </p>
             </div>
@@ -319,7 +342,7 @@ export function CgpaCalculatorClient({
             <div className="p-4 sm:p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-bold">Term-by-Term Cumulative Planner</h3>
-                <p className="text-xs text-muted-foreground">Adjust future term GPAs to see your projected graduation CGPA.</p>
+                <p className="text-xs text-muted-foreground">Adjust any term GPA (including published terms to simulate retake clearance) or toggle terms.</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -327,7 +350,7 @@ export function CgpaCalculatorClient({
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium bg-background hover:bg-muted transition"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  Load My Published Results
+                  Reset to Published Results
                 </button>
               </div>
             </div>
@@ -336,6 +359,7 @@ export function CgpaCalculatorClient({
               <table className="w-full text-xs sm:text-sm text-left">
                 <thead className="bg-muted/60 text-muted-foreground uppercase text-[11px] font-semibold">
                   <tr>
+                    <th className="px-4 py-3">Include</th>
                     <th className="px-4 py-3">Term</th>
                     <th className="px-4 py-3">Credits</th>
                     <th className="px-4 py-3">Status</th>
@@ -349,7 +373,20 @@ export function CgpaCalculatorClient({
                     const isPublished = t.isPublished;
                     const qualityPoints = (t.gpa * t.credits).toFixed(2);
                     return (
-                      <tr key={t.termKey} className="hover:bg-muted/40 transition">
+                      <tr key={t.termKey} className={`transition ${!t.isIncluded ? "opacity-50 bg-muted/20" : "hover:bg-muted/40"}`}>
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={t.isIncluded}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setTermPlanner((prev) =>
+                                prev.map((item) => (item.termKey === t.termKey ? { ...item, isIncluded: checked } : item))
+                              );
+                            }}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                        </td>
                         <td className="px-4 py-3 font-bold">
                           <span className="inline-flex items-center gap-2">
                             <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 text-xs flex items-center justify-center font-bold">
@@ -377,6 +414,7 @@ export function CgpaCalculatorClient({
                               step="0.01"
                               min="0.00"
                               max="4.00"
+                              disabled={!t.isIncluded}
                               value={t.gpa}
                               onChange={(e) => {
                                 const val = parseFloat(e.target.value) || 0;
@@ -396,7 +434,7 @@ export function CgpaCalculatorClient({
                           </div>
                         </td>
                         <td className="px-4 py-3 font-mono font-semibold text-muted-foreground">
-                          {qualityPoints}
+                          {t.isIncluded ? qualityPoints : "—"}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button
@@ -550,9 +588,20 @@ export function CgpaCalculatorClient({
                               min="0"
                               max="100"
                               placeholder="0 - 100%"
+                              value={courseMarksMap[course.code] ?? ""}
                               onChange={(e) => {
-                                const m = parseFloat(e.target.value) || 0;
-                                handleCourseGradeChange(course.code, marksToGradePoint(m));
+                                const rawVal = e.target.value;
+                                setCourseMarksMap((prev) => ({ ...prev, [course.code]: rawVal }));
+                                if (rawVal === "") {
+                                  setCourseGradeMap((prev) => {
+                                    const copy = { ...prev };
+                                    delete copy[course.code];
+                                    return copy;
+                                  });
+                                } else {
+                                  const m = parseFloat(rawVal) || 0;
+                                  handleCourseGradeChange(course.code, marksToGradePoint(m));
+                                }
                               }}
                               className="w-28 px-2.5 py-1 rounded-lg border bg-background text-sm font-semibold"
                             />
