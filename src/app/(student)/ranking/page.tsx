@@ -26,6 +26,13 @@ interface RegisteredStudent {
   full_name: string | null;
 }
 
+interface AirDropRecord {
+  dropped_roll: string;
+  from_batch?: string | null;
+  junior_batch_assigned?: string | null;
+  dropped_term?: string | null;
+}
+
 export default async function StudentRankingPage({
   searchParams,
 }: {
@@ -50,11 +57,12 @@ export default async function StudentRankingPage({
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  const [{ data: dept }, { data: batch }, { data: regStudentsRpc }, { data: allResultsData }] = await Promise.all([
+  const [{ data: dept }, { data: batch }, { data: regStudentsRpc }, { data: allResultsData }, { data: airDropsData }] = await Promise.all([
     profile.department_id ? supabase.from("departments").select("name, code").eq("id", profile.department_id).maybeSingle() : Promise.resolve({ data: null }),
     profile.batch_id ? supabase.from("batches").select("name").eq("id", profile.batch_id).maybeSingle() : Promise.resolve({ data: null }),
     rawClient.rpc("get_registered_student_names"),
     rawClient.from("term_results").select("student_id, student_id_code, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count, remarks").order("level_term_key", { ascending: true }),
+    rawClient.from("student_air_drop_history").select("dropped_roll, from_batch, junior_batch_assigned, dropped_term"),
   ]);
 
   const rollToAccountMap = new Map<string, { full_name: string; profile_id: string }>();
@@ -63,6 +71,11 @@ export default async function StudentRankingPage({
   ((regStudentsRpc || []) as RegisteredStudent[]).forEach((s) => {
     if (s.student_id) rollToAccountMap.set(s.student_id.trim().toLowerCase(), { full_name: s.full_name || "Student", profile_id: s.profile_id });
     if (s.profile_id) idToAccountMap.set(s.profile_id, { full_name: s.full_name || "Student", student_id: s.student_id || "" });
+  });
+
+  const airDropMap = new Map<string, string>();
+  ((airDropsData || []) as AirDropRecord[]).forEach((d) => {
+    if (d.dropped_roll) airDropMap.set(d.dropped_roll.trim(), d.junior_batch_assigned || "Junior Batch");
   });
 
   const allResults = (allResultsData || []) as RawResultRow[];
@@ -93,7 +106,6 @@ export default async function StudentRankingPage({
   batchResults.forEach((r) => {
     const rollKey = (r.student_id_code || idToAccountMap.get(r.student_id || "")?.student_id || r.student_id || "").trim();
     if (!rollKey) return;
-    if (regularPrefix && rollKey.length >= 3 && !rollKey.startsWith(regularPrefix)) return;
 
     if (selectedTermFilter !== "overall") {
       if (r.level_term_key === selectedTermFilter) targetRows.set(rollKey, { ...r, student_id_code: rollKey });
@@ -110,16 +122,75 @@ export default async function StudentRankingPage({
       const displayName = accountInfo ? accountInfo.full_name : null;
       const primaryScore = selectedTermFilter === "overall" ? (r.cgpa !== null && r.level_term_key !== "1-1" ? Number(r.cgpa) : Number(r.gpa)) : Number(r.gpa);
       const secondaryScore = Number(r.cgpa ?? r.gpa);
-      return { ...r, roll_code: rollStr || "N/A", displayName, primaryScore, secondaryScore };
+
+      let category: "regular" | "irregular" | "air_dropped" = "regular";
+      let badgeLabel: string | null = null;
+      let badgeColor: string = "";
+
+      if (airDropMap.has(rollStr)) {
+        category = "air_dropped";
+        const targetJunior = airDropMap.get(rollStr);
+        badgeLabel = `Air Dropped → ${targetJunior} Batch`;
+        badgeColor = "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800";
+      } else if (regularPrefix && rollStr.length >= 3 && !rollStr.startsWith(regularPrefix)) {
+        category = "irregular";
+        const yr = rollStr.slice(0, 2);
+        const exBatch = yr === "23" ? "Ex-7th Batch" : yr === "22" ? "Ex-6th Batch" : "Senior Batch";
+        badgeLabel = `Irregular • ${exBatch}`;
+        badgeColor = "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800";
+      }
+
+      return { 
+        ...r, 
+        roll_code: rollStr || "N/A", 
+        displayName, 
+        primaryScore, 
+        secondaryScore,
+        category,
+        badgeLabel,
+        badgeColor
+      };
     })
     .sort((a, b) => {
+      const catOrder = (cat: string) => (cat === "regular" ? 0 : cat === "irregular" ? 1 : 2);
+      if (catOrder(a.category) !== catOrder(b.category)) {
+        return catOrder(a.category) - catOrder(b.category);
+      }
       if (b.primaryScore !== a.primaryScore) return b.primaryScore - a.primaryScore;
       if (b.secondaryScore !== a.secondaryScore) return b.secondaryScore - a.secondaryScore;
       return a.term_retake_count - b.term_retake_count;
     });
 
-  const myRankIndex = leaderboard.findIndex((item) => item.student_id === user.id || item.roll_code.toLowerCase() === myRollClean);
-  const myRank = myRankIndex >= 0 ? myRankIndex + 1 : null;
+  let regularRankCounter = 0;
+  const rankedLeaderboard = leaderboard.map((item) => {
+    let rankDisplay = "";
+    let isNumericRank = false;
+    let numericRank: number | null = null;
+
+    if (item.category === "regular") {
+      regularRankCounter += 1;
+      numericRank = regularRankCounter;
+      rankDisplay = `#${regularRankCounter}`;
+      isNumericRank = true;
+    } else if (item.category === "irregular") {
+      rankDisplay = "Irregular";
+    } else {
+      rankDisplay = "Unranked";
+    }
+
+    return {
+      ...item,
+      rankDisplay,
+      isNumericRank,
+      numericRank,
+    };
+  });
+
+  const totalRegularCount = regularRankCounter;
+  const myItem = rankedLeaderboard.find((item) => item.student_id === user.id || item.roll_code.toLowerCase() === myRollClean);
+  const myRankText = myItem?.isNumericRank 
+    ? `#${myItem.numericRank} of ${totalRegularCount}`
+    : myItem?.rankDisplay || "Unranked";
 
   return (
     <div className="min-h-screen bg-background flex flex-col lg:flex-row">
@@ -140,7 +211,7 @@ export default async function StudentRankingPage({
               <div className="text-[11px] font-semibold uppercase text-amber-800">
                 {selectedTermFilter === "overall" ? "Overall Merit Position" : `Term ${selectedTermFilter} Rank`}
               </div>
-              <div className="text-2xl font-extrabold text-amber-600 mt-0.5">{myRank ? `#${myRank} of ${leaderboard.length}` : "Unranked"}</div>
+              <div className="text-2xl font-extrabold text-amber-600 mt-0.5">{myRankText}</div>
             </div>
           </div>
 
@@ -158,7 +229,7 @@ export default async function StudentRankingPage({
             </div>
           )}
 
-          {leaderboard.length === 0 ? (
+          {rankedLeaderboard.length === 0 ? (
             <div className="rounded-2xl border bg-card p-12 text-center space-y-3">
               <Users className="w-10 h-10 mx-auto text-muted-foreground/60" />
               <h3 className="text-base font-bold">No Merit Ranking Data Available Yet</h3>
@@ -167,7 +238,7 @@ export default async function StudentRankingPage({
             <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
               <div className="p-4 sm:p-5 border-b flex items-center justify-between">
                 <h2 className="text-sm font-bold">
-                  {selectedTermFilter === "overall" ? `Overall Batch Merit Leaderboard (${leaderboard.length} Students)` : `Term ${selectedTermFilter} Merit Leaderboard (${leaderboard.length} Students)`}
+                  {selectedTermFilter === "overall" ? `Overall Batch Merit Leaderboard (${totalRegularCount} Regular Students)` : `Term ${selectedTermFilter} Merit Leaderboard (${totalRegularCount} Regular Students)`}
                 </h2>
                 <span className="text-xs text-muted-foreground">{selectedTermFilter === "overall" ? "Sorted by Latest CGPA" : `Sorted by Term ${selectedTermFilter} GPA`}</span>
               </div>
@@ -185,23 +256,47 @@ export default async function StudentRankingPage({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {leaderboard.map((row, idx) => {
-                      const rank = idx + 1;
+                    {rankedLeaderboard.map((row, idx) => {
                       const isMe = row.student_id === user.id || row.roll_code.toLowerCase() === myRollClean;
                       const retakeSubjects = row.remarks ? row.remarks.replace(/^Retakes:\s*/i, "").trim() : "";
                       return (
                         <tr key={row.roll_code + idx} className={isMe ? "bg-blue-50/70 dark:bg-blue-950/40 font-semibold" : "hover:bg-muted/40"}>
                           <td className="px-4 py-3 font-bold">
-                            <span className="inline-flex items-center gap-1.5">
-                              {rank === 1 && <Trophy className="w-4 h-4 text-amber-500" />}
-                              {rank === 2 && <Medal className="w-4 h-4 text-slate-400" />}
-                              {rank === 3 && <Award className="w-4 h-4 text-amber-700" />}
-                              #{rank}
-                            </span>
+                            {row.isNumericRank ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                {row.numericRank === 1 && <Trophy className="w-4 h-4 text-amber-500" />}
+                                {row.numericRank === 2 && <Medal className="w-4 h-4 text-slate-400" />}
+                                {row.numericRank === 3 && <Award className="w-4 h-4 text-amber-700" />}
+                                {row.rankDisplay}
+                              </span>
+                            ) : row.category === "irregular" ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800">
+                                Irregular
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800">
+                                Unranked
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
-                            {row.displayName ? <span className="text-foreground font-medium">{row.displayName}</span> : <span className="text-muted-foreground/60 italic text-xs">Not registered yet</span>}
-                            {isMe && <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px]">You</span>}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {row.displayName ? (
+                                <span className="text-foreground font-medium">{row.displayName}</span>
+                              ) : (
+                                <span className="text-muted-foreground/60 italic text-xs">Not registered yet</span>
+                              )}
+                              {isMe && (
+                                <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-semibold">
+                                  You
+                                </span>
+                              )}
+                              {row.badgeLabel && (
+                                <span className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold ${row.badgeColor}`}>
+                                  {row.badgeLabel}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3 font-mono text-xs font-semibold">{row.roll_code}</td>
                           <td className="px-4 py-3">Term {row.level_term_key}</td>
