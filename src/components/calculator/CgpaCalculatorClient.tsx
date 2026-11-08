@@ -144,7 +144,10 @@ export function CgpaCalculatorClient({
       projectedCredits += t.credits;
     });
 
-    const currentCgpa = completedCredits > 0 ? completedPoints / completedCredits : 0;
+        const latestPublishedWithCgpa = [...publishedResults].reverse().find((r) => r.cgpa !== null && r.cgpa > 0);
+    const currentCgpa = latestPublishedWithCgpa && latestPublishedWithCgpa.cgpa
+      ? latestPublishedWithCgpa.cgpa
+      : (completedCredits > 0 ? completedPoints / completedCredits : 0);
     const projectedFinalCgpa = projectedCredits > 0 ? projectedPoints / projectedCredits : 0;
 
     const target = parseFloat(targetGoalCgpa) || 3.50;
@@ -162,7 +165,7 @@ export function CgpaCalculatorClient({
       neededAverageGpa,
       isGoalFeasible: neededAverageGpa <= 4.00,
     };
-  }, [termPlanner, currentCurriculum, targetGoalCgpa]);
+  }, [termPlanner, currentCurriculum, targetGoalCgpa, publishedResults]);
 
   const resetAllCourses = () => {
     setCourseGradeMap({});

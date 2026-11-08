@@ -433,7 +433,7 @@ export const ALL_CURRICULA: Record<string, DepartmentCurriculum> = {
     id: "ye",
     name: "Yarn Engineering",
     shortName: "YE",
-    totalCredits: 169,
+    totalCredits: 166,
     terms: [
       {
         termKey: "1-1", level: 1, term: 1, title: "Level 1 Term 1", totalCredits: 19,
@@ -524,9 +524,8 @@ export const ALL_CURRICULA: Record<string, DepartmentCurriculum> = {
         ]
       },
       {
-        termKey: "4-1", level: 4, term: 1, title: "Level 4 Term 1", totalCredits: 20,
+        termKey: "4-1", level: 4, term: 1, title: "Level 4 Term 1", totalCredits: 17,
         courses: [
-          { code: "HSS 301", name: "Economics", credits: 3.0, type: "theory" },
           { code: "YE 401", name: "Modern Yarn Manufacturing", credits: 3.0, type: "theory" },
           { code: "YE 402", name: "Modern Yarn Manufacturing (Practical)", credits: 1.0, type: "practical" },
           { code: "YE 403", name: "Special Yarn Manufacturing", credits: 3.0, type: "theory" },
