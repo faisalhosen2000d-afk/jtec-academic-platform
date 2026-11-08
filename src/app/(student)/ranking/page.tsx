@@ -85,7 +85,7 @@ export default async function StudentRankingPage({
   const myResultRow = allResults.find(
     (r) => r.student_id === user.id || (r.student_id_code && r.student_id_code.trim().toLowerCase() === myRollClean)
   );
-  const targetBatchId = myResultRow?.batch_id || profile.batch_id;
+  const targetBatchId = profile.batch_id || myResultRow?.batch_id;
   const targetDeptId = myResultRow?.department_id || profile.department_id;
 
   const batchResults = allResults.filter(

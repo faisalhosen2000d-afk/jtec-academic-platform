@@ -58,11 +58,28 @@ export default async function StudentResultsPage() {
   const allRows = (rowsData || []) as TermResultRecord[];
   const myRoll = (profile.student_id || "").trim().toLowerCase();
 
-  const results = allRows.filter(
+  const rawUserResults = allRows.filter(
     (r) => r.student_id === user.id || (r.student_id_code && r.student_id_code.trim().toLowerCase() === myRoll)
   );
 
-  const latest = results.length > 0 ? results[results.length - 1] : null;
+  let seenDrop = false;
+  const results: TermResultRecord[] = [];
+  for (const r of rawUserResults) {
+    if (r.status === "air_dropped") {
+      if (!seenDrop) {
+        seenDrop = true;
+        results.push(r);
+      } else {
+        // Automatically clean up accidental duplicate air_dropped record in later term
+        await rawClient.from("term_results").delete().eq("id", r.id);
+      }
+    } else {
+      results.push(r);
+    }
+  }
+
+  const passedResults = results.filter((r) => r.status !== "air_dropped");
+  const latest = passedResults.length > 0 ? passedResults[passedResults.length - 1] : (results.length > 0 ? results[results.length - 1] : null);
   const tBatch = latest?.batch_id || profile.batch_id;
   const tDept = latest?.department_id || profile.department_id;
 
@@ -173,17 +190,19 @@ export default async function StudentResultsPage() {
                 <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Term-wise Retake Breakdown</div>
                 <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
                   {results.map((r) => {
+                    const isTermDropped = r.status === "air_dropped";
                     const freshList = termFreshMap.get(r.level_term_key) || [];
                     const allCodesInRemarks = getCodes(r.remarks);
-                    const isNew = freshList.length > 0;
-                    const isCarriedOnly = allCodesInRemarks.length > 0 && !isNew;
-                    const isCleanTerm = freshList.length === 0;
+                    const isNew = !isTermDropped && freshList.length > 0;
+                    const isCarriedOnly = !isTermDropped && allCodesInRemarks.length > 0 && !isNew;
 
                     return (
                       <div
                         key={r.id}
                         className={`rounded-xl border p-3 text-xs space-y-1.5 ${
-                          isNew
+                          isTermDropped
+                            ? "bg-red-50/70 border-red-200 dark:bg-red-950/20 dark:border-red-900"
+                            : isNew
                             ? "bg-amber-50/70 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900"
                             : isCarriedOnly
                             ? "bg-emerald-50/40 border-emerald-200 dark:bg-emerald-950/10 dark:border-emerald-900/60"
@@ -193,16 +212,20 @@ export default async function StudentResultsPage() {
                         <div className="flex items-center justify-between gap-1.5 font-bold">
                           <span className="whitespace-nowrap shrink-0">Term {r.level_term_key}</span>
                           <span className={`text-[11px] px-2 py-0.5 rounded-md whitespace-nowrap ${
-                            isNew
+                            isTermDropped
+                              ? "bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-200 font-bold"
+                              : isNew
                               ? "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200"
-                              : isCarriedOnly
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200"
                               : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200"
                           }`}>
-                            {isNew ? `${freshList.length} New Retake` : isCarriedOnly ? "Carried Over" : "All Clear"}
+                            {isTermDropped ? "Year Dropped" : isNew ? `${freshList.length} New Retake` : isCarriedOnly ? "Carried Over" : "All Clear"}
                           </span>
                         </div>
-                        {isNew ? (
+                        {isTermDropped ? (
+                          <div className="text-[11px] text-red-700 dark:text-red-400 font-semibold">
+                            Omitted from exam sheet &bull; Migrated to {batch?.name || "Junior"} Batch
+                          </div>
+                        ) : isNew ? (
                           <div className="flex flex-wrap gap-1 pt-0.5">
                             {freshList.map((c, i) => (
                               <span key={i} className="px-2 py-0.5 rounded bg-amber-200 text-amber-950 font-mono font-bold text-[10px]">
@@ -325,6 +348,11 @@ export default async function StudentResultsPage() {
                             );
                           })}
                         </div>
+                      </div>
+                    ) : isDropped ? (
+                      <div className="px-3 py-2 rounded-xl bg-red-50/70 border border-red-200 text-xs text-red-700 flex items-center gap-1.5 font-semibold">
+                        <ShieldAlert className="w-3.5 h-3.5 shrink-0 text-red-600" />
+                        <span>Year Dropped in Term {r.level_term_key} &bull; Re-assigned to {batch?.name || "Junior"} Batch</span>
                       </div>
                     ) : (
                       <div className="px-3 py-2 rounded-xl bg-emerald-50/50 border border-emerald-100 text-xs text-emerald-700 flex items-center gap-1.5 font-medium">

@@ -155,54 +155,92 @@ export default async function StudentDashboardPage() {
 
   
 
+  const myCleanRoll = (profile?.student_id || "").trim();
   const [resData, rankData] = await Promise.all([
     rawAdmin
       .from("term_results")
-      .select("level_term_key, gpa, cgpa, status, term_retake_count")
-      .eq("student_id", user.id)
+      .select("id, level_term_key, gpa, cgpa, status, term_retake_count, level_id, term_id")
+      .or(myCleanRoll ? `student_id.eq.${user.id},student_id_code.eq.${myCleanRoll}` : `student_id.eq.${user.id}`)
       .order("level_term_key", { ascending: true }),
 
     rawAdmin
       .from("term_results")
-      .select("student_id, student_id_code, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count")
+      .select("student_id, student_id_code, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count, status")
       .order("level_term_key", { ascending: true }),
   ]);
 
-  const userTerms = (resData?.data || []) as Array<{
+  const rawUserTerms = (resData?.data || []) as Array<{
+    id?: string;
     level_term_key: string;
     gpa: number;
     cgpa: number | null;
+    status?: string;
     term_retake_count: number;
+    level_id?: string;
+    term_id?: string;
   }>;
-  const lastTerm = userTerms.length > 0 ? userTerms[userTerms.length - 1] : null;
-  const cardScoreText = lastTerm
-    ? lastTerm.level_term_key === "1-1"
-      ? `${Number(lastTerm.gpa).toFixed(2)} GPA`
-      : `${Number(lastTerm.cgpa ?? lastTerm.gpa).toFixed(2)} CGPA`
+
+  let firstDropTerm: typeof rawUserTerms[0] | null = null;
+  const userTerms: typeof rawUserTerms = [];
+  for (const t of rawUserTerms) {
+    if (t.status === "air_dropped") {
+      if (!firstDropTerm) {
+        firstDropTerm = t;
+        userTerms.push(t);
+      } else if (t.id) {
+        await rawAdmin.from("term_results").delete().eq("id", t.id);
+      }
+    } else {
+      userTerms.push(t);
+    }
+  }
+
+  if (firstDropTerm && firstDropTerm.level_id && firstDropTerm.term_id) {
+    if (profile && (profile.current_level_id !== firstDropTerm.level_id || profile.current_term_id !== firstDropTerm.term_id)) {
+      await rawAdmin
+        .from("profiles")
+        .update({
+          current_level_id: firstDropTerm.level_id,
+          current_term_id: firstDropTerm.term_id,
+        })
+        .eq("id", user.id);
+    }
+  }
+
+  const passedUserTerms = userTerms.filter((t) => t.status !== "air_dropped");
+  const lastPassedTerm = passedUserTerms.length > 0 ? passedUserTerms[passedUserTerms.length - 1] : null;
+  const lastTerm = lastPassedTerm || (userTerms.length > 0 ? userTerms[userTerms.length - 1] : null);
+
+  const cardScoreText = lastPassedTerm
+    ? lastPassedTerm.level_term_key === "1-1"
+      ? `${Number(lastPassedTerm.gpa).toFixed(2)} GPA`
+      : `${Number(lastPassedTerm.cgpa ?? lastPassedTerm.gpa).toFixed(2)} CGPA`
+    : firstDropTerm
+    ? "Year Dropped"
     : "No Results";
 
-  const totalPendingRetakes = Number(lastTerm?.term_retake_count) || 0;
+  const totalPendingRetakes = firstDropTerm ? 5 : (Number(lastPassedTerm?.term_retake_count) || 0);
 
   const allBatchRows = (rankData?.data || []) as Array<{
     student_id: string;
+    student_id_code?: string;
     department_id: string;
     batch_id: string;
     level_term_key: string;
     gpa: number;
     cgpa: number | null;
     term_retake_count: number;
+    status?: string;
   }>;
 
-  // Find user's own target batch & department from their latest uploaded result
-  const myTargetBatch = lastTerm ? allBatchRows.find((r) => r.student_id === user.id)?.batch_id : profile?.batch_id;
-  const myTargetDept = lastTerm ? allBatchRows.find((r) => r.student_id === user.id)?.department_id : profile?.department_id;
+  const myTargetBatch = profile?.batch_id || (lastTerm ? allBatchRows.find((r) => r.student_id === user.id)?.batch_id : undefined);
+  const myTargetDept = profile?.department_id || (lastTerm ? allBatchRows.find((r) => r.student_id === user.id)?.department_id : undefined);
 
-  // Filter peers in the same batch & department
   const peerRows = allBatchRows.filter(
-    (r) => (!myTargetBatch || r.batch_id === myTargetBatch) && (!myTargetDept || r.department_id === myTargetDept)
+    (r) => r.status !== "air_dropped" && (!myTargetBatch || r.batch_id === myTargetBatch) && (!myTargetDept || r.department_id === myTargetDept)
   );
 
-  const activeRows = peerRows.length > 0 ? peerRows : allBatchRows;
+  const activeRows = peerRows;
   const pfxMap = new Map<string, number>();
   activeRows.forEach((row) => {
     const rk = ((row as { student_id_code?: string }).student_id_code || "").trim();
@@ -230,7 +268,7 @@ export default async function StudentDashboardPage() {
       .sort((a, b) => (b.score !== a.score ? b.score - a.score : a.retakes - b.retakes));
 
   const myIdx = sortedBatch.findIndex((item) => item.sid === user.id || item.sid === profile?.student_id);
-  const cardRankText = myIdx >= 0 ? `#${myIdx + 1}` : (lastTerm ? "#1" : "Unranked");
+  const cardRankText = myIdx >= 0 && !firstDropTerm ? `#${myIdx + 1}` : "Unranked";
 
   return (
     <div className="min-h-screen bg-muted/30">

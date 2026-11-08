@@ -73,21 +73,42 @@ export async function verifyMissingStudentsForBatch(input: {
     .eq("department_id", input.department_id)
     .eq("batch_id", input.batch_id);
 
-  // 2. Fetch all student rolls that had results in ANY previous term in this batch (unregistered sheet rolls included)
-  const { data: previousTermRows } = await adminClient
-    .from("term_results")
-    .select("student_id, student_id_code, status")
-    .eq("department_id", input.department_id)
-    .eq("batch_id", input.batch_id)
-    .neq("status", "air_dropped");
+  // 2. Fetch ALL term_results & air_drop_history to exclude anyone already air-dropped in an earlier term
+  const [{ data: allBatchTermRows }, { data: dropHistoryRows }] = await Promise.all([
+    adminClient
+      .from("term_results")
+      .select("student_id, student_id_code, status, level_term_key")
+      .eq("department_id", input.department_id)
+      .eq("batch_id", input.batch_id),
+    adminClient
+      .from("student_air_drop_history")
+      .select("student_id_code, dropped_roll, previous_batch_id, dropped_at_level_term, dropped_term"),
+  ]);
+
+  const alreadyDroppedRolls = new Set<string>();
+  (allBatchTermRows || []).forEach((r) => {
+    if (r.status === "air_dropped" && (!input.level_term_key || r.level_term_key !== input.level_term_key)) {
+      const rl = (r.student_id_code || "").trim().toLowerCase();
+      if (rl) alreadyDroppedRolls.add(rl);
+    }
+  });
+  (dropHistoryRows || []).forEach((d: { student_id_code?: string; dropped_roll?: string; dropped_at_level_term?: string; dropped_term?: string }) => {
+    const rl = (d.student_id_code || d.dropped_roll || "").trim().toLowerCase();
+    const dTerm = d.dropped_at_level_term || d.dropped_term;
+    if (rl && (!input.level_term_key || !dTerm || dTerm !== input.level_term_key)) {
+      alreadyDroppedRolls.add(rl);
+    }
+  });
 
   const rosterMap = new Map<string, { id?: string; student_id: string; full_name?: string }>();
 
-  // Add previously known sheet rolls
-  (previousTermRows || []).forEach((r) => {
+  // Add previously known sheet rolls (only if NOT already air-dropped)
+  (allBatchTermRows || []).forEach((r) => {
+    if (r.status === "air_dropped") return;
     const roll = (r.student_id_code || "").trim();
-    if (roll) {
-      rosterMap.set(roll.toLowerCase(), {
+    const rollLower = roll.toLowerCase();
+    if (roll && !alreadyDroppedRolls.has(rollLower)) {
+      rosterMap.set(rollLower, {
         id: r.student_id || undefined,
         student_id: roll,
         full_name: "Roll " + roll,
@@ -95,15 +116,18 @@ export async function verifyMissingStudentsForBatch(input: {
     }
   });
 
-  // Overwrite with real profile names if registered
+  // Overwrite with real profile names if registered (and not already dropped)
   (registeredStudents || []).forEach((s) => {
     if (s.student_id) {
       const roll = s.student_id.trim();
-      rosterMap.set(roll.toLowerCase(), {
-        id: s.id,
-        student_id: roll,
-        full_name: s.full_name || "Roll " + roll,
-      });
+      const rollLower = roll.toLowerCase();
+      if (!alreadyDroppedRolls.has(rollLower)) {
+        rosterMap.set(rollLower, {
+          id: s.id,
+          student_id: roll,
+          full_name: s.full_name || "Roll " + roll,
+        });
+      }
     }
   });
 
