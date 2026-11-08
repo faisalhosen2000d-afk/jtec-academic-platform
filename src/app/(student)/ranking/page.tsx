@@ -18,6 +18,7 @@ interface RawResultRow {
   cgpa: number | null;
   term_retake_count: number;
   remarks: string | null;
+  status?: string | null;
 }
 
 interface RegisteredStudent {
@@ -61,7 +62,7 @@ export default async function StudentRankingPage({
     profile.department_id ? supabase.from("departments").select("name, code").eq("id", profile.department_id).maybeSingle() : Promise.resolve({ data: null }),
     profile.batch_id ? supabase.from("batches").select("name").eq("id", profile.batch_id).maybeSingle() : Promise.resolve({ data: null }),
     rawClient.rpc("get_registered_student_names"),
-    rawClient.from("term_results").select("student_id, student_id_code, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count, remarks").order("level_term_key", { ascending: true }),
+    rawClient.from("term_results").select("student_id, student_id_code, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count, remarks, status").order("level_term_key", { ascending: true }),
     rawClient.from("student_air_drop_history").select("dropped_roll, from_batch, junior_batch_assigned, dropped_term"),
   ]);
 
@@ -75,7 +76,7 @@ export default async function StudentRankingPage({
 
   const airDropMap = new Map<string, string>();
   ((airDropsData || []) as AirDropRecord[]).forEach((d) => {
-    if (d.dropped_roll) airDropMap.set(d.dropped_roll.trim(), d.junior_batch_assigned || "Junior Batch");
+    if (d.dropped_roll) airDropMap.set(d.dropped_roll.trim(), d.junior_batch_assigned || "9th");
   });
 
   const allResults = (allResultsData || []) as RawResultRow[];
@@ -127,9 +128,14 @@ export default async function StudentRankingPage({
       let badgeLabel: string | null = null;
       let badgeColor: string = "";
 
-      if (airDropMap.has(rollStr)) {
+      const isAirDropped = 
+        airDropMap.has(rollStr) ||
+        r.status === "air_dropped" ||
+        Boolean(r.remarks && r.remarks.toLowerCase().includes("year drop"));
+
+      if (isAirDropped) {
         category = "air_dropped";
-        const targetJunior = airDropMap.get(rollStr);
+        const targetJunior = airDropMap.get(rollStr) || "9th";
         badgeLabel = `Air Dropped → ${targetJunior} Batch`;
         badgeColor = "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800";
       } else if (regularPrefix && rollStr.length >= 3 && !rollStr.startsWith(regularPrefix)) {
@@ -258,9 +264,10 @@ export default async function StudentRankingPage({
                   <tbody className="divide-y divide-border">
                     {rankedLeaderboard.map((row, idx) => {
                       const isMe = row.student_id === user.id || row.roll_code.toLowerCase() === myRollClean;
+                      const isYearDropped = row.category === "air_dropped";
                       const retakeSubjects = row.remarks ? row.remarks.replace(/^Retakes:\s*/i, "").trim() : "";
                       return (
-                        <tr key={row.roll_code + idx} className={isMe ? "bg-blue-50/70 dark:bg-blue-950/40 font-semibold" : "hover:bg-muted/40"}>
+                        <tr key={row.roll_code + idx} className={isMe ? "bg-blue-50/70 dark:bg-blue-950/40 font-semibold" : isYearDropped ? "bg-red-50/30 dark:bg-red-950/20 hover:bg-red-50/50" : "hover:bg-muted/40"}>
                           <td className="px-4 py-3 font-bold">
                             {row.isNumericRank ? (
                               <span className="inline-flex items-center gap-1.5">
@@ -303,7 +310,9 @@ export default async function StudentRankingPage({
                           <td className="px-4 py-3 font-semibold text-blue-600">{Number(row.gpa).toFixed(2)}</td>
                           <td className="px-4 py-3 font-bold text-emerald-600">{row.level_term_key === "1-1" ? "1-1 Only" : Number(row.cgpa ?? row.gpa).toFixed(2)}</td>
                           <td className="px-4 py-3">
-                            {row.term_retake_count > 0 ? (
+                            {isYearDropped ? (
+                              <span className="px-2 py-0.5 rounded bg-red-100 text-red-800 border border-red-200 font-mono text-[10px] font-bold">Year Dropped</span>
+                            ) : row.term_retake_count > 0 ? (
                               <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-mono text-[10px] font-bold">{retakeSubjects || `${row.term_retake_count} Retake`}</span>
                             ) : (
                               <span className="text-emerald-600 text-xs font-medium">Clear</span>
