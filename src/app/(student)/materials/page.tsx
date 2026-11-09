@@ -231,11 +231,14 @@ export default async function MaterialsPage() {
       .in("id", uniqueUploaderIds.length > 0 ? uniqueUploaderIds : ["00000000-0000-0000-0000-000000000000"]),
   ]);
 
-  const uploaderDeptMap = new Map(
-    (uploaderDeptProfilesResult?.data || []).map((p: any) => [
-      p.id,
-      p.departments?.name || p.departments?.code || null,
-    ]),
+  const uploaderDeptMap = new Map<string, string | null>(
+    (uploaderDeptProfilesResult?.data || []).map((p) => {
+      const row = p as { id: string; departments?: { name?: string | null; code?: string | null } | null };
+      return [
+        row.id,
+        row.departments?.name || row.departments?.code || null,
+      ];
+    }),
   );
 
   const uploaderMap = new Map(
