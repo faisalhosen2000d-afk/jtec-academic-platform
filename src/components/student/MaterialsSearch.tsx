@@ -140,7 +140,7 @@ function CustomDropdown({
 
       {/* Floating Menu Popover */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border border-border/80 bg-popover p-1.5 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-150">
+        <div className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-150">
           <div className="space-y-0.5">
             {options.map((option) => {
               const isSelected = option.id === value;
