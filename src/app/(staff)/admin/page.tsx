@@ -22,7 +22,15 @@ export default async function AdminDashboardPage() {
     .eq("id", user.id)
     .single();
 
-  if (error || !profile || profile.role !== "admin") {
+  if (error || !profile) {
+    redirect("/staff-login");
+  }
+
+  if (profile.role === "super_admin") {
+    redirect("/super-admin");
+  }
+
+  if (profile.role !== "admin") {
     redirect("/staff-login");
   }
 

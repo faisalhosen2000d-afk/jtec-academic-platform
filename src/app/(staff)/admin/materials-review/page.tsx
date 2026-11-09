@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
@@ -72,8 +72,10 @@ export default async function MaterialsReviewPage() {
               </p>
             </div>
 
-            <Link href="/admin">
-              <Button variant="outline">Back to Admin Dashboard</Button>
+            <Link href={profile.role === "super_admin" ? "/super-admin" : "/admin"}>
+              <Button variant="outline">
+                {profile.role === "super_admin" ? "Back to Super Admin Dashboard" : "Back to Admin Dashboard"}
+              </Button>
             </Link>
           </div>
         </section>
