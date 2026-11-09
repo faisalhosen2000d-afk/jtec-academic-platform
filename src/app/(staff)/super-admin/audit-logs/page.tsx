@@ -22,6 +22,20 @@ type ActorProfile = {
   role: string;
 };
 
+type AuditLogRpcRow = {
+  id: string;
+  actor_id: string;
+  action: string;
+  target_table: string;
+  target_id: string | null;
+  previous_state: Record<string, unknown> | null;
+  new_state: Record<string, unknown> | null;
+  created_at: string;
+  actor_name: string;
+  actor_email: string;
+  actor_role: string;
+};
+
 export default async function AuditLogsPage() {
   const supabase = await createClient();
 
@@ -43,33 +57,41 @@ export default async function AuditLogsPage() {
     redirect("/");
   }
 
-  
-  const { data: logs, error } = await supabase
-    .from("audit_logs")
-    .select("id, actor_id, action, target_table, target_id, previous_state, new_state, created_at")
-    .order("created_at", { ascending: false })
-    .limit(100);
+  // Fetch audit logs safely via SECURITY DEFINER RPC bypassing all RLS policies
+  const { data: rawLogs, error } = await (
+    supabase.rpc as unknown as (
+      name: string,
+      args?: Record<string, unknown>
+    ) => Promise<{ data: AuditLogRpcRow[] | null; error: unknown }>
+  )("get_system_audit_logs", { p_limit: 100 });
 
   if (error) {
     console.error("Audit logs query error:", error);
   }
 
-  const auditLogs = (logs ?? []) as AuditLogRow[];
-  const actorIds = Array.from(new Set(auditLogs.map((log) => log.actor_id).filter(Boolean)));
+  const logRows = rawLogs ?? [];
+  const auditLogs: AuditLogRow[] = logRows.map((r) => ({
+    id: r.id,
+    actor_id: r.actor_id,
+    action: r.action,
+    target_table: r.target_table,
+    target_id: r.target_id,
+    previous_state: r.previous_state,
+    new_state: r.new_state,
+    created_at: r.created_at,
+  }));
 
   const actorMap: Record<string, ActorProfile> = {};
-  if (actorIds.length > 0) {
-    const { data: actors } = await supabase
-      .from("profiles")
-      .select("id, full_name, email, role")
-      .in("id", actorIds);
-
-    if (actors) {
-      actors.forEach((actor) => {
-        actorMap[actor.id] = actor as ActorProfile;
-      });
+  logRows.forEach((r) => {
+    if (r.actor_id && !actorMap[r.actor_id]) {
+      actorMap[r.actor_id] = {
+        id: r.actor_id,
+        full_name: r.actor_name,
+        email: r.actor_email,
+        role: r.actor_role,
+      };
     }
-  }
+  });
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -108,9 +130,9 @@ export default async function AuditLogsPage() {
               Primary Monitored Actions
             </p>
             <p className="mt-2 text-sm font-medium text-foreground">
-              Deletions, Permissions &amp; Promotions
+              Deletions, Permissions & Promotions
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">Recorded securely via service-role</p>
+            <p className="mt-1 text-xs text-muted-foreground">Recorded securely via system RPC</p>
           </div>
 
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -120,7 +142,7 @@ export default async function AuditLogsPage() {
             <p className="mt-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
               Immutable History
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">Permanent traceability &amp; audit trail</p>
+            <p className="mt-1 text-xs text-muted-foreground">Permanent traceability & audit trail</p>
           </div>
         </section>
 
