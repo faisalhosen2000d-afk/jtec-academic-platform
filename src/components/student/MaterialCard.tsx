@@ -55,13 +55,12 @@ interface DepartmentBadgeConfig {
   dotClass: string;
 }
 
-function getDepartmentBadge(
-  uploaderDeptName?: string | null,
-  subjectCode?: string | null
+function getUploaderDepartmentBadge(
+  uploaderDeptName?: string | null
 ): DepartmentBadgeConfig {
-  const text = `${uploaderDeptName || ""} ${subjectCode || ""}`.toUpperCase();
+  const text = (uploaderDeptName || "").toUpperCase();
 
-  if (text.includes("APPAREL") || text.includes("AE ") || text.includes("AE-") || text.includes("AE/")) {
+  if (text.includes("APPAREL") || text.includes("AE")) {
     return {
       code: "AE",
       shortName: "AE • Apparel",
@@ -71,7 +70,7 @@ function getDepartmentBadge(
     };
   }
 
-  if (text.includes("WET") || text.includes("WPE ") || text.includes("WPE-") || text.includes("WPE/")) {
+  if (text.includes("WET") || text.includes("WPE")) {
     return {
       code: "WPE",
       shortName: "WPE • Wet Process",
@@ -81,7 +80,7 @@ function getDepartmentBadge(
     };
   }
 
-  if (text.includes("FABRIC") || text.includes("FE ") || text.includes("FE-") || text.includes("FE/")) {
+  if (text.includes("FABRIC") || text.includes("FE")) {
     return {
       code: "FE",
       shortName: "FE • Fabric",
@@ -91,7 +90,7 @@ function getDepartmentBadge(
     };
   }
 
-  if (text.includes("YARN") || text.includes("YE ") || text.includes("YE-") || text.includes("YE/")) {
+  if (text.includes("YARN") || text.includes("YE")) {
     return {
       code: "YE",
       shortName: "YE • Yarn",
@@ -158,9 +157,8 @@ export default function MaterialCard({
     .toUpperCase();
 
   const isPdf = cleanFileType === "PDF";
-  const dept = getDepartmentBadge(
-    material.uploader?.department?.name || material.uploader?.department_name,
-    material.subject?.subject_code
+  const dept = getUploaderDepartmentBadge(
+    material.uploader?.department_name || material.uploader?.department?.name
   );
 
   return (
@@ -230,7 +228,7 @@ export default function MaterialCard({
                 materialId={material.id}
               />
             </div>
-            {/* Signature Department Badge */}
+            {/* Signature Department Badge - strictly based on Uploader's Department */}
             <span
               className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-bold ${dept.badgeClass}`}
               title={dept.fullName}

@@ -28,6 +28,7 @@ type Material = {
     instagram: string | null;
     linkedin: string | null;
     telegram: string | null;
+    department_name?: string | null;
   } | null;
   subject: {
     id: string;
@@ -211,20 +212,43 @@ export default async function MaterialsPage() {
     new Set(visibleMaterials.map((m) => m.uploader_id)),
   );
 
-  const uploaderEntries = await Promise.all(
-    uniqueUploaderIds.map(async (uploaderId) => {
-      const { data: uploaderData } = await supabase.rpc(
-        "get_public_contact_profile",
-        { p_profile_id: uploaderId },
-      );
-      return [
-        uploaderId,
-        (uploaderData?.[0] ?? null) as Material["uploader"],
-      ] as const;
-    }),
+  const [uploaderEntries, uploaderDeptProfilesResult] = await Promise.all([
+    Promise.all(
+      uniqueUploaderIds.map(async (uploaderId) => {
+        const { data: uploaderData } = await supabase.rpc(
+          "get_public_contact_profile",
+          { p_profile_id: uploaderId },
+        );
+        return [
+          uploaderId,
+          (uploaderData?.[0] ?? null) as Material["uploader"],
+        ] as const;
+      }),
+    ),
+    supabase
+      .from("profiles")
+      .select("id, departments:department_id (name, code)")
+      .in("id", uniqueUploaderIds.length > 0 ? uniqueUploaderIds : ["00000000-0000-0000-0000-000000000000"]),
+  ]);
+
+  const uploaderDeptMap = new Map(
+    (uploaderDeptProfilesResult?.data || []).map((p: any) => [
+      p.id,
+      p.departments?.name || p.departments?.code || null,
+    ]),
   );
 
-  const uploaderMap = new Map(uploaderEntries);
+  const uploaderMap = new Map(
+    uploaderEntries.map(([uid, uData]) => [
+      uid,
+      uData
+        ? {
+            ...uData,
+            department_name: uploaderDeptMap.get(uid) ?? null,
+          }
+        : null,
+    ]),
+  );
 
   const materialList: Material[] = visibleMaterials.map((material) => ({
     ...material,
