@@ -200,10 +200,7 @@ export default function MaterialCard({
       {material.uploader && (
         <div className="mt-4 flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <UploaderContactProfile
-              profile={material.uploader}
-              materialId={material.id}
-            />
+            <UploaderContactProfile profile={material.uploader} materialId={material.id} departmentName={material.uploader.department_name} />
           </div>
           {getDepartmentBadge(material.uploader.department_name)}
         </div>
