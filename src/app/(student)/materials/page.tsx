@@ -217,7 +217,11 @@ export default async function MaterialsPage() {
     new Set(visibleMaterials.map((m) => m.uploader_id)),
   );
 
-  const [uploaderEntries, uploaderDeptProfilesResult] = await Promise.all([
+  const [
+    uploaderEntries,
+    uploaderProfilesResult,
+    allDepartmentsResult,
+  ] = await Promise.all([
     Promise.all(
       uniqueUploaderIds.map(async (uploaderId) => {
         const { data: uploaderData } = await supabase.rpc(
@@ -232,18 +236,25 @@ export default async function MaterialsPage() {
     ),
     rawAdmin
       .from("profiles")
-      .select("id, departments:department_id (name, code)")
+      .select("id, department_id")
       .in("id", uniqueUploaderIds.length > 0 ? uniqueUploaderIds : ["00000000-0000-0000-0000-000000000000"]),
+    rawAdmin
+      .from("departments")
+      .select("id, name, code"),
   ]);
 
+  const deptNameById = new Map<string, string | null>(
+    (allDepartmentsResult?.data || []).map((d) => [
+      d.id,
+      d.name || d.code || null,
+    ]),
+  );
+
   const uploaderDeptMap = new Map<string, string | null>(
-    (uploaderDeptProfilesResult?.data || []).map((p) => {
-      const row = p as { id: string; departments?: { name?: string | null; code?: string | null } | null };
-      return [
-        row.id,
-        row.departments?.name || row.departments?.code || null,
-      ];
-    }),
+    (uploaderProfilesResult?.data || []).map((p) => [
+      p.id,
+      p.department_id ? deptNameById.get(p.department_id) ?? null : null,
+    ]),
   );
 
   const uploaderMap = new Map(
