@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import AuditLogsView from "./AuditLogsView";
 
 type AuditLogRow = {
@@ -44,9 +43,8 @@ export default async function AuditLogsPage() {
     redirect("/");
   }
 
-  const serviceSupabase = createServiceRoleClient();
-
-  const { data: logs, error } = await serviceSupabase
+  
+  const { data: logs, error } = await supabase
     .from("audit_logs")
     .select("id, actor_id, action, target_table, target_id, previous_state, new_state, created_at")
     .order("created_at", { ascending: false })
@@ -61,7 +59,7 @@ export default async function AuditLogsPage() {
 
   const actorMap: Record<string, ActorProfile> = {};
   if (actorIds.length > 0) {
-    const { data: actors } = await serviceSupabase
+    const { data: actors } = await supabase
       .from("profiles")
       .select("id, full_name, email, role")
       .in("id", actorIds);
