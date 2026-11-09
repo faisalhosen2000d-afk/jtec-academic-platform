@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import { getAcademicTermNavigation } from "@/lib/academic-terms";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
@@ -42,10 +41,7 @@ type Material = {
 
 export default async function MaterialsPage() {
   const supabase = await createClient();
-  const rawAdmin = createRawSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  
 
   const {
     data: { user },
@@ -230,8 +226,22 @@ export default async function MaterialsPage() {
         ] as const;
       }),
     ),
-    supabase.rpc("get_uploader_departments", {
-      p_profile_ids: uniqueUploaderIds.length > 0 ? uniqueUploaderIds : ["00000000-0000-0000-0000-000000000000"],
+    (
+      supabase.rpc as unknown as (
+        name: string,
+        args?: Record<string, unknown>
+      ) => Promise<{
+        data: Array<{
+          profile_id: string;
+          department_name?: string | null;
+          department_code?: string | null;
+        }> | null;
+      }>
+    )("get_uploader_departments", {
+      p_profile_ids:
+        uniqueUploaderIds.length > 0
+          ? uniqueUploaderIds
+          : ["00000000-0000-0000-0000-000000000000"],
     }),
   ]);
 
