@@ -230,7 +230,7 @@ export default async function MaterialsPage() {
         ] as const;
       }),
     ),
-    supabase
+    rawAdmin
       .from("profiles")
       .select("id, departments:department_id (name, code)")
       .in("id", uniqueUploaderIds.length > 0 ? uniqueUploaderIds : ["00000000-0000-0000-0000-000000000000"]),
