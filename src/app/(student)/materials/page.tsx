@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import { getAcademicTermNavigation } from "@/lib/academic-terms";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
@@ -41,6 +42,10 @@ type Material = {
 
 export default async function MaterialsPage() {
   const supabase = await createClient();
+  const rawAdmin = createRawSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   const {
     data: { user },
