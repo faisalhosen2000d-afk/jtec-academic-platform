@@ -184,8 +184,11 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
       .order("name", { ascending: true });
 
     if (allBatches && allBatches.length > 1) {
-      const found = allBatches.find((b) => b.id !== currentBatch.id && b.name > currentBatch.name);
-      nextJuniorBatchId = found ? found.id : allBatches[allBatches.length - 1]?.id || null;
+      const getBatchNum = (name: string) => parseInt(name.replace(/\D/g, ""), 10) || 0;
+      const sortedBatches = [...allBatches].sort((a, b) => getBatchNum(a.name) - getBatchNum(b.name));
+      const currNum = getBatchNum(currentBatch.name);
+      const found = sortedBatches.find((b) => b.id !== currentBatch.id && getBatchNum(b.name) > currNum);
+      nextJuniorBatchId = found ? found.id : sortedBatches[sortedBatches.length - 1]?.id || null;
     }
   }
 
@@ -250,7 +253,11 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
         if (isRegistered && nextJuniorBatchId) {
           await adminClient
             .from("profiles")
-            .update({ batch_id: nextJuniorBatchId })
+            .update({
+              batch_id: nextJuniorBatchId,
+              current_level_id: input.level_id,
+              current_term_id: input.term_id,
+            })
             .eq("id", decision.profile_id);
 
           await adminClient.from("student_air_drop_history").insert({
