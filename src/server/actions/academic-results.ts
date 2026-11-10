@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import { createClient as createServerAuthClient } from "@/lib/supabase/server";
@@ -62,8 +62,10 @@ export async function verifyMissingStudentsForBatch(input: {
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const adminClient = createRawSupabaseClient(supabaseUrl, serviceKey);
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const adminClient = serviceKey
+    ? createRawSupabaseClient(supabaseUrl, serviceKey)
+    : authSupabase;
 
   // 1. Fetch registered student profiles in this batch
   const { data: registeredStudents } = await adminClient
@@ -77,24 +79,31 @@ export async function verifyMissingStudentsForBatch(input: {
   const [{ data: allBatchTermRows }, { data: dropHistoryRows }] = await Promise.all([
     adminClient
       .from("term_results")
-      .select("student_id, student_id_code, status, level_term_key")
+      .select("student_id, student_id_code, status, gpa, remarks, level_term_key")
       .eq("department_id", input.department_id)
       .eq("batch_id", input.batch_id),
     adminClient
       .from("student_air_drop_history")
-      .select("student_id_code, dropped_roll, previous_batch_id, dropped_at_level_term, dropped_term"),
+      .select("student_id_code, previous_batch_id, dropped_at_level_term"),
   ]);
 
   const alreadyDroppedRolls = new Set<string>();
   (allBatchTermRows || []).forEach((r) => {
-    if (r.status === "air_dropped" && (!input.level_term_key || r.level_term_key !== input.level_term_key)) {
-      const rl = (r.student_id_code || "").trim().toLowerCase();
+    const isDroppedRow =
+      r.status === "air_dropped" ||
+      r.status === "year_dropped" ||
+      Number(r.gpa) === 0 ||
+      (r.remarks || "").toLowerCase().includes("year drop");
+
+    if (isDroppedRow && (!input.level_term_key || r.level_term_key !== input.level_term_key)) {
+      const rl = (r.student_id_code || "").trim().replace(/\.0+$/, "").toLowerCase();
       if (rl) alreadyDroppedRolls.add(rl);
     }
   });
-  (dropHistoryRows || []).forEach((d: { student_id_code?: string; dropped_roll?: string; dropped_at_level_term?: string; dropped_term?: string }) => {
-    const rl = (d.student_id_code || d.dropped_roll || "").trim().toLowerCase();
-    const dTerm = d.dropped_at_level_term || d.dropped_term;
+
+  (dropHistoryRows || []).forEach((d: { student_id_code?: string; previous_batch_id?: string; dropped_at_level_term?: string }) => {
+    const rl = (d.student_id_code || "").trim().replace(/\.0+$/, "").toLowerCase();
+    const dTerm = d.dropped_at_level_term;
     if (rl && (!input.level_term_key || !dTerm || dTerm !== input.level_term_key)) {
       alreadyDroppedRolls.add(rl);
     }
@@ -104,8 +113,14 @@ export async function verifyMissingStudentsForBatch(input: {
 
   // Add previously known sheet rolls (only if NOT already air-dropped)
   (allBatchTermRows || []).forEach((r) => {
-    if (r.status === "air_dropped") return;
-    const roll = (r.student_id_code || "").trim();
+    const isDroppedRow =
+      r.status === "air_dropped" ||
+      r.status === "year_dropped" ||
+      Number(r.gpa) === 0 ||
+      (r.remarks || "").toLowerCase().includes("year drop");
+    if (isDroppedRow) return;
+
+    const roll = (r.student_id_code || "").trim().replace(/\.0+$/, "");
     const rollLower = roll.toLowerCase();
     if (roll && !alreadyDroppedRolls.has(rollLower)) {
       rosterMap.set(rollLower, {
@@ -119,7 +134,7 @@ export async function verifyMissingStudentsForBatch(input: {
   // Overwrite with real profile names if registered (and not already dropped)
   (registeredStudents || []).forEach((s) => {
     if (s.student_id) {
-      const roll = s.student_id.trim();
+      const roll = s.student_id.trim().replace(/\.0+$/, "");
       const rollLower = roll.toLowerCase();
       if (!alreadyDroppedRolls.has(rollLower)) {
         rosterMap.set(rollLower, {
@@ -166,8 +181,10 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const adminClient = createRawSupabaseClient(supabaseUrl, serviceKey);
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const adminClient = serviceKey
+    ? createRawSupabaseClient(supabaseUrl, serviceKey)
+    : authSupabase;
 
   // Recursive Next Junior Batch lookup: find the next batch in chronological order
   let nextJuniorBatchId: string | null = null;
@@ -241,6 +258,16 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
 
     if (upsertErr) {
       return { error: `Failed to save results: ${upsertErr.message}` };
+    }
+
+    // Sync any registered air-dropped students who just passed this term with the junior batch
+    for (const item of termResultsPayload) {
+      if (item.student_id) {
+        await adminClient.rpc("check_and_sync_air_dropped_student", {
+          target_user_id: item.student_id,
+          target_student_id: item.student_id_code,
+        });
+      }
     }
   }
 
