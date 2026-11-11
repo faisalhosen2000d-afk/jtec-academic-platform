@@ -81,7 +81,7 @@ export async function signUp(
     email: formData.get("email"),
     password: formData.get("password"),
     confirm_password: formData.get("confirm_password"),
-    registration_code: formData.get("registration_code"),
+    registration_code: formData.get("registration_code") || undefined,
   });
 
   if (!parsed.success) {
@@ -102,6 +102,69 @@ export async function signUp(
     registration_code,
   } = parsed.data;
 
+  // Validate ID Card Image
+  const idCardFile = formData.get("id_card_image") as File | null;
+  if (!idCardFile || typeof idCardFile === "string" || idCardFile.size === 0) {
+    return {
+      success: false,
+      error: "Please upload your Student ID Card photo for verification.",
+      fieldErrors: {
+        id_card_image: ["Student ID Card photo is required."],
+      },
+    };
+  }
+
+  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+  if (!allowedTypes.includes(idCardFile.type)) {
+    return {
+      success: false,
+      error: "ID Card photo must be in JPEG, PNG, or WebP format.",
+      fieldErrors: {
+        id_card_image: ["Only JPEG, PNG, or WebP images are allowed."],
+      },
+    };
+  }
+
+  if (idCardFile.size > 5 * 1024 * 1024) {
+    return {
+      success: false,
+      error: "ID Card photo size must be less than 5MB.",
+      fieldErrors: {
+        id_card_image: ["File size must be under 5MB."],
+      },
+    };
+  }
+
+  // Upload image to private storage bucket
+  const ext = idCardFile.name.split(".").pop()?.toLowerCase() || "jpg";
+  const imagePath = `pending/${student_id}_${Date.now()}.${ext}`;
+
+  try {
+    const serviceRole = createServiceRoleClient();
+    const arrayBuffer = await idCardFile.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const { error: uploadError } = await serviceRole.storage
+      .from("student-id-verifications")
+      .upload(imagePath, buffer, {
+        contentType: idCardFile.type,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      return {
+        success: false,
+        error: `Failed to upload ID Card photo: ${uploadError.message}`,
+      };
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return {
+      success: false,
+      error: `Failed to store ID Card photo: ${msg}`,
+    };
+  }
+
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signUp({
@@ -111,7 +174,8 @@ export async function signUp(
       data: {
         full_name,
         student_id,
-        registration_code,
+        id_card_image_path: imagePath,
+        ...(registration_code ? { registration_code } : {}),
       },
 
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,

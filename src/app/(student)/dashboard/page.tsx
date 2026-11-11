@@ -10,6 +10,22 @@ import {
   getStudentVisibleMaterialsCount,
 } from "@/server/services/student-materials";
 
+type DashboardProfileJoin = {
+  student_id: string | null;
+  full_name: string;
+  email: string;
+  department_id: string | null;
+  batch_id: string | null;
+  current_level_id: string | null;
+  current_term_id: string | null;
+  is_verified: boolean;
+  verification_status?: string;
+  departments?: { name: string } | null;
+  batches?: { name: string } | null;
+  levels?: { name: string } | null;
+  terms?: { name: string } | null;
+};
+
 export default async function StudentDashboardPage() {
   const supabase = await createClient();
 
@@ -21,6 +37,7 @@ export default async function StudentDashboardPage() {
     redirect("/login");
   }
 
+  // 1. Single Concurrently-Batched Fetch: Profile with Relational Joins + Notices + Bookmarks
   const [
     profileResult,
     noticesResult,
@@ -36,14 +53,20 @@ export default async function StudentDashboardPage() {
         department_id,
         batch_id,
         current_level_id,
-        current_term_id
+        current_term_id,
+        is_verified,
+        verification_status,
+        departments:department_id (name),
+        batches:batch_id (name),
+        levels:current_level_id (name),
+        terms:current_term_id (name)
       `)
       .eq("id", user.id)
       .single(),
     supabase
       .from("notices")
       .select(
-        "id, title, category_id, content, target_scope, target_department_id, target_batch_id, target_level_id, target_term_id, is_pinned, created_at",
+        "id, title, category_id, content, target_scope, target_department_id, target_batch_id, target_level_id, target_term_id, is_pinned, created_at"
       )
       .eq("is_archived", false)
       .order("is_pinned", { ascending: false })
@@ -55,253 +78,190 @@ export default async function StudentDashboardPage() {
     getStudentBookmarksCount(supabase, user.id),
   ]);
 
-  const { data: profile } = profileResult;
-  const { data: notices, error: noticesError } = noticesResult;
+  const rawProfile = (profileResult.data as unknown) as DashboardProfileJoin | null;
+  const { data: notices } = noticesResult;
   const { data: noticeCategories } = noticeCategoriesResult;
 
-  const [
-    departmentResult,
-    batchResult,
-    levelResult,
-    termResult,
-    materialsCount,
-  ] = await Promise.all([
-    profile?.department_id
-      ? supabase
-          .from("departments")
-          .select("name")
-          .eq("id", profile.department_id)
-          .single()
-      : Promise.resolve({ data: null, error: null }),
-    profile?.batch_id
-      ? supabase
-          .from("batches")
-          .select("name")
-          .eq("id", profile.batch_id)
-          .single()
-      : Promise.resolve({ data: null }),
-    profile?.current_level_id
-      ? supabase
-          .from("levels")
-          .select("name")
-          .eq("id", profile.current_level_id)
-          .single()
-      : Promise.resolve({ data: null }),
-    profile?.current_term_id
-      ? supabase
-          .from("terms")
-          .select("name")
-          .eq("id", profile.current_term_id)
-          .single()
-      : Promise.resolve({ data: null }),
-    profile?.department_id &&
-    profile?.current_level_id &&
-    profile?.current_term_id
-      ? getStudentVisibleMaterialsCount(supabase, {
-          department_id: profile.department_id,
-          current_level_id: profile.current_level_id,
-          current_term_id: profile.current_term_id,
-        })
-      : Promise.resolve(0),
-  ]);
-
-  const { data: department } = departmentResult;
-  const { data: batch } = batchResult;
-  const { data: level } = levelResult;
-  const { data: term } = termResult;
+  const isApprovedStudent = Boolean(
+    rawProfile?.is_verified === true || rawProfile?.verification_status === "approved"
+  );
 
   const studentName =
-    profile?.full_name ||
+    rawProfile?.full_name ||
     user.user_metadata?.full_name ||
     user.email?.split("@")[0] ||
     "Student";
 
   const studentId =
-    profile?.student_id ||
+    rawProfile?.student_id ||
     user.user_metadata?.student_id ||
     "Student";
 
-  const studentEmail = profile?.email || user.email || "-";
+  const studentEmail = rawProfile?.email || user.email || "-";
 
-  const departmentName = department?.name || "Not assigned";
-  const batchName = batch?.name || "Not assigned";
-  const levelName = level?.name || "Not assigned";
-  const termName = term?.name || "Not assigned";
+  const departmentName = rawProfile?.departments?.name || (isApprovedStudent ? "Not assigned" : "Pending Verification");
+  const batchName = rawProfile?.batches?.name || (isApprovedStudent ? "Not assigned" : "Pending Verification");
+  const levelName = rawProfile?.levels?.name || (isApprovedStudent ? "Not assigned" : "Pending Verification");
+  const termName = rawProfile?.terms?.name || (isApprovedStudent ? "Not assigned" : "Pending Verification");
 
-    // Real-time Results & Ranking computation
-    // Auto-check if this student has an unreversed Air Drop record and sync their batch seamlessly!
-  
+  // 2. Performance Optimization: If unverified/pending, skip heavy college-wide result queries
+  let materialsCount = 0;
+  let cardScoreText = isApprovedStudent ? "No Results" : "Pending Verification";
+  let cardRankText = isApprovedStudent ? "Unranked" : "—";
+  let totalPendingRetakes = 0;
+  let lastTerm: { level_term_key: string; gpa: number; cgpa: number | null; status?: string; term_retake_count: number } | null = null;
+  let sortedBatch: Array<{ sid: string; score: number; retakes: number; term: string }> = [];
+  let myIdx = -1;
 
-  const rawAdmin = createRawSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  if (isApprovedStudent && rawProfile?.student_id) {
+    const rawAdmin = createRawSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
-  if (profile?.student_id) {
+    const myCleanRoll = rawProfile.student_id.trim();
+
+    // Run Air-drop sync safely
     try {
       await rawAdmin.rpc("check_and_sync_air_dropped_student", {
         target_user_id: user.id,
-        target_student_id: profile.student_id,
+        target_student_id: rawProfile.student_id,
       });
     } catch {
       // Gracefully continue
     }
-  }
 
-  
-
-  // Auto-check if this student has an unreversed Air Drop record and sync their batch seamlessly!
-  
-
-  
-
-  const myCleanRoll = (profile?.student_id || "").trim();
-  const [resData, rankData] = await Promise.all([
-    rawAdmin
-      .from("term_results")
-      .select("id, level_term_key, gpa, cgpa, status, term_retake_count, level_id, term_id")
-      .or(myCleanRoll ? `student_id.eq.${user.id},student_id_code.eq.${myCleanRoll}` : `student_id.eq.${user.id}`)
-      .order("level_term_key", { ascending: true }),
-
-    rawAdmin
-      .from("term_results")
-      .select("student_id, student_id_code, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count, status")
-      .order("level_term_key", { ascending: true }),
-  ]);
-
-  const rawUserTerms = (resData?.data || []) as Array<{
-    id?: string;
-    level_term_key: string;
-    gpa: number;
-    cgpa: number | null;
-    status?: string;
-    term_retake_count: number;
-    level_id?: string;
-    term_id?: string;
-  }>;
-
-  let firstDropTerm: typeof rawUserTerms[0] | null = null;
-  const userTerms: typeof rawUserTerms = [];
-  for (const t of rawUserTerms) {
-    if (t.status === "air_dropped") {
-      if (!firstDropTerm) {
-        firstDropTerm = t;
-        userTerms.push(t);
-      } else if (t.id) {
-        await rawAdmin.from("term_results").delete().eq("id", t.id);
-      }
-    } else {
-      userTerms.push(t);
-    }
-  }
-
-  const passedUserTerms = userTerms.filter((t) => t.status !== "air_dropped");
-
-  if (firstDropTerm && !passedUserTerms.some((p) => p.level_term_key === firstDropTerm?.level_term_key)) {
-    const [dLvlNum, dTrmNum] = (firstDropTerm.level_term_key || "1-2").split("-");
-    const [{ data: allLvls }, { data: allTrms }] = await Promise.all([
-      rawAdmin.from("levels").select("id, name"),
-      rawAdmin.from("terms").select("id, name"),
+    // Run Materials Count & Results concurrently
+    const [matCount, resData, rankData] = await Promise.all([
+      rawProfile.department_id && rawProfile.current_level_id && rawProfile.current_term_id
+        ? getStudentVisibleMaterialsCount(supabase, {
+            department_id: rawProfile.department_id,
+            current_level_id: rawProfile.current_level_id,
+            current_term_id: rawProfile.current_term_id,
+          })
+        : Promise.resolve(0),
+      rawAdmin
+        .from("term_results")
+        .select("id, level_term_key, gpa, cgpa, status, term_retake_count, level_id, term_id")
+        .or(myCleanRoll ? `student_id.eq.${user.id},student_id_code.eq.${myCleanRoll}` : `student_id.eq.${user.id}`)
+        .order("level_term_key", { ascending: true }),
+      rawAdmin
+        .from("term_results")
+        .select("student_id, student_id_code, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count, status")
+        .order("level_term_key", { ascending: true }),
     ]);
-    const targetLvl = (allLvls || []).find((l: { id: string; name: string }) => l.name.includes(dLvlNum || "1"));
-    const targetTrm = (allTrms || []).find((t: { id: string; name: string }) => t.name.includes(dTrmNum || "2"));
 
-    if (targetLvl && targetTrm && profile && (profile.current_level_id !== targetLvl.id || profile.current_term_id !== targetTrm.id)) {
-      await rawAdmin
-        .from("profiles")
-        .update({
-          current_level_id: targetLvl.id,
-          current_term_id: targetTrm.id,
-        })
-        .eq("id", user.id);
+    materialsCount = matCount || 0;
+
+    const rawUserTerms = (resData?.data || []) as Array<{
+      id?: string;
+      level_term_key: string;
+      gpa: number;
+      cgpa: number | null;
+      status?: string;
+      term_retake_count: number;
+      level_id?: string;
+      term_id?: string;
+    }>;
+
+    let firstDropTerm: typeof rawUserTerms[0] | null = null;
+    const userTerms: typeof rawUserTerms = [];
+    for (const t of rawUserTerms) {
+      if (t.status === "air_dropped") {
+        if (!firstDropTerm) {
+          firstDropTerm = t;
+          userTerms.push(t);
+        }
+      } else {
+        userTerms.push(t);
+      }
     }
-  }
-  const lastPassedTerm = passedUserTerms.length > 0 ? passedUserTerms[passedUserTerms.length - 1] : null;
-  const lastTerm = lastPassedTerm || (userTerms.length > 0 ? userTerms[userTerms.length - 1] : null);
 
-  const cardScoreText = lastPassedTerm
-    ? lastPassedTerm.level_term_key === "1-1"
-      ? `${Number(lastPassedTerm.gpa).toFixed(2)} GPA`
-      : `${Number(lastPassedTerm.cgpa ?? lastPassedTerm.gpa).toFixed(2)} CGPA`
-    : firstDropTerm
-    ? "Year Dropped"
-    : "No Results";
+    const passedUserTerms = userTerms.filter((t) => t.status !== "air_dropped");
+    const lastPassedTerm = passedUserTerms.length > 0 ? passedUserTerms[passedUserTerms.length - 1] : null;
+    lastTerm =
+  lastPassedTerm ??
+  (userTerms.length > 0
+    ? userTerms[userTerms.length - 1] ?? null
+    : null);
 
-  const totalPendingRetakes = firstDropTerm ? 5 : (Number(lastPassedTerm?.term_retake_count) || 0);
+    cardScoreText = lastPassedTerm
+      ? lastPassedTerm.level_term_key === "1-1"
+        ? `${Number(lastPassedTerm.gpa).toFixed(2)} GPA`
+        : `${Number(lastPassedTerm.cgpa ?? lastPassedTerm.gpa).toFixed(2)} CGPA`
+      : firstDropTerm
+      ? "Year Dropped"
+      : "No Results";
 
-  const allBatchRows = (rankData?.data || []) as Array<{
-    student_id: string;
-    student_id_code?: string;
-    department_id: string;
-    batch_id: string;
-    level_term_key: string;
-    gpa: number;
-    cgpa: number | null;
-    term_retake_count: number;
-    status?: string;
-  }>;
+    totalPendingRetakes = firstDropTerm ? 5 : Number(lastPassedTerm?.term_retake_count) || 0;
 
-  const myTargetBatch = profile?.batch_id || (lastTerm ? allBatchRows.find((r) => r.student_id === user.id)?.batch_id : undefined);
-  const myTargetDept = profile?.department_id || (lastTerm ? allBatchRows.find((r) => r.student_id === user.id)?.department_id : undefined);
+    const allBatchRows = (rankData?.data || []) as Array<{
+      student_id: string;
+      student_id_code?: string;
+      department_id: string;
+      batch_id: string;
+      level_term_key: string;
+      gpa: number;
+      cgpa: number | null;
+      term_retake_count: number;
+      status?: string;
+    }>;
 
-  const peerRows = allBatchRows.filter(
-    (r) => r.status !== "air_dropped" && (!myTargetBatch || r.batch_id === myTargetBatch) && (!myTargetDept || r.department_id === myTargetDept)
-  );
+    const myTargetBatch = rawProfile.batch_id || (lastTerm ? allBatchRows.find((r) => r.student_id === user.id)?.batch_id : undefined);
+    const myTargetDept = rawProfile.department_id || (lastTerm ? allBatchRows.find((r) => r.student_id === user.id)?.department_id : undefined);
 
-  const activeRows = peerRows;
-  const pfxMap = new Map<string, number>();
-  activeRows.forEach((row) => {
-    const rk = ((row as { student_id_code?: string }).student_id_code || "").trim();
-    if (rk.length >= 3) pfxMap.set(rk.slice(0, 3), (pfxMap.get(rk.slice(0, 3)) || 0) + 1);
-  });
-  let regPfx = "";
-  let maxPfx = 0;
-  pfxMap.forEach((c, p) => { if (c > maxPfx) { maxPfx = c; regPfx = p; } });
+    const peerRows = allBatchRows.filter(
+      (r) => r.status !== "air_dropped" && (!myTargetBatch || r.batch_id === myTargetBatch) && (!myTargetDept || r.department_id === myTargetDept)
+    );
 
-  const studentBestMap = new Map<string, { score: number; retakes: number; term: string }>();
-  activeRows.forEach((row) => {
-    const rk = ((row as { student_id_code?: string }).student_id_code || "").trim();
-    if (regPfx && rk.length >= 3 && !rk.startsWith(regPfx)) return;
-    const rKey = (row as { student_id_code?: string }).student_id_code || row.student_id; const prev = studentBestMap.get(rKey);
-    if (!prev || row.level_term_key >= prev.term) {
-      const val = row.cgpa !== null && row.level_term_key !== "1-1" ? Number(row.cgpa) : Number(row.gpa);
-      studentBestMap.set((row as { student_id_code?: string }).student_id_code || row.student_id, { score: val, retakes: Number(row.term_retake_count) || 0, term: row.level_term_key });
-    }
-  });
+    const activeRows = peerRows;
+    const pfxMap = new Map<string, number>();
+    activeRows.forEach((row) => {
+      const rk = ((row as { student_id_code?: string }).student_id_code || "").trim();
+      if (rk.length >= 3) pfxMap.set(rk.slice(0, 3), (pfxMap.get(rk.slice(0, 3)) || 0) + 1);
+    });
+    let regPfx = "";
+    let maxPfx = 0;
+    pfxMap.forEach((c, p) => { if (c > maxPfx) { maxPfx = c; regPfx = p; } });
 
-  const currentBatchTerm = lastTerm?.level_term_key || "2-1";
-    const sortedBatch = Array.from(studentBestMap.entries())
+    const studentBestMap = new Map<string, { score: number; retakes: number; term: string }>();
+    activeRows.forEach((row) => {
+      const rk = ((row as { student_id_code?: string }).student_id_code || "").trim();
+      if (regPfx && rk.length >= 3 && !rk.startsWith(regPfx)) return;
+      const rKey = (row as { student_id_code?: string }).student_id_code || row.student_id;
+      const prev = studentBestMap.get(rKey);
+      if (!prev || row.level_term_key >= prev.term) {
+        const val = row.cgpa !== null && row.level_term_key !== "1-1" ? Number(row.cgpa) : Number(row.gpa);
+        studentBestMap.set(rKey, { score: val, retakes: Number(row.term_retake_count) || 0, term: row.level_term_key });
+      }
+    });
+
+    const currentBatchTerm = lastTerm?.level_term_key || "2-1";
+    sortedBatch = Array.from(studentBestMap.entries())
       .filter(([_, d]) => !currentBatchTerm || d.term === currentBatchTerm)
       .map(([sid, d]) => ({ sid, ...d }))
       .sort((a, b) => (b.score !== a.score ? b.score - a.score : a.retakes - b.retakes));
 
-  const myIdx = sortedBatch.findIndex((item) => item.sid === user.id || item.sid === profile?.student_id);
-  const cardRankText = myIdx >= 0 && !firstDropTerm ? `#${myIdx + 1}` : "Unranked";
+    myIdx = sortedBatch.findIndex((item) => item.sid === user.id || item.sid === rawProfile.student_id);
+    cardRankText = myIdx >= 0 && !firstDropTerm ? `#${myIdx + 1}` : "Unranked";
+  }
 
   return (
     <div className="min-h-screen bg-muted/30">
       <div className="flex min-h-screen">
-        {/* Student Sidebar */}
         <StudentSidebar />
 
-        {/* Main Area */}
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Header */}
           <StudentHeader />
 
-          {/* Dashboard Content */}
           <main className="flex-1 p-6">
             <div className="mx-auto w-full max-w-7xl space-y-6">
               {/* Welcome */}
               <section>
-                <p className="text-sm text-muted-foreground">
-                  Welcome back
-                </p>
-
+                <p className="text-sm text-muted-foreground">Welcome back</p>
                 <h2 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
                   Hello, {studentName} &#128075;
                 </h2>
-
                 <p className="mt-1 text-sm text-muted-foreground">
                   Here&apos;s an overview of your academic activity.
                 </p>
@@ -310,54 +270,26 @@ export default async function StudentDashboardPage() {
               {/* Academic Information */}
               <section className="rounded-xl border border-border bg-background p-6 shadow-sm">
                 <div>
-                  <h3 className="font-semibold text-foreground">
-                    Academic Information
-                  </h3>
-
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Your current academic information.
-                  </p>
+                  <h3 className="font-semibold text-foreground">Academic Information</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">Your current academic information.</p>
                 </div>
 
                 <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="rounded-lg border border-border p-4">
-                    <p className="text-xs text-muted-foreground">
-                      Department
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-foreground">
-                      {departmentName}
-                    </p>
+                    <p className="text-xs text-muted-foreground">Department</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">{departmentName}</p>
                   </div>
-
                   <div className="rounded-lg border border-border p-4">
-                    <p className="text-xs text-muted-foreground">
-                      Batch
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-foreground">
-                      {batchName}
-                    </p>
+                    <p className="text-xs text-muted-foreground">Batch</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">{batchName}</p>
                   </div>
-
                   <div className="rounded-lg border border-border p-4">
-                    <p className="text-xs text-muted-foreground">
-                      Level
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-foreground">
-                      {levelName}
-                    </p>
+                    <p className="text-xs text-muted-foreground">Level</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">{levelName}</p>
                   </div>
-
                   <div className="rounded-lg border border-border p-4">
-                    <p className="text-xs text-muted-foreground">
-                      Term
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-foreground">
-                      {termName}
-                    </p>
+                    <p className="text-xs text-muted-foreground">Term</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">{termName}</p>
                   </div>
                 </div>
               </section>
@@ -365,45 +297,23 @@ export default async function StudentDashboardPage() {
               {/* Stats */}
               <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-xl border border-border bg-background p-5 shadow-sm">
-                  <p className="text-sm text-muted-foreground">
-                    Materials
-                  </p>
-
-                  <p className="mt-2 text-3xl font-semibold text-foreground">
-                    {materialsCount}
-                  </p>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Available for you
-                  </p>
+                  <p className="text-sm text-muted-foreground">Materials</p>
+                  <p className="mt-2 text-3xl font-semibold text-foreground">{materialsCount}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Available for you</p>
                 </div>
 
                 <div className="rounded-xl border border-border bg-background p-5 shadow-sm">
-                  <p className="text-sm text-muted-foreground">
-                    Bookmarks
-                  </p>
-
-                  <p className="mt-2 text-3xl font-semibold text-foreground">
-                    {bookmarksCount}
-                  </p>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Saved materials
-                  </p>
+                  <p className="text-sm text-muted-foreground">Bookmarks</p>
+                  <p className="mt-2 text-3xl font-semibold text-foreground">{bookmarksCount || 0}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Saved materials</p>
                 </div>
 
                 <Link
                   href="/results"
                   className="rounded-xl border border-border bg-background p-5 shadow-sm transition hover:border-blue-500/60"
                 >
-                  <p className="text-sm text-muted-foreground">
-                    Results
-                  </p>
-
-                  <p className="mt-2 text-2xl sm:text-3xl font-semibold text-blue-600">
-                    {cardScoreText}
-                  </p>
-
+                  <p className="text-sm text-muted-foreground">Results</p>
+                  <p className="mt-2 text-2xl sm:text-3xl font-semibold text-blue-600">{cardScoreText}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {lastTerm ? `Term ${lastTerm.level_term_key} • ${totalPendingRetakes > 0 ? `${totalPendingRetakes} Retake` : "All Clear"}` : "Academic results"}
                   </p>
@@ -413,14 +323,8 @@ export default async function StudentDashboardPage() {
                   href="/ranking"
                   className="rounded-xl border border-border bg-background p-5 shadow-sm transition hover:border-amber-500/60"
                 >
-                  <p className="text-sm text-muted-foreground">
-                    Ranking
-                  </p>
-
-                  <p className="mt-2 text-2xl sm:text-3xl font-semibold text-amber-600">
-                    {cardRankText}
-                  </p>
-
+                  <p className="text-sm text-muted-foreground">Ranking</p>
+                  <p className="mt-2 text-2xl sm:text-3xl font-semibold text-amber-600">{cardRankText}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {myIdx >= 0 ? `Out of ${sortedBatch.length} in batch` : "Current position"}
                   </p>
@@ -431,15 +335,9 @@ export default async function StudentDashboardPage() {
               <section className="rounded-xl border border-border bg-background p-6 shadow-sm">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h3 className="font-semibold text-foreground">
-                      Notices
-                    </h3>
-
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Recent academic notices relevant to you.
-                    </p>
+                    <h3 className="font-semibold text-foreground">Notices</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">Recent academic notices relevant to you.</p>
                   </div>
-
                   <Link
                     href="/notifications"
                     className="w-fit rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
@@ -449,11 +347,7 @@ export default async function StudentDashboardPage() {
                 </div>
 
                 <div className="mt-5">
-                  {noticesError ? (
-                    <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-                      Notices could not be loaded.
-                    </div>
-                  ) : notices && notices.length > 0 ? (
+                  {notices && notices.length > 0 ? (
                     <NoticeList categories={noticeCategories ?? []}>
                       <div className="divide-y divide-border">
                         {notices.map((notice) => (
@@ -466,17 +360,13 @@ export default async function StudentDashboardPage() {
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <h4 className="font-medium text-foreground">
-                                    {notice.title}
-                                  </h4>
-
+                                  <h4 className="font-medium text-foreground">{notice.title}</h4>
                                   {notice.is_pinned && (
                                     <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium">
                                       Pinned
                                     </span>
                                   )}
                                 </div>
-
                                 <p className="mt-1 text-xs text-muted-foreground">
                                   {new Intl.DateTimeFormat("en-US", {
                                     timeZone: "Asia/Dhaka",
@@ -485,173 +375,17 @@ export default async function StudentDashboardPage() {
                                   }).format(new Date(notice.created_at))}
                                 </p>
                               </div>
-
-                              <Link
-                                href={`/notices/${notice.id}`}
-                                className="w-fit shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                              >
-                                Open
-                              </Link>
                             </div>
-
-                            <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-                              {notice.content}
-                            </p>
                           </div>
                         ))}
                       </div>
                     </NoticeList>
                   ) : (
                     <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                      <p className="font-medium text-foreground">
-                        No notices yet
-                      </p>
-
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        New academic notices relevant to you will appear here.
-                      </p>
+                      <p className="font-medium text-foreground">No notices yet</p>
+                      <p className="mt-1 text-sm text-muted-foreground">New academic notices relevant to you will appear here.</p>
                     </div>
                   )}
-                </div>
-              </section>
-
-              {/* Quick Access */}
-              <section className="grid gap-6 lg:grid-cols-3">
-                <div className="rounded-xl border border-border bg-background p-6 shadow-sm lg:col-span-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-foreground">
-                        Quick Access
-                      </h3>
-
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Quickly access your main academic sections.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <Link
-                      href="/materials"
-                      className="rounded-lg border border-border p-4 transition-colors hover:bg-muted"
-                    >
-                      <p className="font-medium text-foreground">
-                        Study Materials
-                      </p>
-
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Browse available academic materials.
-                      </p>
-                    </Link>
-
-
-
-                    <Link
-                      href="/bookmarks"
-                      className="rounded-lg border border-border p-4 transition-colors hover:bg-muted"
-                    >
-                      <p className="font-medium text-foreground">
-                        Bookmarks
-                      </p>
-
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Open your bookmarked resources.
-                      </p>
-                    </Link>
-
-                    <Link
-                      href="/results"
-                      className="rounded-lg border border-border p-4 transition-colors hover:bg-muted"
-                    >
-                      <p className="font-medium text-foreground">
-                        Results
-                      </p>
-
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        View your academic results.
-                      </p>
-                    </Link>
-
-                    <Link
-                      href="/ranking"
-                      className="rounded-lg border border-border p-4 transition-colors hover:bg-muted"
-                    >
-                      <p className="font-medium text-foreground">
-                        Ranking
-                      </p>
-
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        View academic & contributor rankings.
-                      </p>
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Account */}
-                <div className="rounded-xl border border-border bg-background p-6 shadow-sm">
-                  <h3 className="font-semibold text-foreground">
-                    Account
-                  </h3>
-
-                  <div className="mt-5 space-y-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Student Name
-                      </p>
-
-                      <p className="mt-1 text-sm font-medium text-foreground">
-                        {studentName}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Student ID
-                      </p>
-
-                      <p className="mt-1 text-sm font-medium text-foreground">
-                        {studentId}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Email
-                      </p>
-
-                      <p className="mt-1 break-all text-sm font-medium text-foreground">
-                        {studentEmail}
-                      </p>
-                    </div>
-
-                    <Link
-                      href="/profile"
-                      className="block rounded-lg border border-border px-4 py-2.5 text-center text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                    >
-                      View Profile
-                    </Link>
-                  </div>
-                </div>
-              </section>
-
-              {/* Status */}
-              <section className="rounded-xl border border-border bg-background p-5 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full bg-green-500"
-                    aria-hidden="true"
-                  />
-
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Account session active
-                    </p>
-
-                    <p className="text-xs text-muted-foreground">
-                      You are securely signed in to the JTEC Academic
-                      Platform.
-                    </p>
-                  </div>
                 </div>
               </section>
             </div>

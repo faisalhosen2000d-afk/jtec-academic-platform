@@ -1,29 +1,21 @@
-import { createServerClient } from "@supabase/ssr";
+﻿import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-/**
- * Refreshes the Supabase auth session cookie on every request.
- *
- * IMPORTANT: this middleware is a UX convenience layer only (keeping
- * sessions alive, and — once Phase D/E lands — coarse route-group
- * redirects for unauthenticated users). It is explicitly NOT the
- * authorization boundary. Per the approved security architecture,
- * real enforcement happens via server-side permission checks + RLS +
- * Storage policies. Route-group protection (student/staff redirects)
- * is implemented in Phase D (Authentication) and Phase E
- * (Role/permission system) — intentionally left out of Phase A.
- */
 export async function middleware(request: NextRequest) {
-  // A visitor without a Supabase session cannot have a token to refresh.
-  // Avoiding `getUser()` here is important: it otherwise makes a network
-  // request before every public page (and every Link prefetch) can render.
-  // Supabase stores an auth session in a cookie named
-  // `sb-<project-ref>-auth-token`, optionally split into numbered chunks.
   const hasAuthSession = request.cookies
     .getAll()
     .some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"));
 
   if (!hasAuthSession) {
+    return NextResponse.next({ request });
+  }
+
+  // Avoid blocking network calls to Supabase Auth on Link prefetch requests
+  const isPrefetch =
+    request.headers.get("x-next-router-prefetch") === "1" ||
+    request.headers.get("purpose") === "prefetch";
+
+  if (isPrefetch) {
     return NextResponse.next({ request });
   }
 
@@ -50,8 +42,6 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  // Touches the session so expired tokens are refreshed before any
-  // Server Component/Action runs. No redirect logic yet — Phase D/E.
   await supabase.auth.getUser();
 
   return response;

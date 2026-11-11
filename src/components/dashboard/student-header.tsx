@@ -151,7 +151,7 @@ export function StudentHeader() {
   const handleSignOut = async () => {
     cachedStudentProfile = null;
     await signOut();
-    window.location.href = "/";
+    window.location.href = "/login";
   };
 
   const title =

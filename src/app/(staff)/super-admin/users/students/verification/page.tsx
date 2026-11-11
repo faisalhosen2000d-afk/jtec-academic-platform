@@ -2,9 +2,23 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import { verifyStudent } from "../../actions";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  StudentVerificationClient,
+  type PendingStudentItem,
+} from "@/app/(staff)/admin/students/verification/StudentVerificationClient";
 
-type StudentProfile = {
+export const dynamic = "force-dynamic";
+
+type RegCodeJoinedRow = {
+  student_id: string | null;
+  departments?: { name: string } | null;
+  batches?: { name: string } | null;
+  levels?: { name: string } | null;
+  terms?: { name: string } | null;
+};
+
+type RawStudentRow = {
   id: string;
   full_name: string;
   student_id: string | null;
@@ -12,24 +26,12 @@ type StudentProfile = {
   department_id: string | null;
   batch_id: string | null;
   is_verified: boolean;
+  verification_status?: string;
+  id_card_image_path?: string | null;
   created_at: string;
 };
 
-async function handleVerifyStudent(studentId: string) {
-  "use server";
-
-  await verifyStudent(studentId);
-}
-
-function VerifyButton({ studentId }: { studentId: string }) {
-  return (
-    <form action={handleVerifyStudent.bind(null, studentId)}>
-      <Button type="submit">Verify</Button>
-    </form>
-  );
-}
-
-export default async function StudentVerificationPage() {
+export default async function SuperAdminStudentVerificationPage() {
   const supabase = await createClient();
 
   const {
@@ -47,152 +49,114 @@ export default async function StudentVerificationPage() {
     .maybeSingle();
 
   if (!currentProfile || currentProfile.role !== "super_admin") {
-    redirect("/");
+    redirect("/staff-login");
   }
 
-  const { data, error } = await supabase
+  // 1. Fetch pending students
+  const { data: studentsData } = await supabase
     .from("profiles")
-    .select(
-      "id, full_name, student_id, email, department_id, batch_id, is_verified, created_at",
-    )
+    .select("*")
     .eq("role", "student")
     .eq("is_verified", false)
     .order("created_at", { ascending: true });
 
-  const students = (data ?? []) as StudentProfile[];
+  const rawStudents = ((studentsData ?? []) as unknown) as RawStudentRow[];
+
+  // 2. Fetch matched academic records from registration_codes
+  const studentRolls = rawStudents.map((s) => s.student_id).filter(Boolean) as string[];
+
+  const codeRecordsMap = new Map<string, RegCodeJoinedRow>();
+  if (studentRolls.length > 0) {
+    const { data: regCodes } = await supabase
+      .from("registration_codes")
+      .select(`
+        student_id,
+        department_id,
+        batch_id,
+        level_id,
+        term_id,
+        departments:department_id(name),
+        batches:batch_id(name),
+        levels:level_id(name),
+        terms:term_id(name)
+      `)
+      .in("student_id", studentRolls);
+
+    if (regCodes) {
+      regCodes.forEach((rc) => {
+        if (rc.student_id && !codeRecordsMap.has(rc.student_id)) {
+          codeRecordsMap.set(rc.student_id, rc);
+        }
+      });
+    }
+  }
+
+  // 3. Generate signed URLs for private ID card images
+  const serviceRole = createServiceRoleClient();
+  const enhancedStudents: PendingStudentItem[] = await Promise.all(
+    rawStudents.map(async (st) => {
+      let signedUrl: string | null = null;
+      if (st.id_card_image_path) {
+        try {
+          const { data: urlData } = await serviceRole.storage
+            .from("student-id-verifications")
+            .createSignedUrl(st.id_card_image_path, 600);
+          signedUrl = urlData?.signedUrl ?? null;
+        } catch {
+          signedUrl = null;
+        }
+      }
+
+      const rc = st.student_id ? codeRecordsMap.get(st.student_id) : null;
+
+      return {
+        id: st.id,
+        full_name: st.full_name,
+        student_id: st.student_id,
+        email: st.email,
+        created_at: st.created_at,
+        id_card_image_path: st.id_card_image_path ?? null,
+        id_card_signed_url: signedUrl,
+        matched_record: rc
+          ? {
+              department_name: rc.departments?.name ?? null,
+              batch_name: rc.batches?.name ?? null,
+              level_name: rc.levels?.name ?? null,
+              term_name: rc.terms?.name ?? null,
+            }
+          : null,
+      };
+    })
+  );
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 rounded-xl border border-border bg-card p-6 sm:flex-row sm:items-center sm:justify-between">
+    <main className="min-h-screen bg-[#050811] text-slate-100 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto w-full max-w-7xl space-y-6">
+        <div className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-6 shadow-xl sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="mb-1 text-sm font-medium text-muted-foreground">
-              Super Admin
-            </p>
-
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Student Verification
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                Super Admin Portal
+              </span>
+              <span className="text-xs text-slate-500">•</span>
+              <span className="text-xs text-slate-400 font-medium">Global Student Verification</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight">
+              Student ID Card Verification
             </h1>
-
-            <p className="mt-2 text-sm text-muted-foreground">
-              Review student accounts that are waiting for verification.
+            <p className="mt-1 text-xs text-slate-400 max-w-2xl">
+              Inspect student identity cards across all departments, verify against institutional student records, and approve to unlock academic access.
             </p>
           </div>
 
           <Link href="/super-admin/users/students">
-            <Button variant="outline">Back to Students</Button>
+            <Button className="rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:border-amber-400 hover:text-white">
+              Back to Student Management
+            </Button>
           </Link>
         </div>
 
-        {/* Summary */}
-        <section className="mb-6">
-          <div className="rounded-xl border border-border bg-card p-5">
-            <p className="text-sm text-muted-foreground">
-              Students awaiting verification
-            </p>
-
-            <p className="mt-1 text-2xl font-bold">{students.length}</p>
-          </div>
-        </section>
-
-        {/* Pending Students */}
-        <section className="rounded-xl border border-border bg-card shadow-sm">
-          <div className="border-b border-border p-5">
-            <h2 className="text-lg font-semibold">
-              Pending Student Accounts
-            </h2>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              These student accounts have not yet been verified.
-            </p>
-          </div>
-
-          {error ? (
-            <div className="p-5">
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-                <p className="text-sm font-medium text-destructive">
-                  Unable to load pending student accounts.
-                </p>
-
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Please try again after checking the database connection and
-                  permissions.
-                </p>
-              </div>
-            </div>
-          ) : students.length === 0 ? (
-            <div className="p-8 text-center">
-              <h3 className="text-base font-semibold">
-                No pending students
-              </h3>
-
-              <p className="mt-2 text-sm text-muted-foreground">
-                There are currently no student accounts waiting for
-                verification.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[850px] text-left text-sm">
-                <thead className="border-b border-border bg-muted/40">
-                  <tr>
-                    <th className="px-5 py-3 font-semibold">Student</th>
-                    <th className="px-5 py-3 font-semibold">Student ID</th>
-                    <th className="px-5 py-3 font-semibold">Email</th>
-                    <th className="px-5 py-3 font-semibold">Department</th>
-                    <th className="px-5 py-3 font-semibold">Registered</th>
-                    <th className="px-5 py-3 font-semibold">Action</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {students.map((student) => (
-                    <tr
-                      key={student.id}
-                      className="border-b border-border last:border-b-0"
-                    >
-                      <td className="px-5 py-4">
-                        <div className="font-medium">{student.full_name}</div>
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {student.student_id ?? "—"}
-                      </td>
-
-                      <td className="px-5 py-4">{student.email}</td>
-
-                      <td className="px-5 py-4">
-                        {student.department_id ?? "—"}
-                      </td>
-
-                      <td className="px-5 py-4 text-muted-foreground">
-                        {new Date(student.created_at).toLocaleDateString(
-                          "en-GB",
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <VerifyButton studentId={student.id} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        {/* Security Note */}
-        <section className="mt-8 rounded-xl border border-border bg-muted/40 p-5">
-          <h2 className="text-base font-semibold">Verification Control</h2>
-
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Student verification uses the existing server-side verification
-            function and its permission checks. The interface does not bypass
-            database Row Level Security (RLS).
-          </p>
-        </section>
+        <StudentVerificationClient students={enhancedStudents} />
       </div>
     </main>
   );
