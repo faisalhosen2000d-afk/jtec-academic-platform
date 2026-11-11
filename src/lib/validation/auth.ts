@@ -94,10 +94,7 @@ export const registerSchema = z
       .string()
       .min(1, "Please confirm your password."),
 
-    registration_code: z
-      .string()
-      .trim()
-      .min(1, "A registration code is required."),
+    registration_code: z.string().trim().optional(),
   })
   .refine((data) => data.password === data.confirm_password, {
     message: "Passwords do not match.",

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useState, useRef, useActionState } from "react";
@@ -24,8 +24,12 @@ const initialState: AuthActionResult = { success: false, error: "" };
 
 export default function RegisterPage() {
   const [state, formAction, isPending] = useActionState(
-    async (_prevState: AuthActionResult, formData: FormData) =>
-      signUp(formData),
+    async (_prevState: AuthActionResult, formData: FormData) => {
+      if (idCardFile) {
+        formData.set("id_card_image", idCardFile);
+      }
+      return signUp(formData);
+    },
     initialState,
   );
 
