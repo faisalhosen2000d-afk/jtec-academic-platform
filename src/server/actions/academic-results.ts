@@ -41,6 +41,30 @@ export interface UploadBatchResultsInput {
   missing_decisions?: MissingStudentDecision[];
 }
 
+interface BatchTermRow {
+  student_id?: string | null;
+  student_id_code?: string | null;
+  status?: string | null;
+  gpa?: number | null;
+  remarks?: string | null;
+  level_term_key?: string | null;
+}
+
+interface DropHistoryRow {
+  student_id_code?: string | null;
+  previous_batch_id?: string | null;
+  dropped_at_level_term?: string | null;
+}
+
+interface RegisteredStudentRow {
+  id: string;
+  full_name?: string | null;
+  student_id?: string | null;
+  email?: string | null;
+  batch_id?: string | null;
+  department_id?: string | null;
+}
+
 export async function verifyMissingStudentsForBatch(input: {
   department_id: string;
   batch_id: string;
@@ -86,7 +110,7 @@ export async function verifyMissingStudentsForBatch(input: {
   ]);
 
   const alreadyDroppedRolls = new Set<string>();
-  (allBatchTermRows || []).forEach((r: any) => {
+  ((allBatchTermRows as BatchTermRow[]) || []).forEach((r) => {
     const isDroppedRow =
       r.status === "air_dropped" ||
       r.status === "year_dropped" ||
@@ -99,7 +123,7 @@ export async function verifyMissingStudentsForBatch(input: {
     }
   });
 
-  (dropHistoryRows || []).forEach((d: any) => {
+  ((dropHistoryRows as DropHistoryRow[]) || []).forEach((d) => {
     const rl = (d.student_id_code || "").trim().replace(/\.0+$/, "").toLowerCase();
     const dTerm = d.dropped_at_level_term;
     if (rl && (!input.level_term_key || !dTerm || dTerm !== input.level_term_key)) {
@@ -110,7 +134,7 @@ export async function verifyMissingStudentsForBatch(input: {
   const rosterMap = new Map<string, { id?: string; student_id: string; full_name?: string }>();
 
   // Add previously known sheet rolls (only if NOT already air-dropped)
-  (allBatchTermRows || []).forEach((r: any) => {
+  ((allBatchTermRows as BatchTermRow[]) || []).forEach((r) => {
     const isDroppedRow =
       r.status === "air_dropped" ||
       r.status === "year_dropped" ||
@@ -130,7 +154,7 @@ export async function verifyMissingStudentsForBatch(input: {
   });
 
   // Overwrite with real profile names if registered (and not already dropped)
-  (registeredStudents || []).forEach((s: any) => {
+  ((registeredStudents as RegisteredStudentRow[]) || []).forEach((s) => {
     if (s.student_id) {
       const roll = s.student_id.trim().replace(/\.0+$/, "");
       const rollLower = roll.toLowerCase();
@@ -257,9 +281,12 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
     }
 
     // Sync any registered air-dropped students who just passed this term with the junior batch
+    const rpcClient = adminClient as unknown as {
+      rpc: (fn: string, args: Record<string, unknown>) => Promise<unknown>;
+    };
     for (const item of termResultsPayload) {
       if (item.student_id) {
-        await (adminClient as any).rpc("check_and_sync_air_dropped_student", {
+        await rpcClient.rpc("check_and_sync_air_dropped_student", {
           target_user_id: item.student_id,
           target_student_id: item.student_id_code,
         });
