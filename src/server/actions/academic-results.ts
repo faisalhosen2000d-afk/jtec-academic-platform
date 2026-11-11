@@ -62,10 +62,8 @@ export async function verifyMissingStudentsForBatch(input: {
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const adminClient = serviceKey
-    ? createRawSupabaseClient(supabaseUrl, serviceKey)
-    : authSupabase;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const adminClient = createRawSupabaseClient(supabaseUrl, serviceKey);
 
   // 1. Fetch registered student profiles in this batch
   const { data: registeredStudents } = await adminClient
@@ -88,7 +86,7 @@ export async function verifyMissingStudentsForBatch(input: {
   ]);
 
   const alreadyDroppedRolls = new Set<string>();
-  (allBatchTermRows || []).forEach((r) => {
+  (allBatchTermRows || []).forEach((r: any) => {
     const isDroppedRow =
       r.status === "air_dropped" ||
       r.status === "year_dropped" ||
@@ -101,7 +99,7 @@ export async function verifyMissingStudentsForBatch(input: {
     }
   });
 
-  (dropHistoryRows || []).forEach((d: { student_id_code?: string; previous_batch_id?: string; dropped_at_level_term?: string }) => {
+  (dropHistoryRows || []).forEach((d: any) => {
     const rl = (d.student_id_code || "").trim().replace(/\.0+$/, "").toLowerCase();
     const dTerm = d.dropped_at_level_term;
     if (rl && (!input.level_term_key || !dTerm || dTerm !== input.level_term_key)) {
@@ -112,7 +110,7 @@ export async function verifyMissingStudentsForBatch(input: {
   const rosterMap = new Map<string, { id?: string; student_id: string; full_name?: string }>();
 
   // Add previously known sheet rolls (only if NOT already air-dropped)
-  (allBatchTermRows || []).forEach((r) => {
+  (allBatchTermRows || []).forEach((r: any) => {
     const isDroppedRow =
       r.status === "air_dropped" ||
       r.status === "year_dropped" ||
@@ -132,7 +130,7 @@ export async function verifyMissingStudentsForBatch(input: {
   });
 
   // Overwrite with real profile names if registered (and not already dropped)
-  (registeredStudents || []).forEach((s) => {
+  (registeredStudents || []).forEach((s: any) => {
     if (s.student_id) {
       const roll = s.student_id.trim().replace(/\.0+$/, "");
       const rollLower = roll.toLowerCase();
@@ -181,10 +179,8 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const adminClient = serviceKey
-    ? createRawSupabaseClient(supabaseUrl, serviceKey)
-    : authSupabase;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const adminClient = createRawSupabaseClient(supabaseUrl, serviceKey);
 
   // Recursive Next Junior Batch lookup: find the next batch in chronological order
   let nextJuniorBatchId: string | null = null;
@@ -263,7 +259,7 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
     // Sync any registered air-dropped students who just passed this term with the junior batch
     for (const item of termResultsPayload) {
       if (item.student_id) {
-        await adminClient.rpc("check_and_sync_air_dropped_student", {
+        await (adminClient as any).rpc("check_and_sync_air_dropped_student", {
           target_user_id: item.student_id,
           target_student_id: item.student_id_code,
         });
