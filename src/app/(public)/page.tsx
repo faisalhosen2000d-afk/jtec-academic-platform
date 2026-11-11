@@ -27,7 +27,6 @@ interface NoticeItem {
   title: string;
   content?: string | null;
   created_at?: string | null;
-  category?: string | null;
 }
 
 export default async function JtecLandingPage() {
@@ -36,7 +35,7 @@ export default async function JtecLandingPage() {
     const supabase = await createClient();
     const { data } = await supabase
       .from("notices")
-      .select("id, title, content, created_at, category")
+      .select("id, title, content, created_at")
       .eq("is_published", true)
       .order("created_at", { ascending: false })
       .limit(3);
@@ -360,7 +359,7 @@ export default async function JtecLandingPage() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950/40 text-red-300 border border-red-500/30">
-                          {n.category || "Official"}
+                          Official Notice
                         </span>
                         <span className="text-xs text-slate-500">
                           {n.created_at ? new Date(n.created_at).toLocaleDateString() : "Recent"}
@@ -393,7 +392,7 @@ export default async function JtecLandingPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950/40 text-red-300 border border-red-500/30">
-                        Examination
+                        Official Notice
                       </span>
                       <span className="text-xs text-slate-500">Official Bulletin</span>
                     </div>
