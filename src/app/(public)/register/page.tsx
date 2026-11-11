@@ -377,7 +377,7 @@ export default function RegisterPage() {
                         </label>
                       </div>
                       <p className="text-[11px] text-slate-500 pl-1">
-                        You'll receive verification alerts and password recovery links at this email.
+                        You will receive verification alerts and password recovery links at this email.
                       </p>
                       {fieldErrors?.email?.[0] && (
                         <p className="text-xs text-rose-400 mt-1 pl-1 font-semibold">{fieldErrors.email[0]}</p>
