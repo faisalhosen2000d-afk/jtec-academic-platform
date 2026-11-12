@@ -449,34 +449,41 @@ export default function AcademicProgressionPanel({
               values.
             </p>
           ) : (
-            <div className="mt-4 max-h-80 overflow-y-auto rounded-xl border border-slate-800/90 bg-[#060A12]/70">
-              <table className="w-full text-left text-xs">
-                <thead className="sticky top-0 border-b border-slate-800 bg-[#0A1020] text-[11px] uppercase tracking-wider text-slate-400">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Student</th>
-                    <th className="px-4 py-3 font-semibold">Student ID</th>
-                    <th className="px-4 py-3 font-semibold">Email</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {cohort.map((student) => (
-                    <tr
-                      key={student.id}
-                      className="transition-colors hover:bg-slate-900/50"
-                    >
-                      <td className="px-4 py-3 font-semibold text-white">
-                        {student.full_name || "Unnamed student"}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-slate-300">
-                        {student.student_id || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-slate-400">
-                        {student.email || "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-4 max-h-80 space-y-2.5 overflow-y-auto pr-1">
+              {cohort.map((student) => {
+                const name = student.full_name || "Unnamed student";
+                const initials = name
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((part) => part[0]?.toUpperCase() ?? "")
+                  .join("") || "ST";
+
+                return (
+                  <div
+                    key={student.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800/90 bg-[#060A12]/85 px-4 py-3 transition-all hover:border-violet-500/45 hover:bg-slate-900/50"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-violet-500/40 bg-violet-500/15 text-xs font-bold text-violet-200 shadow-[0_0_12px_rgba(139,92,246,0.2)]">
+                        {initials}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">
+                          {name}
+                        </p>
+                        <p className="truncate text-[11px] text-slate-400">
+                          {student.email || "—"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className="shrink-0 rounded-lg border border-slate-700/80 bg-slate-900/90 px-2.5 py-1 font-mono text-xs font-medium text-slate-200">
+                      Roll: {student.student_id || "—"}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>
