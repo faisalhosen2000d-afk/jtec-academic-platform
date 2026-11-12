@@ -86,7 +86,7 @@ export default function ReviewFileActions({
           type="button"
           onClick={handleOpenFile}
           disabled={loading}
-          className="rounded-lg border border-border bg-background px-4 py-2 text-xs font-semibold text-slate-200 transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-xl bg-gradient-to-r from-sky-500 to-sky-600 px-4 py-2 text-xs font-bold text-slate-950 shadow-md transition hover:from-sky-400 hover:to-sky-500 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
         >
           {loading ? "Opening..." : "Open File"}
         </button>

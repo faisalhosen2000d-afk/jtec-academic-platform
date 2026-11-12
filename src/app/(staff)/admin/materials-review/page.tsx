@@ -237,9 +237,9 @@ export default async function AdminMaterialsReviewPage() {
               return (
                 <article
                   key={material.id}
-                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl transition-all hover:border-sky-500/40"
+                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-sky-500/50 hover:shadow-[0_0_30px_rgba(56,189,248,0.12)]"
                 >
-                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-500/50 to-transparent opacity-60 transition-opacity group-hover:opacity-100" />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-sky-500/10 via-transparent to-amber-500/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" /><div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-500/50 to-transparent opacity-60 transition-opacity group-hover:opacity-100" />
 
                   <div>
                     {/* Badges Top Row */}
@@ -294,11 +294,7 @@ export default async function AdminMaterialsReviewPage() {
                       </span>
                       <span className="inline-flex items-center gap-1.5">
                         <Calendar className="h-3.5 w-3.5 text-slate-500" />
-                        {new Date(material.created_at).toLocaleDateString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {new Date(material.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Dhaka" })}
                       </span>
                     </div>
                   </div>
