@@ -1066,6 +1066,107 @@ export type BulkNoticeDeleteResult =
       error: string;
     };
 
+export type BulkNoticePreviewItem = {
+  id: string;
+  title: string;
+  created_at: string;
+  attachments: string[];
+};
+
+export type BulkNoticePreviewResult =
+  | { success: true; items: BulkNoticePreviewItem[] }
+  | { success: false; error: string };
+
+export async function previewBulkDeleteNotices(
+  fromDate: string,
+  toDate: string,
+): Promise<BulkNoticePreviewResult> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "You must be logged in." };
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id, role")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile) {
+      return { success: false, error: "Profile not verified." };
+    }
+
+    if (profile.role === "admin") {
+      const { data: deleteScope } = await supabase
+        .from("staff_scopes")
+        .select("id")
+        .eq("profile_id", user.id)
+        .eq("can_delete_notices", true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!deleteScope) {
+        return { success: false, error: "No delete permission." };
+      }
+    } else if (profile.role !== "super_admin") {
+      return { success: false, error: "Unauthorized." };
+    }
+
+    if (!fromDate || !toDate || fromDate > toDate) {
+      return { success: false, error: "Please provide a valid date range." };
+    }
+
+    const serviceSupabase = createServiceRoleClient();
+    const startDate = `${fromDate}T00:00:00`;
+    const endDate = `${toDate}T23:59:59.999`;
+
+    const { data: notices, error: noticesError } = await serviceSupabase
+      .from("notices")
+      .select("id, title, created_at")
+      .gte("created_at", startDate)
+      .lte("created_at", endDate)
+      .order("created_at", { ascending: false });
+
+    if (noticesError) {
+      return { success: false, error: "Could not load notice preview." };
+    }
+
+    if (!notices || notices.length === 0) {
+      return { success: true, items: [] };
+    }
+
+    const noticeIds = notices.map((n) => n.id);
+    const { data: attachmentRows } = await serviceSupabase
+      .from("notice_attachments")
+      .select("notice_id, file_path")
+      .in("notice_id", noticeIds);
+
+    const attachmentsByNotice = new Map<string, string[]>();
+    for (const row of attachmentRows ?? []) {
+      const fileName = row.file_path.split("/").pop() || row.file_path;
+      const existing = attachmentsByNotice.get(row.notice_id) ?? [];
+      existing.push(fileName);
+      attachmentsByNotice.set(row.notice_id, existing);
+    }
+
+    return {
+      success: true,
+      items: notices.map((n) => ({
+        id: n.id,
+        title: n.title,
+        created_at: n.created_at,
+        attachments: attachmentsByNotice.get(n.id) ?? [],
+      })),
+    };
+  } catch {
+    return { success: false, error: "Failed to load preview." };
+  }
+}
 export async function bulkDeleteNotices(
   fromDate: string,
   toDate: string,
