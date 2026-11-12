@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
@@ -53,22 +53,7 @@ export default async function AdminStudentsPage() {
             </p>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
-            <div className="flex flex-col rounded-xl border border-border bg-card p-5 shadow-sm">
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold">Student Verification</h3>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Review and verify student accounts according to the Admin permission scope.
-                </p>
-              </div>
-
-              <div className="mt-5">
-                <Link href="/admin/students/verification">
-                  <Button className="w-full">Manage Student Verification</Button>
-                </Link>
-              </div>
-            </div>
-
+          <div className="grid gap-5 max-w-xl">
             <div className="flex flex-col rounded-xl border border-border bg-card p-5 shadow-sm">
               <div className="flex-1">
                 <h3 className="text-lg font-semibold">
