@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, Info, KeyRound, Plus } from "lucide-react";
+import { Check, ChevronDown, Info, KeyRound, Sparkles } from "lucide-react";
 import { createRegistrationCode } from "./actions";
 import { ModernDateTimePicker } from "@/components/ui/ModernDateTimePicker";
 
@@ -289,7 +289,7 @@ export function RegistrationCodeForm({
             disabled={!ready}
             className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-500 px-5 text-xs font-bold text-slate-950 shadow-[0_0_22px_rgba(6,182,212,0.3)] transition-all duration-150 hover:from-cyan-300 hover:to-cyan-400 hover:shadow-[0_0_28px_rgba(6,182,212,0.5)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
           >
-            <Plus className="h-4 w-4" />
+            <Sparkles className="h-4 w-4" />
             <span>Generate Registration Code</span>
           </button>
         </div>
