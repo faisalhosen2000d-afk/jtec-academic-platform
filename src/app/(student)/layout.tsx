@@ -1,4 +1,4 @@
-﻿import { ReactNode } from "react";
+import { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -80,7 +80,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
           className={`w-full border-b px-4 py-2.5 text-xs transition-colors z-40 relative flex items-center justify-between ${
             isRejected
               ? "bg-red-950/80 border-red-500/40 text-red-200"
-              : "bg-amber-950/60 border-amber-500/30 text-amber-200"
+              : "bg-amber-950/60 border-b border-amber-500/30 shadow-md text-amber-200"
           }`}
         >
           <div className="flex items-center gap-2 max-w-4xl">
