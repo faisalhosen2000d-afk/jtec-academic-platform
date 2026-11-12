@@ -514,7 +514,7 @@ export default function ModernAuthCard({
                   </div>
                 </div>
 
-                <div className="relative flex h-12 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-800/80 bg-[#060A12]/80 px-1.5">
+                <div className={`relative flex h-12 w-full items-center justify-center rounded-xl transition-all duration-300 ${studentReady ? "border-transparent bg-transparent" : "overflow-hidden border border-slate-800/80 bg-[#060A12]/80 px-1.5"}`}>
                   {!studentReady && (
                     <span className="pointer-events-none select-none text-[11px] font-medium text-slate-500">
                       Fill ID &amp; password to unlock
@@ -528,7 +528,7 @@ export default function ModernAuthCard({
                     }}
                     className={
                       studentReady
-                        ? `${studentSubmitCls} h-10 w-full transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(220,38,38,0.5)] active:scale-95`
+                        ? `${studentSubmitCls} h-12 w-full transition-all duration-200 hover:brightness-110 hover:shadow-[0_0_28px_rgba(220,38,38,0.55)] active:scale-[0.98]`
                         : `absolute h-9 w-40 cursor-not-allowed rounded-lg border border-slate-700 bg-slate-900/95 text-xs font-semibold text-slate-300 shadow-lg transition-transform duration-300 ease-out ${
                             dodgeSide === 1 ? "translate-x-[68px]" : "-translate-x-[68px]"
                           }`
@@ -619,7 +619,7 @@ export default function ModernAuthCard({
                   </div>
                 </div>
 
-                <div className="relative flex h-12 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-800/80 bg-[#060A12]/80 px-1.5">
+                <div className={`relative flex h-12 w-full items-center justify-center rounded-xl transition-all duration-300 ${staffReady ? "border-transparent bg-transparent" : "overflow-hidden border border-slate-800/80 bg-[#060A12]/80 px-1.5"}`}>
                   {!staffReady && (
                     <span className="pointer-events-none select-none text-[11px] font-medium text-slate-500">
                       Fill email &amp; password to unlock
@@ -633,7 +633,7 @@ export default function ModernAuthCard({
                     }}
                     className={
                       staffReady
-                        ? `${staffSubmitCls} h-10 w-full transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] active:scale-95`
+                        ? `${staffSubmitCls} h-12 w-full transition-all duration-200 hover:brightness-110 hover:shadow-[0_0_28px_rgba(245,158,11,0.55)] active:scale-[0.98]`
                         : `absolute h-9 w-40 cursor-not-allowed rounded-lg border border-slate-700 bg-slate-900/95 text-xs font-semibold text-slate-300 shadow-lg transition-transform duration-300 ease-out ${
                             dodgeSide === 1 ? "translate-x-[68px]" : "-translate-x-[68px]"
                           }`
