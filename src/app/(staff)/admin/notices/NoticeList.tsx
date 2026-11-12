@@ -148,7 +148,7 @@ export default function NoticeList({
         
       </div>
 
-      <div className="divide-y divide-slate-800">
+      <div className="space-y-3 p-4">
         {children}
       </div>
 
@@ -167,16 +167,16 @@ export default function NoticeList({
               type="button"
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage === 1}
-              className="rounded-lg border border-slate-800 px-3 py-1.5 font-medium hover:bg-slate-900 disabled:opacity-40"
+              className="cursor-pointer rounded-lg border border-slate-700/80 bg-slate-900/70 px-3 py-1.5 font-medium text-slate-200 transition-colors hover:border-cyan-500/50 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Previous
             </button>
-            <span className="px-2 font-medium">Page {currentPage} of {totalPages}</span>
+            <span className="px-2 font-medium text-slate-300">Page {currentPage} of {totalPages}</span>
             <button
               type="button"
               onClick={() => goToPage(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="rounded-lg border border-slate-800 px-3 py-1.5 font-medium hover:bg-slate-900 disabled:opacity-40"
+              className="cursor-pointer rounded-lg border border-slate-700/80 bg-slate-900/70 px-3 py-1.5 font-medium text-slate-200 transition-colors hover:border-cyan-500/50 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Next
             </button>

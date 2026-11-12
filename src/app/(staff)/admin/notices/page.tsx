@@ -189,7 +189,7 @@ export default async function AdminNoticesPage() {
           />
         </section>
 
-        <section className="lg:col-span-7 rounded-2xl border border-slate-800/90 bg-gradient-to-b from-cyan-950/25 via-[#0A1020] to-[#0A1020] shadow-xl">
+        <section className="lg:col-span-7 rounded-2xl border border-cyan-500/35 bg-gradient-to-b from-cyan-950/20 via-[#0A1020] to-[#0A1020] shadow-[0_0_35px_rgba(6,182,212,0.08)] transition-all duration-300 hover:border-cyan-400/60 hover:shadow-[0_0_50px_rgba(6,182,212,0.2)]">
           <div className="flex flex-col gap-4 border-b border-slate-800/80 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-semibold">Published Notices</h2>
@@ -209,12 +209,12 @@ export default async function AdminNoticesPage() {
                 key={notice.id}
                 data-notice-search={`${notice.title} ${notice.content} ${categoryName}`}
                 data-notice-category={notice.category_id ?? ""}
-                className="divide-y divide-border"
+                className={`rounded-xl border transition-all duration-200 ${notice.is_pinned ? "border-amber-500/40 bg-amber-500/[0.04] hover:border-amber-400/70 hover:shadow-[0_0_24px_rgba(245,158,11,0.14)]" : "border-slate-800/90 bg-slate-950/40 hover:border-cyan-500/45 hover:shadow-[0_0_22px_rgba(6,182,212,0.12)]"}`}
               >
-                <div className="p-6">
+                <div className="p-5">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <h3 className="font-semibold">{notice.title}</h3>
+                      <h3 className="font-semibold text-white">{notice.title}</h3>
 
                       <p className="mt-1 text-xs text-slate-400">
                         {new Intl.DateTimeFormat("en-US", {
@@ -237,18 +237,18 @@ export default async function AdminNoticesPage() {
                           value={notice.id}
                         />
 
-                        <Button type="submit" variant="outline">
+                        <button type="submit" className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all ${notice.is_pinned ? "border-amber-500/40 bg-amber-500/15 text-amber-300 hover:border-amber-400 hover:bg-amber-500/25" : "border-cyan-500/35 bg-cyan-500/10 text-cyan-300 hover:border-cyan-400 hover:bg-cyan-500/20"}`}>
                           {notice.is_pinned ? "Unpin" : "Pin"}
-                        </Button>
+                        </button>
                       </form>
 
                       {notice.is_pinned && (
                         <>
-                          <span className="rounded-full border border-slate-800 px-2 py-1">
+                          <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-300">
                             Pinned
                           </span>
 
-                          <span className="rounded-full border border-slate-800 px-2 py-1">
+                          <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-300">
                             Pinned by:{" "}
                             {pinnerNameById.get(notice.pinned_by ?? "") ??
                               "JTEC Administrator"}
@@ -264,7 +264,7 @@ export default async function AdminNoticesPage() {
                       )}
 
                       {notice.is_archived && (
-                        <span className="rounded-full border border-slate-800 px-2 py-1">
+                        <span className="rounded-full border border-slate-700/80 bg-slate-900/80 px-2.5 py-0.5 text-[11px] font-medium text-slate-300">
                           Archived
                         </span>
                       )}
