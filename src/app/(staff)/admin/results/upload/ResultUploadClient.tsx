@@ -375,14 +375,15 @@ export default function ResultUploadClient({ departments, batches, levels, terms
         </div>
       )}
 
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
       {/* Target Level & Batch Selector */}
-      <div className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-4">
+      <div className="lg:col-span-5 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-5">
         <h2 className="text-base font-bold flex items-center gap-2">
           <FileText className="w-5 h-5 text-emerald-400" />
           1. Select Target Department, Batch & Term
         </h2>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase">Department</label>
             <ModernDropdown value={selectedDept} onChange={setSelectedDept} placeholder="Select Department" options={departments.map((d) => ({ value: d.id, label: `${d.name} (${d.code})` }))} />
@@ -419,7 +420,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
       </div>
 
       {/* Excel / CSV Upload Zone & Paste Area */}
-      <div className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-5">
+      <div className="lg:col-span-7 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-bold flex items-center gap-2">
@@ -435,7 +436,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
             type="button"
             variant="outline"
             onClick={handleDownloadTemplate}
-            className="text-xs h-9 px-3 gap-1.5 self-start sm:self-auto"
+            className="text-xs h-9 px-3 gap-1.5 self-start sm:self-auto border-slate-700 bg-slate-900 text-slate-200 hover:border-emerald-500/50 hover:bg-slate-800 hover:text-white cursor-pointer"
           >
             <Download className="w-4 h-4 text-slate-400" />
             Download Excel Template (.csv)
@@ -445,7 +446,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
         {/* Drag & Drop File Box */}
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 rounded-2xl p-6 text-center cursor-pointer transition bg-slate-50/50 dark:bg-slate-900/40"
+          className="border-2 border-dashed border-slate-700 hover:border-emerald-500/60 rounded-2xl p-6 text-center cursor-pointer transition bg-slate-950/70 hover:bg-slate-900/80"
         >
           <input
             type="file"
@@ -455,7 +456,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
             className="hidden"
           />
           <FileSpreadsheet className="w-10 h-10 mx-auto text-emerald-400 mb-2" />
-          <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
+          <div className="text-sm font-bold text-slate-200">
             {uploadedFileName ? `Selected: ${uploadedFileName}` : "Click to select or drop your Excel/CSV result file here"}
           </div>
           <p className="text-xs text-slate-400 mt-1">
@@ -478,36 +479,37 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                 ? "StudentID\tGPA\tRetakes\n24060401001\t3.85\t0\n24060401002\t3.42\t1\n24060401021\t3.92\t0"
                 : "StudentID\tGPA\tCGPA\tRetakes\n24060401001\t3.85\t3.80\t0\n24060401002\t3.42\t3.45\t1\n24060401021\t3.92\t3.90\t0"
             }
-            className="w-full p-4 rounded-xl border bg-slate-950 border-slate-700/80 text-slate-200 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+            className="w-full p-4 rounded-xl border bg-slate-950 border-slate-700/80 text-slate-200 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-          <Button onClick={handleTextParse} variant="outline" className="text-xs h-10 px-4">
+          <Button onClick={handleTextParse} variant="outline" className="text-xs h-10 px-4 border-slate-700 bg-slate-900 text-slate-200 hover:border-emerald-500/50 hover:bg-slate-800 hover:text-white cursor-pointer">
             Parse Sheet ({parsedResults.length} Ready)
           </Button>
 
           <Button
             onClick={handleDetectMissing}
             disabled={parsedResults.length === 0 || loading}
-            className="h-10 px-6 bg-blue-700 hover:bg-blue-800 text-white font-semibold text-xs"
+            className="h-10 px-6 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-bold text-xs shadow-lg cursor-pointer"
           >
             {loading ? "Checking Roster..." : `Verify & Publish Results (${parsedResults.length})`}
           </Button>
         </div>
       </div>
 
+      </div>
       {/* Parsed Preview Table */}
       {parsedResults.length > 0 && (
-        <div className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-4">
+        <div className="lg:col-span-5 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-5">
           <h3 className="text-sm font-bold flex items-center justify-between">
             <span>Parsed Entries Preview ({parsedResults.length} Students)</span>
             <span className="text-xs font-normal text-slate-400">Ready to commit to database</span>
           </h3>
 
-          <div className="overflow-x-auto max-h-96 overflow-y-auto rounded-xl border shadow-inner">
+          <div className="overflow-x-auto max-h-96 overflow-y-auto rounded-xl border border-slate-800 shadow-inner">
             <table className="w-full text-xs text-left">
-              <thead className="bg-muted text-slate-400 uppercase font-semibold">
+              <thead className="bg-slate-900 text-slate-400 uppercase font-semibold">
                 <tr>
                   <th className="px-3 py-2.5">#</th>
                   <th className="px-3 py-2.5">Student ID</th>
@@ -516,9 +518,9 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                   <th className="px-3 py-2.5">Retakes</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-slate-800">
                 {parsedResults.map((r, i) => (
-                  <tr key={i} className="hover:bg-muted/40">
+                  <tr key={i} className="hover:bg-slate-900/60">
                     <td className="px-3 py-2 text-slate-400">{i + 1}</td>
                     <td className="px-3 py-2 font-mono font-bold">{r.student_id_string}</td>
                     <td className="px-3 py-2 font-semibold text-emerald-400">{r.gpa.toFixed(2)}</td>
@@ -527,7 +529,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                     </td>
                     <td className="px-3 py-2">
                       {r.term_retake_count && r.term_retake_count > 0 ? (
-                        <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold text-[10px]">
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-semibold text-[10px]">
                           {r.retake_subjects ? `${r.retake_subjects} (${r.term_retake_count})` : `${r.retake_subjects ? `${r.retake_subjects} (${r.term_retake_count})` : `${r.term_retake_count} Retake`}`}
                         </span>
                       ) : (
@@ -597,7 +599,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                             },
                           }));
                         }}
-                        className="h-9 px-3 rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold text-xs focus:ring-2 focus:ring-blue-600"
+                        className="h-9 px-3 rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold text-xs focus:ring-2 focus:ring-emerald-500"
                       >
                         <option value="air_drop">Year Drop (Migrate Batch)</option>
                         <option value="skip">Skip / Typo (Keep Current)</option>
@@ -618,7 +620,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                               },
                             }));
                           }}
-                          className="h-9 px-3 rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-semibold text-xs focus:ring-2 focus:ring-blue-600"
+                          className="h-9 px-3 rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-semibold text-xs focus:ring-2 focus:ring-emerald-500"
                         >
                           <option value="academic_failure">&ge; 5 Retakes</option>
                           <option value="missed_practical_lab">Missed Final Lab</option>
