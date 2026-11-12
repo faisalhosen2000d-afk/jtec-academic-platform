@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -159,8 +159,8 @@ export default function AdminUploadPermissionsPage() {
             </p>
           </div>
 
-          <Link href="/admin/students">
-            <Button variant="outline">Back to Student Management</Button>
+          <Link href="/admin">
+            <Button variant="outline">Back to Admin Console</Button>
           </Link>
         </div>
 
