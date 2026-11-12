@@ -123,14 +123,39 @@ export default async function JtecLandingPage() {
               <span>Official Institutional Gateway & Academic Operating System</span>
             </div>
 
+            <style>{`
+              @keyframes jtecRevealUp {
+                0% { opacity: 0; transform: translateY(22px) scale(0.98); filter: blur(6px); }
+                100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+              }
+              @keyframes jtecGoldShimmer {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
+              }
+              .jtec-anim-line1 {
+                animation: jtecRevealUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+              }
+              .jtec-anim-line2 {
+                opacity: 0;
+                background-size: 220% auto;
+                animation: jtecRevealUp 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.22s forwards,
+                           jtecGoldShimmer 6s ease-in-out 1.1s infinite;
+              }
+              .jtec-anim-sub {
+                opacity: 0;
+                animation: jtecRevealUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.42s forwards;
+              }
+            `}</style>
+
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-serif font-black tracking-tight text-white mb-6 leading-tight">
-              JHENAIDAH TEXTILE<br />
-              <span className="bg-gradient-to-r from-white via-amber-200 to-amber-500 bg-clip-text text-transparent">
+              <span className="inline-block jtec-anim-line1">JHENAIDAH TEXTILE</span><br />
+              <span className="inline-block jtec-anim-line2 bg-gradient-to-r from-white via-amber-300 to-amber-500 bg-clip-text text-transparent">
                 ENGINEERING COLLEGE
               </span>
             </h1>
 
-            <p className="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed font-light">
+            <p className="jtec-anim-sub text-base sm:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed font-light">
               Weaving innovation with technical mastery. Empowering the next generation of textile engineers through specialized laboratories, dynamic academics, and modern digital governance.
             </p>
 
