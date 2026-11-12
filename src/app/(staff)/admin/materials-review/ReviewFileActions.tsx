@@ -70,14 +70,14 @@ export default function ReviewFileActions({
     : fileType.toUpperCase();
 
   return (
-    <div className="mt-5 border-t border-border pt-4">
+    <div className="w-full">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-foreground">
+          <p className="text-xs font-semibold text-slate-200">
             Material File
           </p>
 
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-slate-400">
             Open this pending {formattedFileType} securely for review.
           </p>
         </div>
@@ -86,7 +86,7 @@ export default function ReviewFileActions({
           type="button"
           onClick={handleOpenFile}
           disabled={loading}
-          className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-lg border border-border bg-background px-4 py-2 text-xs font-semibold text-slate-200 transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? "Opening..." : "Open File"}
         </button>

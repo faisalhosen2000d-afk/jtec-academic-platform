@@ -133,7 +133,7 @@ export default function ReviewActions({
 
   return (
     <>
-      <div className="mt-5 border-t border-border pt-4">
+      <div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <button
             type="button"
@@ -143,7 +143,7 @@ export default function ReviewActions({
               setModal("approve");
             }}
             disabled={loading !== null}
-            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           >
             Approve
           </button>
@@ -157,7 +157,7 @@ export default function ReviewActions({
               setModal("reject");
             }}
             disabled={loading !== null}
-            className="rounded-lg border border-red-300 bg-background px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-xl border border-rose-500/40 bg-rose-500/15 px-4 py-2 text-xs font-bold text-rose-300 transition hover:bg-rose-500/25 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           >
             Reject
           </button>
@@ -217,7 +217,7 @@ export default function ReviewActions({
                 type="button"
                 onClick={handleApprove}
                 disabled={loading !== null}
-                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
               >
                 {loading === "approve" ? "Approving..." : "Approve"}
               </button>

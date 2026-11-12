@@ -88,10 +88,10 @@ export default async function AdminMaterialsReviewPage() {
       .from("materials")
       .select("id", { count: "exact", head: true })
       .eq("status", "rejected"),
-    serviceRole.from("subjects").select("id, subject_code, subject_name, department_id, level_id, term_id"),
-    serviceRole.from("departments").select("id, name, code"),
-    serviceRole.from("levels").select("id, name"),
-    serviceRole.from("terms").select("id, name"),
+    supabase.from("subjects").select("id, subject_code, subject_name, department_id, level_id, term_id"),
+    supabase.from("departments").select("id, name, code"),
+    supabase.from("levels").select("id, name"),
+    supabase.from("terms").select("id, name"),
   ]);
 
   const materials = pendingRes.data || [];
@@ -103,16 +103,16 @@ export default async function AdminMaterialsReviewPage() {
   const uploaderIds = Array.from(
     new Set(materials.map((m) => m.uploader_id).filter(Boolean))
   );
-  const uploaderMap = new Map<string, { full_name: string; student_id: string | null }>();
+  const uploaderMap = new Map<string, { full_name: string; student_id: string | null; department_id: string | null }>();
   if (uploaderIds.length > 0) {
     const { data: uploaders } = await serviceRole
       .from("profiles")
-      .select("id, full_name, student_id")
+      .select("id, full_name, student_id, department_id")
       .in("id", uploaderIds);
     ((uploaders || []) as GenericRow[]).forEach((u) => {
       uploaderMap.set(String(u.id), {
         full_name: String(u.full_name || "Student"),
-        student_id: u.student_id ? String(u.student_id) : null,
+        student_id: u.student_id ? String(u.student_id) : null, department_id: u.department_id ? String(u.department_id) : null,
       });
     });
   }
@@ -288,7 +288,7 @@ export default async function AdminMaterialsReviewPage() {
                         </span>
                         {uploader?.student_id && (
                           <span className="text-slate-500">
-                            (Roll: {uploader.student_id})
+                            ({uploader.department_id && deptMap.get(uploader.department_id)?.code ? `${deptMap.get(uploader.department_id)?.code} • ` : ""}Roll: {uploader.student_id})
                           </span>
                         )}
                       </span>
@@ -304,7 +304,7 @@ export default async function AdminMaterialsReviewPage() {
                   </div>
 
                   {/* Bottom Action Bar (Preserves existing ReviewFileActions & ReviewActions) */}
-                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800/80 pt-4">
+                  <div className="mt-5 flex flex-col gap-4 border-t border-slate-800/80 pt-4">
                     <ReviewFileActions
                       materialId={material.id}
                       fileType={material.file_type}
