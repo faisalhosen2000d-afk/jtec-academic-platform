@@ -46,7 +46,7 @@ export default function NoticeSearch({ initialValue = "" }: { initialValue?: str
       onChange={(event) => setValue(event.target.value)}
       placeholder="Search notices..."
       aria-label="Search notices"
-      className="mt-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm sm:max-w-md"
+      className="mt-4 w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm sm:max-w-md"
     />
   );
 }

@@ -66,26 +66,26 @@ export default function NoticeList({
   return (
     <div ref={containerRef} className="mt-4">
       {/* Mobile-Optimized Search, Filter & Bulk Delete Header */}
-      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between bg-muted/20 border-b border-border rounded-t-xl">
+      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between bg-slate-900/20 border-b border-slate-800 rounded-t-xl">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search notices by title, content..."
               aria-label="Search notices"
-              className="w-full h-10 pl-10 pr-3 rounded-xl border border-input bg-background text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:outline-none"
+              className="w-full h-10 pl-10 pr-3 rounded-xl border border-input bg-slate-950 text-xs text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary focus:outline-none"
             />
           </div>
 
           <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
+            <Filter className="h-4 w-4 text-slate-400 shrink-0 hidden sm:block" />
             <select
               value={category}
               onChange={(event) => setCategory(event.target.value)}
               aria-label="Filter notices by category"
-              className="w-full sm:w-56 h-10 rounded-xl border border-input bg-background px-3 text-xs font-medium text-foreground focus:ring-2 focus:ring-primary focus:outline-none"
+              className="w-full sm:w-56 h-10 rounded-xl border border-input bg-slate-950 px-3 text-xs font-medium text-slate-100 focus:ring-2 focus:ring-primary focus:outline-none"
             >
               <option value="all">All Categories</option>
               {categories.map((item) => (
@@ -107,17 +107,17 @@ export default function NoticeList({
         )}
       </div>
 
-      <div className="divide-y divide-border">
+      <div className="divide-y divide-slate-800">
         {children}
       </div>
 
       {matchCount === 0 ? (
-        <div className="p-10 text-center text-sm text-muted-foreground">
+        <div className="p-10 text-center text-sm text-slate-400">
           No matching notices found.
         </div>
       ) : (
-        <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/10 text-xs">
-          <span className="text-muted-foreground">
+        <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 bg-slate-900/10 text-xs">
+          <span className="text-slate-400">
             Showing {Math.min(matchCount, (currentPage - 1) * NOTICES_PER_PAGE + 1)}–{Math.min(matchCount, currentPage * NOTICES_PER_PAGE)} of {matchCount} notices
           </span>
 
@@ -126,7 +126,7 @@ export default function NoticeList({
               type="button"
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage === 1}
-              className="rounded-lg border border-border px-3 py-1.5 font-medium hover:bg-muted disabled:opacity-40"
+              className="rounded-lg border border-slate-800 px-3 py-1.5 font-medium hover:bg-slate-900 disabled:opacity-40"
             >
               Previous
             </button>
@@ -135,7 +135,7 @@ export default function NoticeList({
               type="button"
               onClick={() => goToPage(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="rounded-lg border border-border px-3 py-1.5 font-medium hover:bg-muted disabled:opacity-40"
+              className="rounded-lg border border-slate-800 px-3 py-1.5 font-medium hover:bg-slate-900 disabled:opacity-40"
             >
               Next
             </button>

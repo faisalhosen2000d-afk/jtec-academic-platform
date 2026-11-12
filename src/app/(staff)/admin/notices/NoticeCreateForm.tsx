@@ -101,7 +101,7 @@ export default function NoticeCreateForm({
       className="space-y-6"
     >
       {!canPublish && (
-        <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 text-sm text-slate-400">
           You do not currently have permission to publish notices.
           Please contact the Super Admin.
         </div>
@@ -111,7 +111,7 @@ export default function NoticeCreateForm({
         <div
           className={`rounded-lg border p-4 text-sm ${
             messageType === "success"
-              ? "border-border bg-muted/40"
+              ? "border-slate-800 bg-slate-900/40"
               : "border-destructive/40 bg-destructive/10 text-destructive"
           }`}
         >
@@ -136,7 +136,7 @@ export default function NoticeCreateForm({
             required
             disabled={!canPublish || isSubmitting}
             placeholder="Enter notice title"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted/40"
+            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
           />
         </div>
 
@@ -156,7 +156,7 @@ export default function NoticeCreateForm({
             required
             disabled={!canPublish || isSubmitting}
             placeholder="Write the notice content..."
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted/40"
+            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
           />
         </div>
 
@@ -185,7 +185,7 @@ export default function NoticeCreateForm({
               }
             }}
             disabled={!canPublish || isSubmitting}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted/40"
+            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
           >
             <option value="">No Category</option>
 
@@ -227,10 +227,10 @@ export default function NoticeCreateForm({
                 required
                 disabled={!canPublish || isSubmitting}
                 placeholder="Enter custom category name"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted/40"
+                className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
               />
 
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-slate-400">
                 This category will be saved for future notices.
               </p>
             </div>
@@ -253,7 +253,7 @@ export default function NoticeCreateForm({
               handleDepartmentChange(event.target.value)
             }
             disabled={!canPublish || isSubmitting}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted/40"
+            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
           >
             <option value="">All Students</option>
 
@@ -264,7 +264,7 @@ export default function NoticeCreateForm({
             ))}
           </select>
 
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-slate-400">
             Select All Students for a college-wide notice, or choose a
             department for optional batch, level, and term targeting.
           </p>
@@ -284,7 +284,7 @@ export default function NoticeCreateForm({
             value={selectedBatchId}
             onChange={(event) => setSelectedBatchId(event.target.value)}
             disabled={!canPublish || isSubmitting || !hasDepartment}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted/40"
+            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
           >
             <option value="">
               {hasDepartment ? "All Batches" : "Select a Department First"}
@@ -313,7 +313,7 @@ export default function NoticeCreateForm({
             value={selectedLevelId}
             onChange={(event) => handleLevelChange(event.target.value)}
             disabled={!canPublish || isSubmitting || !hasDepartment}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted/40"
+            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
           >
             <option value="">
               {hasDepartment ? "All Levels" : "Select a Department First"}
@@ -347,7 +347,7 @@ export default function NoticeCreateForm({
               !hasDepartment ||
               !selectedLevelId
             }
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted/40"
+            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
           >
             <option value="">
               {!hasDepartment
@@ -373,7 +373,7 @@ export default function NoticeCreateForm({
             className="mb-2 block text-sm font-medium"
           >
             Attachment
-            <span className="ml-1 font-normal text-muted-foreground">
+            <span className="ml-1 font-normal text-slate-400">
               (Optional)
             </span>
           </label>
@@ -384,10 +384,10 @@ export default function NoticeCreateForm({
             type="file"
             accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
             disabled={!canPublish || isSubmitting}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium disabled:cursor-not-allowed disabled:bg-muted/40"
+            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium disabled:cursor-not-allowed disabled:bg-slate-900/40"
           />
 
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-slate-400">
             PDF, JPG, JPEG, PNG, DOC, or DOCX. Maximum file size: 100 MB.
           </p>
         </div>

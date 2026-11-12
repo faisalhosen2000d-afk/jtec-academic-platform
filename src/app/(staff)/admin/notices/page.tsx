@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft, BellRing, Trash2 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
@@ -132,11 +133,11 @@ export default async function AdminNoticesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-8 flex flex-col gap-4 rounded-xl border border-slate-800 bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="mb-1 text-sm font-medium text-muted-foreground">
+            <p className="mb-1 text-sm font-medium text-slate-400">
               JTEC Academic Platform
             </p>
 
@@ -144,7 +145,7 @@ export default async function AdminNoticesPage() {
               Notice Management
             </h1>
 
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="mt-2 text-sm text-slate-400">
               Create, manage, and publish academic notices for targeted
               students.
             </p>
@@ -159,11 +160,11 @@ export default async function AdminNoticesPage() {
           </Link>
         </div>
 
-        <section className="mb-8 rounded-xl border border-border bg-card p-6 shadow-sm">
+        <section className="mb-8 rounded-xl border border-slate-800 bg-card p-6 shadow-sm">
           <div className="mb-5">
             <h2 className="text-lg font-semibold">Create Notice</h2>
 
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-slate-400">
               Publish notices to all students or to a specific department
               with optional batch, level, and term targeting.
             </p>
@@ -179,11 +180,11 @@ export default async function AdminNoticesPage() {
           />
         </section>
 
-        <section className="rounded-xl border border-border bg-card shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-border p-6 sm:flex-row sm:items-center sm:justify-between">
+        <section className="rounded-xl border border-slate-800 bg-card shadow-sm">
+          <div className="flex flex-col gap-4 border-b border-slate-800 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-semibold">Existing Notices</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 text-sm text-slate-400">
                 Published and archived notices will appear here.
               </p>
 
@@ -206,7 +207,7 @@ export default async function AdminNoticesPage() {
                     <div>
                       <h3 className="font-semibold">{notice.title}</h3>
 
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="mt-1 text-xs text-slate-400">
                         {new Intl.DateTimeFormat("en-US", {
                           timeZone: "Asia/Dhaka",
                           dateStyle: "medium",
@@ -214,7 +215,7 @@ export default async function AdminNoticesPage() {
                         }).format(new Date(notice.created_at))}
                       </p>
 
-                      <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
+                      <p className="mt-2 line-clamp-3 text-sm text-slate-400">
                         {notice.content}
                       </p>
                     </div>
@@ -234,11 +235,11 @@ export default async function AdminNoticesPage() {
 
                       {notice.is_pinned && (
                         <>
-                          <span className="rounded-full border border-border px-2 py-1">
+                          <span className="rounded-full border border-slate-800 px-2 py-1">
                             Pinned
                           </span>
 
-                          <span className="rounded-full border border-border px-2 py-1">
+                          <span className="rounded-full border border-slate-800 px-2 py-1">
                             Pinned by:{" "}
                             {pinnerNameById.get(notice.pinned_by ?? "") ??
                               "JTEC Administrator"}
@@ -254,7 +255,7 @@ export default async function AdminNoticesPage() {
                       )}
 
                       {notice.is_archived && (
-                        <span className="rounded-full border border-border px-2 py-1">
+                        <span className="rounded-full border border-slate-800 px-2 py-1">
                           Archived
                         </span>
                       )}
