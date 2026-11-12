@@ -94,7 +94,7 @@ export default async function JtecLandingPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/register"
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 font-semibold text-sm border border-slate-700/80 hover:border-amber-500/40 transition-all"
+              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 font-semibold text-xs sm:text-sm border border-slate-700/80 hover:border-amber-500/40 transition-all"
             >
               <UserPlus className="w-4 h-4 text-amber-400" />
               <span>Sign Up</span>
@@ -104,7 +104,7 @@ export default async function JtecLandingPage() {
               className="relative group inline-flex items-center justify-center p-0.5 rounded-xl font-medium text-sm transition-all duration-300 hover:scale-105"
             >
               <span className="absolute inset-0 bg-gradient-to-r from-red-600 via-amber-500 to-red-600 rounded-xl blur-sm opacity-70 group-hover:opacity-100 transition duration-300"></span>
-              <span className="relative px-5 py-2.5 rounded-[10px] bg-[#0C1425] text-white flex items-center gap-2 border border-amber-500/30 group-hover:bg-[#101B33]">
+              <span className="relative px-3 sm:px-5 py-2 sm:py-2.5 rounded-[10px] bg-[#0C1425] text-white flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm border border-amber-500/30 group-hover:bg-[#101B33]">
                 <GraduationCap className="w-4 h-4 text-amber-400" />
                 <span className="font-semibold tracking-wide">Student Portal</span>
                 <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-1 transition-transform" />
@@ -154,18 +154,18 @@ export default async function JtecLandingPage() {
 
           {/* Cinematic Campus Gate Card */}
           <div className="relative max-w-5xl mx-auto rounded-3xl p-2 bg-gradient-to-b from-slate-700/40 via-slate-800/40 to-slate-900/80 shadow-2xl">
-            <div className="relative rounded-[22px] overflow-hidden bg-slate-950 border border-slate-800/80 aspect-[16/9]">
+            <div className="relative rounded-[22px] overflow-hidden bg-slate-950 border border-slate-800/80 sm:aspect-[16/9]">
               <Image
                 src="/campus-gate-night.webp"
                 alt="JTEC Campus Main Gate at Night"
                 width={1280}
                 height={720}
                 priority
-                className="w-full h-full object-cover object-center transform hover:scale-105 transition-transform duration-1000 ease-out"
+                className="w-full aspect-[16/9] sm:aspect-auto sm:h-full object-cover object-center transform hover:scale-105 transition-transform duration-1000 ease-out"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#060A12] via-transparent to-transparent opacity-90"></div>
 
-              <div className="absolute bottom-6 left-6 right-6 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 p-5 rounded-2xl backdrop-blur-md bg-slate-950/70 border border-white/10 shadow-xl">
+              <div className="relative sm:absolute sm:bottom-6 sm:left-6 sm:right-6 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 sm:gap-4 p-4 sm:p-5 sm:rounded-2xl backdrop-blur-md bg-slate-950/90 sm:bg-slate-950/70 border-t sm:border border-white/10 shadow-xl">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
@@ -174,8 +174,8 @@ export default async function JtecLandingPage() {
                   <h3 className="text-lg font-bold text-white">Main Entrance & Academic Complex</h3>
                   <p className="text-xs text-slate-400">Jhenaidah Textile Engineering College, Jhenaidah-7300, Bangladesh</p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1.5 rounded-lg bg-red-950/60 border border-red-500/30 text-xs font-semibold text-red-300">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <span className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-red-950/60 border border-red-500/30 text-xs font-semibold text-red-300">
                     Established Campus
                   </span>
                   <span className="px-3 py-1.5 rounded-lg bg-amber-950/60 border border-amber-500/30 text-xs font-semibold text-amber-300">
