@@ -138,7 +138,10 @@ export default async function AdminDashboardPage() {
         {/* Top 4 Live KPI Stat Cards */}
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {/* KPI 1: Pending ID Verifications */}
-          <div className="group rounded-2xl border border-slate-800/90 bg-[#0A1020]/90 p-5 shadow-lg transition-all hover:border-amber-500/40">
+          <Link
+            href="/admin/students/verification"
+            className="group block cursor-pointer rounded-2xl border border-slate-800/90 bg-[#0A1020]/90 p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-500/50 hover:shadow-[0_0_28px_rgba(245,158,11,0.14)]"
+          >
             <div className="flex items-center justify-between">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.12)]">
                 <ShieldCheck className="h-5 w-5" />
@@ -147,16 +150,22 @@ export default async function AdminDashboardPage() {
                 Verification Queue
               </span>
             </div>
-            <div className="mt-4">
-              <p className="text-xs font-medium text-slate-400">Pending ID Verifications</p>
-              <p className="mt-1 font-serif text-3xl font-bold text-white">
-                {pendingVerifications}
-              </p>
+            <div className="mt-4 flex items-end justify-between">
+              <div>
+                <p className="text-xs font-medium text-slate-400">Pending ID Verifications</p>
+                <p className="mt-1 font-serif text-3xl font-bold text-white">
+                  {pendingVerifications}
+                </p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-amber-400/70 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-amber-300" />
             </div>
-          </div>
+          </Link>
 
           {/* KPI 2: Materials Review */}
-          <div className="group rounded-2xl border border-slate-800/90 bg-[#0A1020]/90 p-5 shadow-lg transition-all hover:border-sky-500/40">
+          <Link
+            href="/admin/materials-review"
+            className="group block cursor-pointer rounded-2xl border border-slate-800/90 bg-[#0A1020]/90 p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-500/50 hover:shadow-[0_0_28px_rgba(56,189,248,0.14)]"
+          >
             <div className="flex items-center justify-between">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.12)]">
                 <FileCheck2 className="h-5 w-5" />
@@ -165,16 +174,22 @@ export default async function AdminDashboardPage() {
                 Coursework
               </span>
             </div>
-            <div className="mt-4">
-              <p className="text-xs font-medium text-slate-400">Pending Materials Review</p>
-              <p className="mt-1 font-serif text-3xl font-bold text-white">
-                {pendingMaterials}
-              </p>
+            <div className="mt-4 flex items-end justify-between">
+              <div>
+                <p className="text-xs font-medium text-slate-400">Pending Materials Review</p>
+                <p className="mt-1 font-serif text-3xl font-bold text-white">
+                  {pendingMaterials}
+                </p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-sky-400/70 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-sky-300" />
             </div>
-          </div>
+          </Link>
 
           {/* KPI 3: Verified Students */}
-          <div className="group rounded-2xl border border-slate-800/90 bg-[#0A1020]/90 p-5 shadow-lg transition-all hover:border-indigo-500/40">
+          <Link
+            href="/admin/students/upload-permissions"
+            className="group block cursor-pointer rounded-2xl border border-slate-800/90 bg-[#0A1020]/90 p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-500/50 hover:shadow-[0_0_28px_rgba(129,140,248,0.14)]"
+          >
             <div className="flex items-center justify-between">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 shadow-[0_0_20px_rgba(129,140,248,0.12)]">
                 <Users className="h-5 w-5" />
@@ -183,16 +198,22 @@ export default async function AdminDashboardPage() {
                 Active Directory
               </span>
             </div>
-            <div className="mt-4">
-              <p className="text-xs font-medium text-slate-400">Verified Students</p>
-              <p className="mt-1 font-serif text-3xl font-bold text-white">
-                {verifiedStudents}
-              </p>
+            <div className="mt-4 flex items-end justify-between">
+              <div>
+                <p className="text-xs font-medium text-slate-400">Verified Students</p>
+                <p className="mt-1 font-serif text-3xl font-bold text-white">
+                  {verifiedStudents}
+                </p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-indigo-400/70 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-indigo-300" />
             </div>
-          </div>
+          </Link>
 
           {/* KPI 4: Active Notices */}
-          <div className="group rounded-2xl border border-slate-800/90 bg-[#0A1020]/90 p-5 shadow-lg transition-all hover:border-cyan-500/40">
+          <Link
+            href="/admin/notices"
+            className="group block cursor-pointer rounded-2xl border border-slate-800/90 bg-[#0A1020]/90 p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-500/50 hover:shadow-[0_0_28px_rgba(6,182,212,0.14)]"
+          >
             <div className="flex items-center justify-between">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.12)]">
                 <BellRing className="h-5 w-5" />
@@ -201,13 +222,16 @@ export default async function AdminDashboardPage() {
                 Notice Board
               </span>
             </div>
-            <div className="mt-4">
-              <p className="text-xs font-medium text-slate-400">Published Notices</p>
-              <p className="mt-1 font-serif text-3xl font-bold text-white">
-                {activeNotices}
-              </p>
+            <div className="mt-4 flex items-end justify-between">
+              <div>
+                <p className="text-xs font-medium text-slate-400">Published Notices</p>
+                <p className="mt-1 font-serif text-3xl font-bold text-white">
+                  {activeNotices}
+                </p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-cyan-400/70 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-cyan-300" />
             </div>
-          </div>
+          </Link>
         </section>
 
         {/* 6 Section-Matched Action Module Cards */}
