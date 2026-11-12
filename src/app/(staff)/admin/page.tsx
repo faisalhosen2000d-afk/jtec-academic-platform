@@ -14,7 +14,7 @@ import {
   ArrowRight,
   GraduationCap,
   Sparkles,
-  Trash2,
+  Trash2, UserCircle2,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -121,7 +121,7 @@ export default async function AdminDashboardPage() {
                 {profile.role.replace("_", " ")}
               </p>
             </div>
-            <form action={handleSignOut}>
+            <Link href="/admin/profile" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-200 transition-all hover:border-amber-500/50 hover:text-amber-300"><UserCircle2 className="h-3.5 w-3.5 text-amber-400" /><span>Profile</span></Link><form action={handleSignOut}>
               <button
                 type="submit"
                 className="inline-flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-300 transition-all hover:border-rose-500/50 hover:bg-rose-500/20 hover:text-rose-200 cursor-pointer"

@@ -107,11 +107,11 @@ export default function SuperAdminPage() {
             </p>
           </div>
 
-          <form action={handleSignOut}>
+          <div className="flex items-center gap-2"><Link href="/super-admin/profile"><Button type="button" variant="outline">My Profile</Button></Link><form action={handleSignOut}>
             <Button type="submit" variant="outline">
               Logout
             </Button>
-          </form>
+          </form></div>
         </div>
 
         {/* Overview */}
