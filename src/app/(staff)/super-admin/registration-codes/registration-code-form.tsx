@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Info, KeyRound, Plus } from "lucide-react";
 import { createRegistrationCode } from "./actions";
+import { ModernDateTimePicker } from "@/components/ui/ModernDateTimePicker";
 
 type Department = {
   id: string;
@@ -275,11 +276,10 @@ export function RegistrationCodeForm({
           >
             Expiry Date &amp; Time (Leave empty for no expiry)
           </label>
-          <input
+          <ModernDateTimePicker
             id="expires_at"
             name="expires_at"
-            type="datetime-local"
-            className="h-11 w-full rounded-xl border border-slate-700/80 bg-[#060A12] px-3.5 text-sm text-white [color-scheme:dark] transition-all focus:border-cyan-400/80 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+            placeholder="No expiry (Never)"
           />
         </div>
 
