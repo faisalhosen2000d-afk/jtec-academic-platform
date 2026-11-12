@@ -193,7 +193,7 @@ export default async function JtecLandingPage() {
               <div className="text-xs font-medium text-slate-400 mt-1">Specialized Departments</div>
             </div>
             <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-sm text-center hover:border-red-500/40 transition-colors">
-              <div className="text-3xl font-black text-white font-serif">166</div>
+              <div className="text-3xl font-black text-white font-serif">164–166</div>
               <div className="text-xs font-medium text-slate-400 mt-1">Total Degree Credits</div>
             </div>
             <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-sm text-center hover:border-amber-500/40 transition-colors">
@@ -281,7 +281,7 @@ export default async function JtecLandingPage() {
                 <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
                   <Scissors className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">AE • 166 Credits</span>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">AE • 164 Credits</span>
               </div>
               <h3 className="text-xl font-bold text-white group-hover:text-emerald-400 transition-colors">Apparel Engineering</h3>
               <p className="text-sm text-slate-400 mt-2 leading-relaxed">
@@ -333,7 +333,7 @@ export default async function JtecLandingPage() {
               </div>
               <h3 className="text-lg font-bold text-white">Curriculum CGPA Planner</h3>
               <p className="text-sm text-slate-400 mt-2 leading-relaxed">
-                Interactive credit-weighted simulator mapped to all 166 credits across 8 semesters for targeted GPA forecasting.
+                Interactive credit-weighted simulator mapped to 164–166 credits across 8 semesters for targeted GPA forecasting.
               </p>
             </div>
           </div>
