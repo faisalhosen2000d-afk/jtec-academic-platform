@@ -140,13 +140,13 @@ export default async function AcademicStructurePage() {
     redirect("/");
   }
 
-  const db = createServiceRoleClient();
+  
   const [deptRes, batchRes, levelRes, termRes, subjRes] = await Promise.all([
     supabase.from("departments").select("id", { count: "exact" }),
     supabase.from("batches").select("id", { count: "exact" }),
     supabase.from("levels").select("id", { count: "exact" }),
     supabase.from("terms").select("id", { count: "exact" }),
-    db.from("subjects").select("id", { count: "exact" }),
+    supabase.from("subjects").select("id", { count: "exact" }),
   ]);
 
   const counts = {
