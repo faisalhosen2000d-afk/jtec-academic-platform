@@ -145,7 +145,7 @@ export async function POST(request: Request) {
     if (body.action === "reject") {
       const { data: material } = await serviceSupabase
         .from("materials")
-        .select("id, title, uploader_id")
+        .select("id, title, uploader_id, file_path")
         .eq("id", body.materialId)
         .maybeSingle();
 
@@ -156,6 +156,16 @@ export async function POST(request: Request) {
       );
 
       const isEscalated = "escalated" in result && result.escalated;
+      if (!isEscalated && material?.file_path) {
+        try {
+          await serviceSupabase.storage
+            .from("academic-materials")
+            .remove([material.file_path]);
+        } catch (storageErr) {
+          console.error("[materials][moderate][storage-remove]", storageErr);
+        }
+      }
+
       if (!isEscalated && material?.uploader_id) {
         try {
           await serviceSupabase.from("notifications").insert({
