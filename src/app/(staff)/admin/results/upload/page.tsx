@@ -26,6 +26,12 @@ export default async function AdminResultUploadPage() {
     redirect("/dashboard");
   }
 
+  let canUploadResults = profile.role === "super_admin";
+  if (profile.role === "admin") {
+    const { data: resultScopes } = await supabase.from("staff_scopes").select("id").eq("profile_id", user.id).eq("can_verify_results", true).limit(1);
+    canUploadResults = Boolean(resultScopes && resultScopes.length > 0);
+  }
+
   const [
     { data: departments },
     { data: batches },
@@ -79,6 +85,7 @@ export default async function AdminResultUploadPage() {
           batches={batches || []}
           levels={levels || []}
           terms={terms || []}
+          canUploadResults={canUploadResults}
         />
       </main>
     </div>

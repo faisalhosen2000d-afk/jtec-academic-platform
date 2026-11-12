@@ -36,6 +36,7 @@ interface ResultUploadClientProps {
   batches: BatchItem[];
   levels: LevelItem[];
   terms: TermItem[];
+  canUploadResults?: boolean;
 }
 
 interface MissingStudentInfo {
@@ -127,7 +128,7 @@ function ModernDropdown({
   );
 }
 
-export default function ResultUploadClient({ departments, batches, levels, terms }: ResultUploadClientProps) {
+export default function ResultUploadClient({ departments, batches, levels, terms, canUploadResults = true }: ResultUploadClientProps) {
   const [selectedDept, setSelectedDept] = useState(departments[0]?.id || "");
   const [selectedBatch, setSelectedBatch] = useState(batches[0]?.id || "");
   const [selectedLevel, setSelectedLevel] = useState(levels[0]?.id || "");
@@ -483,14 +484,14 @@ export default function ResultUploadClient({ departments, batches, levels, terms
           />
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        {!canUploadResults && (<div className="rounded-xl border border-amber-500/40 bg-amber-950/25 p-3.5 text-xs text-amber-200 flex items-start gap-2.5"><ShieldAlert className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" /><span><strong>Permission Required:</strong> You do not have permission to upload or publish results. Ask a Super Admin to enable <strong>Student Result Upload</strong> for your account.</span></div>)}<div className="flex flex-wrap items-center justify-between gap-3 pt-2">
           <Button onClick={handleTextParse} variant="outline" className="text-xs h-10 px-4 border-slate-700 bg-slate-900 text-slate-200 hover:border-emerald-500/50 hover:bg-slate-800 hover:text-white cursor-pointer">
             Parse Sheet ({parsedResults.length} Ready)
           </Button>
 
           <Button
             onClick={handleDetectMissing}
-            disabled={parsedResults.length === 0 || loading}
+            disabled={!canUploadResults || parsedResults.length === 0 || loading}
             className="h-10 px-6 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-bold text-xs shadow-lg cursor-pointer"
           >
             {loading ? "Checking Roster..." : `Verify & Publish Results (${parsedResults.length})`}
@@ -640,7 +641,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
               </Button>
               <Button
                 onClick={() => handleCommitAll(Object.values(missingDecisions))}
-                disabled={loading}
+                disabled={!canUploadResults || loading}
                 className="h-9 px-5 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs"
               >
                 {loading ? "Processing Migration..." : "Confirm Air Drops & Publish Results"}

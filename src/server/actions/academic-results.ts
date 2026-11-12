@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { revalidatePath } from "next/cache";
 import { createClient as createServerAuthClient } from "@/lib/supabase/server";
@@ -83,6 +83,40 @@ export async function verifyMissingStudentsForBatch(input: {
 
   if (!profile || !["admin", "super_admin"].includes(profile.role)) {
     return { error: "Insufficient permissions." };
+  }
+
+  if (profile.role === "admin") {
+    const { data: resultScope } = await authSupabase
+      .from("staff_scopes")
+      .select("id")
+      .eq("profile_id", user.id)
+      .eq("can_verify_results", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!resultScope) {
+      return {
+        error:
+          "You do not have permission to upload or publish student results. Ask a Super Admin to enable Student Result Upload for your account.",
+      };
+    }
+  }
+
+  if (profile.role === "admin") {
+    const { data: resultScope } = await authSupabase
+      .from("staff_scopes")
+      .select("id")
+      .eq("profile_id", user.id)
+      .eq("can_verify_results", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!resultScope) {
+      return {
+        error:
+          "You do not have permission to upload or publish student results. Ask a Super Admin to enable Student Result Upload for your account.",
+      };
+    }
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -200,6 +234,40 @@ export async function commitBatchResultsAndAirDrops(input: UploadBatchResultsInp
 
   if (!profile || !["admin", "super_admin"].includes(profile.role)) {
     return { error: "Insufficient permissions." };
+  }
+
+  if (profile.role === "admin") {
+    const { data: resultScope } = await authSupabase
+      .from("staff_scopes")
+      .select("id")
+      .eq("profile_id", user.id)
+      .eq("can_verify_results", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!resultScope) {
+      return {
+        error:
+          "You do not have permission to upload or publish student results. Ask a Super Admin to enable Student Result Upload for your account.",
+      };
+    }
+  }
+
+  if (profile.role === "admin") {
+    const { data: resultScope } = await authSupabase
+      .from("staff_scopes")
+      .select("id")
+      .eq("profile_id", user.id)
+      .eq("can_verify_results", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!resultScope) {
+      return {
+        error:
+          "You do not have permission to upload or publish student results. Ask a Super Admin to enable Student Result Upload for your account.",
+      };
+    }
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;

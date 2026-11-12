@@ -440,11 +440,11 @@ export default async function StaffPermissionsPage({
 
                     <span>
                       <span className="block text-sm font-medium">
-                        Result Verification
+                        Student Result Upload
                       </span>
 
                       <span className="block text-xs text-muted-foreground">
-                        Allow result verification in this scope.
+                        Allow uploading and publishing student results in this scope.
                       </span>
                     </span>
                   </label>
@@ -628,7 +628,7 @@ export default async function StaffPermissionsPage({
                           />
 
                           <span className="text-sm font-medium">
-                            Result Verification
+                            Student Result Upload
                           </span>
                         </label>
 
