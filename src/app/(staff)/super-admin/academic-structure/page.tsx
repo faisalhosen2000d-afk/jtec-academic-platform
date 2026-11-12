@@ -140,21 +140,21 @@ export default async function AcademicStructurePage() {
     redirect("/");
   }
 
-  const serviceRole = createServiceRoleClient();
+  const db = createServiceRoleClient();
   const [deptRes, batchRes, levelRes, termRes, subjRes] = await Promise.all([
-    serviceRole.from("departments").select("id", { count: "exact", head: true }),
-    serviceRole.from("batches").select("id", { count: "exact", head: true }),
-    serviceRole.from("levels").select("id", { count: "exact", head: true }),
-    serviceRole.from("terms").select("id", { count: "exact", head: true }),
-    serviceRole.from("subjects").select("id", { count: "exact", head: true }),
+    supabase.from("departments").select("id", { count: "exact" }),
+    supabase.from("batches").select("id", { count: "exact" }),
+    supabase.from("levels").select("id", { count: "exact" }),
+    supabase.from("terms").select("id", { count: "exact" }),
+    db.from("subjects").select("id", { count: "exact" }),
   ]);
 
   const counts = {
-    departments: deptRes.count ?? 0,
-    batches: batchRes.count ?? 0,
-    levels: levelRes.count ?? 0,
-    terms: termRes.count ?? 0,
-    subjects: subjRes.count ?? 0,
+    departments: deptRes.count ?? deptRes.data?.length ?? 0,
+    batches: batchRes.count ?? batchRes.data?.length ?? 0,
+    levels: levelRes.count ?? levelRes.data?.length ?? 0,
+    terms: termRes.count ?? termRes.data?.length ?? 0,
+    subjects: subjRes.count ?? subjRes.data?.length ?? 0,
   };
 
   return (
