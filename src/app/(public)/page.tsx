@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { 
@@ -93,6 +93,13 @@ export default async function JtecLandingPage() {
 
           <div className="flex items-center gap-3">
             <Link
+              href="/register"
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 font-semibold text-sm border border-slate-700/80 hover:border-amber-500/40 transition-all"
+            >
+              <UserPlus className="w-4 h-4 text-amber-400" />
+              <span>Sign Up</span>
+            </Link>
+            <Link
               href="/login"
               className="relative group inline-flex items-center justify-center p-0.5 rounded-xl font-medium text-sm transition-all duration-300 hover:scale-105"
             >
@@ -168,6 +175,13 @@ export default async function JtecLandingPage() {
                   <p className="text-xs text-slate-400">Jhenaidah Textile Engineering College, Jhenaidah-7300, Bangladesh</p>
                 </div>
                 <div className="flex items-center gap-3">
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 font-semibold text-sm border border-slate-700/80 hover:border-amber-500/40 transition-all"
+            >
+              <UserPlus className="w-4 h-4 text-amber-400" />
+              <span>Sign Up</span>
+            </Link>
                   <span className="px-3 py-1.5 rounded-lg bg-red-950/60 border border-red-500/30 text-xs font-semibold text-red-300">
                     Established Campus
                   </span>
@@ -444,7 +458,7 @@ export default async function JtecLandingPage() {
                   className="w-full sm:w-auto px-8 py-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-semibold text-sm border border-slate-700 transition-all flex items-center justify-center gap-2"
                 >
                   <UserPlus className="w-4 h-4 text-amber-400" />
-                  <span>Create Account with Code</span>
+                  <span>Create Student Account</span>
                 </Link>
               </div>
             </div>
@@ -487,7 +501,7 @@ export default async function JtecLandingPage() {
               <h4 className="text-white font-semibold text-sm mb-4">Quick Navigation</h4>
               <ul className="space-y-2.5">
                 <li><Link href="/login" className="hover:text-amber-400 transition-colors">Student Portal Login</Link></li>
-                <li><Link href="/register" className="hover:text-amber-400 transition-colors">Registration with Code</Link></li>
+                <li><Link href="/register" className="hover:text-amber-400 transition-colors">Student Sign Up</Link></li>
                 <li><a href="#notices" className="hover:text-amber-400 transition-colors">Official Notice Board</a></li>
                 <li><a href="#features" className="hover:text-amber-400 transition-colors">Academic Hub</a></li>
               </ul>

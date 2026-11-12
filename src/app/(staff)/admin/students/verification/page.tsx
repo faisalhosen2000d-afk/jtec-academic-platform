@@ -50,7 +50,8 @@ export default async function AdminStudentVerificationPage() {
   }
 
   // 1. Fetch pending students
-  const { data: studentsData } = await supabase
+  const serviceRole = createServiceRoleClient();
+  const { data: studentsData } = await serviceRole
     .from("profiles")
     .select("*")
     .eq("role", "student")
@@ -64,7 +65,7 @@ export default async function AdminStudentVerificationPage() {
 
   const codeRecordsMap = new Map<string, RegCodeJoinedRow>();
   if (studentRolls.length > 0) {
-    const { data: regCodes } = await supabase
+    const { data: regCodes } = await serviceRole
       .from("registration_codes")
       .select(`
         student_id,
@@ -89,7 +90,7 @@ export default async function AdminStudentVerificationPage() {
   }
 
   // 3. Generate signed URLs for private ID card images
-  const serviceRole = createServiceRoleClient();
+  
   const enhancedStudents: PendingStudentItem[] = await Promise.all(
     rawStudents.map(async (st) => {
       let signedUrl: string | null = null;

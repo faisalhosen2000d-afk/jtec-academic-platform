@@ -83,7 +83,7 @@ export default function SuperAdminPage() {
     const result = await signOut();
 
     if (result.success) {
-      redirect("/");
+      redirect("/staff-login");
     }
   }
 
