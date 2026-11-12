@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { UploadCloud, FileSpreadsheet, AlertTriangle, CheckCircle, FileText, ShieldAlert, X, Download } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { UploadCloud, FileSpreadsheet, AlertTriangle, CheckCircle, FileText, ShieldAlert, X, Download, ChevronDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   verifyMissingStudentsForBatch,
@@ -43,6 +43,88 @@ interface MissingStudentInfo {
   full_name: string;
   student_id: string;
   email: string;
+}
+
+function ModernDropdown({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  options: { value: string; label: string }[];
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, []);
+
+  const selectedLabel =
+    options.find((o) => o.value === value)?.label || placeholder;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className={`flex h-11 w-full items-center justify-between gap-2 rounded-xl border px-3.5 text-xs font-medium transition-all cursor-pointer ${
+          open
+            ? "border-emerald-400/80 bg-slate-900 text-white ring-2 ring-emerald-500/20"
+            : "border-slate-700/80 bg-slate-950/90 text-slate-200 hover:border-slate-600 hover:bg-slate-900"
+        }`}
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-200 ${
+            open ? "rotate-180 text-emerald-400" : ""
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 z-50 mt-2 max-h-60 overflow-y-auto rounded-2xl border border-slate-700/80 bg-[#0B1224]/95 p-1.5 shadow-2xl backdrop-blur-xl">
+          {options.map((opt) => {
+            const isSelected = opt.value === value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors cursor-pointer ${
+                  isSelected
+                    ? "bg-emerald-500/15 font-semibold text-emerald-300"
+                    : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                }`}
+              >
+                <span className="truncate">{opt.label}</span>
+                {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function ResultUploadClient({ departments, batches, levels, terms }: ResultUploadClientProps) {
@@ -294,75 +376,35 @@ export default function ResultUploadClient({ departments, batches, levels, terms
       )}
 
       {/* Target Level & Batch Selector */}
-      <div className="bg-card border rounded-2xl p-6 shadow-sm space-y-4">
+      <div className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-4">
         <h2 className="text-base font-bold flex items-center gap-2">
-          <FileText className="w-5 h-5 text-blue-600" />
+          <FileText className="w-5 h-5 text-emerald-400" />
           1. Select Target Department, Batch & Term
         </h2>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase">Department</label>
-            <select
-              value={selectedDept}
-              onChange={(e) => setSelectedDept(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl border bg-background text-sm font-medium"
-            >
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name} ({d.code})
-                </option>
-              ))}
-            </select>
+            <label className="text-xs font-semibold text-slate-400 uppercase">Department</label>
+            <ModernDropdown value={selectedDept} onChange={setSelectedDept} placeholder="Select Department" options={departments.map((d) => ({ value: d.id, label: `${d.name} (${d.code})` }))} />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase">Batch</label>
-            <select
-              value={selectedBatch}
-              onChange={(e) => setSelectedBatch(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl border bg-background text-sm font-medium"
-            >
-              {batches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+            <label className="text-xs font-semibold text-slate-400 uppercase">Batch</label>
+            <ModernDropdown value={selectedBatch} onChange={setSelectedBatch} placeholder="Select Batch" options={batches.map((b) => ({ value: b.id, label: b.name }))} />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase">Academic Level</label>
-            <select
-              value={selectedLevel}
-              onChange={(e) => setSelectedLevel(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl border bg-background text-sm font-medium"
-            >
-              {levels.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
+            <label className="text-xs font-semibold text-slate-400 uppercase">Academic Level</label>
+            <ModernDropdown value={selectedLevel} onChange={setSelectedLevel} placeholder="Select Level" options={levels.map((l) => ({ value: l.id, label: l.name }))} />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase">Academic Term</label>
-            <select
-              value={selectedTerm}
-              onChange={(e) => setSelectedTerm(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl border bg-background text-sm font-medium"
-            >
-              {Array.from(new Map(terms.map((t) => [t.name.trim(), t])).values()).map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+            <label className="text-xs font-semibold text-slate-400 uppercase">Academic Term</label>
+            <ModernDropdown value={selectedTerm} onChange={setSelectedTerm} placeholder="Select Term" options={Array.from(new Map(terms.map((t) => [t.name.trim(), { value: t.id, label: t.name }])).values())} />
           </div>
         </div>
 
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-semibold">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs font-semibold">
           <span>Targeting: Level {lvlNum} Term {trmNum} (Key: {levelTermKey})</span>
           {isFirstTerm ? (
             <span className="bg-blue-200 dark:bg-blue-800 text-blue-900 dark:text-blue-100 px-2 py-0.5 rounded-full text-[10px]">
@@ -377,15 +419,15 @@ export default function ResultUploadClient({ departments, batches, levels, terms
       </div>
 
       {/* Excel / CSV Upload Zone & Paste Area */}
-      <div className="bg-card border rounded-2xl p-6 shadow-sm space-y-5">
+      <div className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-bold flex items-center gap-2">
-              <UploadCloud className="w-5 h-5 text-blue-600" />
+              <UploadCloud className="w-5 h-5 text-emerald-400" />
               2. Upload Result Sheet or Paste Data
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Accepted columns: <span className="font-mono font-semibold text-foreground">StudentID, Term GPA{isFirstTerm ? "" : ", CGPA"}, Retakes</span>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Accepted columns: <span className="font-mono font-semibold text-white">StudentID, Term GPA{isFirstTerm ? "" : ", CGPA"}, Retakes</span>
             </p>
           </div>
 
@@ -395,7 +437,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
             onClick={handleDownloadTemplate}
             className="text-xs h-9 px-3 gap-1.5 self-start sm:self-auto"
           >
-            <Download className="w-4 h-4 text-muted-foreground" />
+            <Download className="w-4 h-4 text-slate-400" />
             Download Excel Template (.csv)
           </Button>
         </div>
@@ -412,18 +454,18 @@ export default function ResultUploadClient({ departments, batches, levels, terms
             accept=".csv,.txt,.tsv"
             className="hidden"
           />
-          <FileSpreadsheet className="w-10 h-10 mx-auto text-blue-600 mb-2" />
+          <FileSpreadsheet className="w-10 h-10 mx-auto text-emerald-400 mb-2" />
           <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
             {uploadedFileName ? `Selected: ${uploadedFileName}` : "Click to select or drop your Excel/CSV result file here"}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             Supports CSV, TSV, or comma-separated exports directly from MS Excel or Google Sheets
           </p>
         </div>
 
         {/* Text Area for Direct Copy-Paste from Excel */}
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-muted-foreground uppercase flex items-center justify-between">
+          <label className="text-xs font-semibold text-slate-400 uppercase flex items-center justify-between">
             <span>Or Copy & Paste directly from Excel</span>
             <span className="text-[11px] font-normal lowercase">Tabs, commas or lines are auto-detected</span>
           </label>
@@ -436,7 +478,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
                 ? "StudentID\tGPA\tRetakes\n24060401001\t3.85\t0\n24060401002\t3.42\t1\n24060401021\t3.92\t0"
                 : "StudentID\tGPA\tCGPA\tRetakes\n24060401001\t3.85\t3.80\t0\n24060401002\t3.42\t3.45\t1\n24060401021\t3.92\t3.90\t0"
             }
-            className="w-full p-4 rounded-xl border bg-background font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+            className="w-full p-4 rounded-xl border bg-slate-950 border-slate-700/80 text-slate-200 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
           />
         </div>
 
@@ -457,15 +499,15 @@ export default function ResultUploadClient({ departments, batches, levels, terms
 
       {/* Parsed Preview Table */}
       {parsedResults.length > 0 && (
-        <div className="bg-card border rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-4">
           <h3 className="text-sm font-bold flex items-center justify-between">
             <span>Parsed Entries Preview ({parsedResults.length} Students)</span>
-            <span className="text-xs font-normal text-muted-foreground">Ready to commit to database</span>
+            <span className="text-xs font-normal text-slate-400">Ready to commit to database</span>
           </h3>
 
           <div className="overflow-x-auto max-h-96 overflow-y-auto rounded-xl border shadow-inner">
             <table className="w-full text-xs text-left">
-              <thead className="bg-muted text-muted-foreground uppercase font-semibold">
+              <thead className="bg-muted text-slate-400 uppercase font-semibold">
                 <tr>
                   <th className="px-3 py-2.5">#</th>
                   <th className="px-3 py-2.5">Student ID</th>
@@ -477,9 +519,9 @@ export default function ResultUploadClient({ departments, batches, levels, terms
               <tbody className="divide-y divide-border">
                 {parsedResults.map((r, i) => (
                   <tr key={i} className="hover:bg-muted/40">
-                    <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
+                    <td className="px-3 py-2 text-slate-400">{i + 1}</td>
                     <td className="px-3 py-2 font-mono font-bold">{r.student_id_string}</td>
-                    <td className="px-3 py-2 font-semibold text-blue-600">{r.gpa.toFixed(2)}</td>
+                    <td className="px-3 py-2 font-semibold text-emerald-400">{r.gpa.toFixed(2)}</td>
                     <td className="px-3 py-2">
                       {isFirstTerm ? "N/A (1-1)" : r.cgpa !== null && r.cgpa !== undefined ? r.cgpa.toFixed(2) : "Same as GPA"}
                     </td>
@@ -498,7 +540,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
             </table>
           </div>
           {false && (
-            <p className="text-center text-xs text-muted-foreground">
+            <p className="text-center text-xs text-slate-400">
               Showing first 10 of {parsedResults.length} parsed records
             </p>
           )}
@@ -513,20 +555,20 @@ export default function ResultUploadClient({ departments, batches, levels, terms
               <div className="flex items-center gap-2.5 text-amber-600 dark:text-amber-400">
                 <ShieldAlert className="w-6 h-6 shrink-0 animate-pulse" />
                 <div>
-                  <h3 className="text-base font-bold text-foreground">
+                  <h3 className="text-base font-bold text-white">
                     Missing Students Detected ({missingStudents.length})
                   </h3>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-slate-400">
                     These registered students were omitted from this term result sheet.
                   </p>
                 </div>
               </div>
-              <button onClick={() => setShowModal(false)} className="text-muted-foreground hover:text-foreground">
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-xs text-muted-foreground leading-relaxed">
+            <p className="text-xs text-slate-400 leading-relaxed">
               Official JTEC result sheets omit students who received an Air Drop. Please review each missing student below and select whether they should be migrated to the junior batch or excluded:
             </p>
 
