@@ -62,7 +62,16 @@ export default async function StudentRankingPage({
     profile.department_id ? supabase.from("departments").select("name, code").eq("id", profile.department_id).maybeSingle() : Promise.resolve({ data: null }),
     profile.batch_id ? supabase.from("batches").select("name").eq("id", profile.batch_id).maybeSingle() : Promise.resolve({ data: null }),
     rawClient.rpc("get_registered_student_names"),
-    rawClient.from("term_results").select("student_id, student_id_code, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count, remarks, status").order("level_term_key", { ascending: true }),
+    (() => {
+      let q = rawClient
+        .from("term_results")
+        .select("student_id, student_id_code, department_id, batch_id, level_term_key, gpa, cgpa, term_retake_count, remarks, status")
+        .order("level_term_key", { ascending: true })
+        .limit(5000);
+      if (profile.department_id) q = q.eq("department_id", profile.department_id);
+      if (profile.batch_id) q = q.eq("batch_id", profile.batch_id);
+      return q;
+    })(),
     rawClient.from("student_air_drop_history").select("dropped_roll, from_batch, junior_batch_assigned, dropped_term"),
   ]);
 
@@ -86,7 +95,7 @@ export default async function StudentRankingPage({
     (r) => r.student_id === user.id || (r.student_id_code && r.student_id_code.trim().toLowerCase() === myRollClean)
   );
   const targetBatchId = profile.batch_id || myResultRow?.batch_id;
-  const targetDeptId = myResultRow?.department_id || profile.department_id;
+  const targetDeptId = profile.department_id || myResultRow?.department_id;
 
   const batchResults = allResults.filter(
     (r) => (!targetBatchId || r.batch_id === targetBatchId) && (!targetDeptId || r.department_id === targetDeptId)
