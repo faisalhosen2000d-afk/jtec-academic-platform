@@ -275,6 +275,27 @@ export default function ModernAuthCard({
 
   return (
     <main className={mainCls}>
+      <style>{`
+        @keyframes authFadeUp {
+          0% { opacity: 0; transform: translateY(24px) scale(0.98); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes authGoldShimmer {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+        .auth-stagger {
+          animation: authFadeUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        .auth-gold-text {
+          background: linear-gradient(90deg, #fbbf24, #fde68a, #f59e0b, #fbbf24);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: authGoldShimmer 5s ease infinite;
+        }
+      `}</style>
       <div className={glowTopCls} aria-hidden="true" />
       <div className={glowBotCls} aria-hidden="true" />
 
@@ -326,19 +347,19 @@ export default function ModernAuthCard({
           </div>
 
           <div className="relative z-10 my-auto max-w-lg space-y-5 py-8">
-            <h1 className={`${heroTitleCls} auth-stagger`} style={{ animationDelay: "80ms" }}>
+            <h1 className={`${heroTitleCls} auth-stagger`} style={{ animationDelay: "100ms" }}>
               Jhenaidah Textile{" "}
               <span className="auth-gold-text">Engineering College</span>
             </h1>
 
-            <p className="auth-stagger text-sm leading-relaxed text-slate-300/90" style={{ animationDelay: "200ms" }}>
+            <p className="auth-stagger text-sm leading-relaxed text-slate-300/90" style={{ animationDelay: "260ms" }}>
               Access your personalized student dashboard, official semester
               transcript, approved course materials, and departmental circulars
               in one unified operating system.
             </p>
 
             <div className="grid gap-3 pt-2">
-              <div className={`${featureCardCls} auth-stagger transition-all duration-300 hover:translate-x-1 hover:border-amber-500/40`} style={{ animationDelay: "320ms" }}>
+              <div className={`${featureCardCls} auth-stagger transition-all duration-300 hover:translate-x-1 hover:border-amber-500/40`} style={{ animationDelay: "420ms" }}>
                 <div className={iconAmberCls}>
                   <Award className="h-4 w-4" />
                 </div>
@@ -352,7 +373,7 @@ export default function ModernAuthCard({
                 </div>
               </div>
 
-              <div className={`${featureCardCls} auth-stagger transition-all duration-300 hover:translate-x-1 hover:border-amber-500/40`} style={{ animationDelay: "320ms" }}>
+              <div className={`${featureCardCls} auth-stagger transition-all duration-300 hover:translate-x-1 hover:border-amber-500/40`} style={{ animationDelay: "580ms" }}>
                 <div className={iconRedCls}>
                   <BookOpen className="h-4 w-4" />
                 </div>
@@ -368,7 +389,7 @@ export default function ModernAuthCard({
             </div>
           </div>
 
-          <div className={`${statusRowCls} auth-stagger`} style={{ animationDelay: "540ms" }}>
+          <div className={`${statusRowCls} auth-stagger`} style={{ animationDelay: "720ms" }}>
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
