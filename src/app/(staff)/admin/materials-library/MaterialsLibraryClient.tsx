@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getStaffMaterialAccessUrl } from "./actions";
 import {
   ArrowLeft,
@@ -13,6 +13,8 @@ import {
   RotateCcw,
   FileText,
   Presentation,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 
 export interface LibraryMaterialItem {
@@ -46,6 +48,88 @@ export interface FilterOption {
   label: string;
 }
 
+function ModernDropdown({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  options: { value: string; label: string }[];
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, []);
+
+  const selectedLabel =
+    options.find((o) => o.value === value)?.label || placeholder;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className={`flex h-10 w-full items-center justify-between gap-2 rounded-xl border px-3.5 text-xs font-medium transition-all cursor-pointer ${
+          open
+            ? "border-sky-400/80 bg-slate-900 text-white ring-2 ring-sky-500/20"
+            : "border-slate-700/80 bg-slate-950/90 text-slate-200 hover:border-slate-600 hover:bg-slate-900"
+        }`}
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-200 ${
+            open ? "rotate-180 text-sky-400" : ""
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 z-40 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-slate-700/80 bg-[#0B1224]/95 p-1.5 shadow-2xl backdrop-blur-xl">
+          {options.map((opt) => {
+            const isSelected = opt.value === value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors cursor-pointer ${
+                  isSelected
+                    ? "bg-sky-500/15 font-semibold text-sky-300"
+                    : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                }`}
+              >
+                <span className="truncate">{opt.label}</span>
+                {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-sky-400" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MaterialsLibraryClient({
   materials,
   subjects,
@@ -65,16 +149,18 @@ export function MaterialsLibraryClient({
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Cascading curriculum subjects based on selected Department, Level, and Term
   const availableSubjects = useMemo(() => {
     const map = new Map<string, string>();
-    const source = subjects.length > 0 ? subjects : materials.map((m) => ({
-      code: m.subject_code,
-      name: m.subject_name,
-      department_id: m.department_id,
-      level_id: m.level_id,
-      term_name: m.term_name,
-    }));
+    const source =
+      subjects.length > 0
+        ? subjects
+        : materials.map((m) => ({
+            code: m.subject_code,
+            name: m.subject_name,
+            department_id: m.department_id,
+            level_id: m.level_id,
+            term_name: m.term_name,
+          }));
 
     source.forEach((s) => {
       if (deptId !== "all" && s.department_id !== deptId) return;
@@ -186,7 +272,7 @@ export function MaterialsLibraryClient({
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 space-y-6">
-        <section className="rounded-2xl border border-slate-800 bg-[#0A1020] p-5 shadow-xl space-y-4">
+        <section className="relative z-20 rounded-2xl border border-slate-800 bg-[#0A1020] p-5 shadow-xl space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -209,63 +295,55 @@ export function MaterialsLibraryClient({
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <select
+            <ModernDropdown
               value={deptId}
-              onChange={(e) => {
-                setDeptId(e.target.value);
+              onChange={(val) => {
+                setDeptId(val);
                 setSubjectCode("all");
               }}
-              className="h-10 rounded-xl border border-slate-700/80 bg-slate-950 px-3 text-xs font-medium text-slate-200 focus:border-sky-400 focus:outline-none"
-            >
-              <option value="all">All Departments</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.label}
-                </option>
-              ))}
-            </select>
+              placeholder="All Departments"
+              options={[
+                { value: "all", label: "All Departments" },
+                ...departments.map((d) => ({ value: d.id, label: d.label })),
+              ]}
+            />
 
-            <select
+            <ModernDropdown
               value={levelId}
-              onChange={(e) => {
-                setLevelId(e.target.value);
+              onChange={(val) => {
+                setLevelId(val);
                 setSubjectCode("all");
               }}
-              className="h-10 rounded-xl border border-slate-700/80 bg-slate-950 px-3 text-xs font-medium text-slate-200 focus:border-sky-400 focus:outline-none"
-            >
-              <option value="all">All Levels</option>
-              {levels.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.label}
-                </option>
-              ))}
-            </select>
+              placeholder="All Levels"
+              options={[
+                { value: "all", label: "All Levels" },
+                ...levels.map((l) => ({ value: l.id, label: l.label })),
+              ]}
+            />
 
-            <select
+            <ModernDropdown
               value={termName}
-              onChange={(e) => {
-                setTermName(e.target.value);
+              onChange={(val) => {
+                setTermName(val);
                 setSubjectCode("all");
               }}
-              className="h-10 rounded-xl border border-slate-700/80 bg-slate-950 px-3 text-xs font-medium text-slate-200 focus:border-sky-400 focus:outline-none"
-            >
-              <option value="all">All Terms</option>
-              <option value="Term 1">Term 1</option>
-              <option value="Term 2">Term 2</option>
-            </select>
+              placeholder="All Terms"
+              options={[
+                { value: "all", label: "All Terms" },
+                { value: "Term 1", label: "Term 1" },
+                { value: "Term 2", label: "Term 2" },
+              ]}
+            />
 
-            <select
+            <ModernDropdown
               value={subjectCode}
-              onChange={(e) => setSubjectCode(e.target.value)}
-              className="h-10 rounded-xl border border-slate-700/80 bg-slate-950 px-3 text-xs font-medium text-slate-200 focus:border-sky-400 focus:outline-none"
-            >
-              <option value="all">All Subjects ({availableSubjects.length})</option>
-              {availableSubjects.map((s) => (
-                <option key={s.code} value={s.code}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSubjectCode(val)}
+              placeholder={`All Subjects (${availableSubjects.length})`}
+              options={[
+                { value: "all", label: `All Subjects (${availableSubjects.length})` },
+                ...availableSubjects.map((s) => ({ value: s.code, label: s.label })),
+              ]}
+            />
           </div>
 
           <div className="flex items-center justify-between pt-1 text-xs text-slate-400">
