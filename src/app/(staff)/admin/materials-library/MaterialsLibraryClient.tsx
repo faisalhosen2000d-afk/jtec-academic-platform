@@ -98,9 +98,10 @@ export function MaterialsLibraryClient({
       if (termName !== "all" && m.term_name.toLowerCase() !== termName.toLowerCase()) return false;
       if (subjectCode !== "all" && m.subject_code !== subjectCode) return false;
       if (q) {
+        const words = q.replace(/\s+/g, " ").split(" ").filter(Boolean);
         const haystack =
           `${m.title} ${m.description || ""} ${m.subject_code} ${m.subject_name} ${m.department_code}`.toLowerCase();
-        if (!haystack.includes(q)) return false;
+        if (!words.every((w) => haystack.includes(w))) return false;
       }
       return true;
     });
