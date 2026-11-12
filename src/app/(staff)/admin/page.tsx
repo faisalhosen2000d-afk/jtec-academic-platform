@@ -207,37 +207,6 @@ export default async function AdminDashboardPage() {
                 {activeNotices}
               </p>
             </div>
-            {/* 7. Academic Materials Library (Blue - Standalone Classroom Vault) */}
-            <div className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-800/90 bg-[#0A1020]/95 p-6 shadow-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-500/50">
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500/60 to-transparent opacity-60 transition-opacity group-hover:opacity-100" />
-              <div>
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="font-serif text-xl font-bold text-white">
-                    Materials Library
-                  </h3>
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-400">
-                    <BookOpen className="h-5 w-5" />
-                  </div>
-                </div>
-                <p className="mt-2.5 text-sm leading-relaxed text-slate-400">
-                  Classroom teaching vault: browse, search, and open approved materials across all departments, levels, and terms.
-                </p>
-              </div>
-
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800/80 pt-4">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-300">
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                  All Departments Vault
-                </span>
-                <Link
-                  href="/admin/materials-library"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-blue-500/30 bg-blue-500/15 px-3.5 py-2 text-xs font-bold text-blue-300 transition-all hover:bg-blue-500/25 hover:text-blue-200"
-                >
-                  <span>Open Library</span>
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                </Link>
-              </div>
-            </div>
           </div>
         </section>
 
