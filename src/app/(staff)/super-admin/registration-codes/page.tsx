@@ -77,6 +77,7 @@ export default async function RegistrationCodesPage() {
     levelsResult,
     termsResult,
     registrationCodesResult,
+    verifiedProfilesResult,
   ] = await Promise.all([
     supabase.from("departments").select("id, name, code").order("name"),
     supabase.from("batches").select("id, name").order("name"),
@@ -91,6 +92,11 @@ export default async function RegistrationCodesPage() {
         "id, code, role_scope, department_id, batch_id, level_id, term_id, max_uses, used_count, expires_at, is_active, created_at, student_id",
       )
       .order("created_at", { ascending: false }),
+    supabase
+      .from("profiles")
+      .select("student_id")
+      .eq("is_verified", true)
+      .not("student_id", "is", null),
   ]);
 
   if (departmentsResult.error) throw new Error(departmentsResult.error.message);
@@ -104,6 +110,12 @@ export default async function RegistrationCodesPage() {
   const batches = (batchesResult.data ?? []) as Batch[];
   const levels = (levelsResult.data ?? []) as Level[];
   const terms = (termsResult.data ?? []) as Term[];
+  const verifiedStudentRolls = new Set(
+    ((verifiedProfilesResult.data ?? []) as Array<{ student_id: string | null }>)
+      .map((p) => p.student_id?.trim())
+      .filter((id): id is string => Boolean(id)),
+  );
+
   const registrationCodes =
     (registrationCodesResult.data ?? []) as RegistrationCode[];
 
@@ -114,10 +126,15 @@ export default async function RegistrationCodesPage() {
 
   const now = Date.now();
   const activeCount = registrationCodes.filter(
-    (c) =>
-      c.is_active &&
-      c.used_count < c.max_uses &&
-      (c.expires_at === null || new Date(c.expires_at).getTime() > now),
+    (c) => {
+      const matchedVerified = Boolean(c.student_id && verifiedStudentRolls.has(c.student_id.trim()));
+      const effectiveUsed = matchedVerified ? Math.max(c.used_count, c.max_uses) : c.used_count;
+      return (
+        c.is_active &&
+        effectiveUsed < c.max_uses &&
+        (c.expires_at === null || new Date(c.expires_at).getTime() > now)
+      );
+    },
   ).length;
   const usedOrExpiredCount = registrationCodes.length - activeCount;
 
@@ -236,8 +253,15 @@ export default async function RegistrationCodesPage() {
                 const isExpired =
                   registrationCode.expires_at !== null &&
                   new Date(registrationCode.expires_at).getTime() <= now;
+                const isMatchedVerifiedStudent = Boolean(
+                  registrationCode.student_id &&
+                    verifiedStudentRolls.has(registrationCode.student_id.trim()),
+                );
+                const effectiveUsedCount = isMatchedVerifiedStudent
+                  ? Math.max(registrationCode.used_count, registrationCode.max_uses)
+                  : registrationCode.used_count;
                 const isUsedUp =
-                  registrationCode.used_count >= registrationCode.max_uses;
+                  effectiveUsedCount >= registrationCode.max_uses;
                 const effectiveActive =
                   registrationCode.is_active && !isExpired && !isUsedUp;
 
@@ -313,7 +337,7 @@ export default async function RegistrationCodesPage() {
                           <div>
                             <p className="text-slate-400">Usage</p>
                             <p className="mt-0.5 font-medium text-white">
-                              {registrationCode.used_count} /{" "}
+                              {effectiveUsedCount} /{" "}
                               {registrationCode.max_uses}
                             </p>
                           </div>
