@@ -149,13 +149,7 @@ export default async function AdminNoticesPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2.5">
-            <Link
-              href="/admin/notices/bulk-delete"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2 text-xs font-semibold text-rose-300 transition-all hover:bg-rose-500/20"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              <span>Bulk Delete</span>
-            </Link>
+
             <Link
               href={profile.role === "super_admin" ? "/super-admin" : "/admin"}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-200 transition-all hover:border-cyan-500/50 hover:text-cyan-300"
@@ -192,10 +186,23 @@ export default async function AdminNoticesPage() {
         <section className="lg:col-span-7 rounded-2xl border border-cyan-500/35 bg-gradient-to-b from-cyan-950/20 via-[#0A1020] to-[#0A1020] shadow-[0_0_35px_rgba(6,182,212,0.08)] transition-all duration-300 hover:border-cyan-400/60 hover:shadow-[0_0_50px_rgba(6,182,212,0.2)]">
           <div className="flex flex-col gap-4 border-b border-slate-800/80 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-semibold">Published Notices</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                Published and archived notices will appear here.
-              </p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Published Notices</h2>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Published and archived notices will appear here.
+                  </p>
+                </div>
+                {canDelete && (
+                  <Link
+                    href="/admin/notices/bulk-delete"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/35 bg-rose-500/10 px-3.5 py-2 text-xs font-semibold text-rose-300 transition-all hover:border-rose-400/60 hover:bg-rose-500/20 hover:shadow-[0_0_18px_rgba(244,63,94,0.2)]"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Bulk Delete</span>
+                  </Link>
+                )}
+              </div>
 
               <NoticeList canDelete={canDelete} categories={categories ?? []}>
           {(notices ?? []).map((notice) => {
