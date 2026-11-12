@@ -169,7 +169,7 @@ export default async function AdminNoticesPage() {
 
       <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
-          <section className="lg:col-span-5 rounded-2xl border border-cyan-500/35 bg-[#0A1020] p-6 shadow-[0_0_35px_rgba(6,182,212,0.08)]">
+          <section className="group relative lg:col-span-5 rounded-2xl border border-cyan-500/35 bg-[#0A1020] p-6 shadow-[0_0_35px_rgba(6,182,212,0.08)] transition-all duration-300 hover:border-cyan-400/60 hover:shadow-[0_0_50px_rgba(6,182,212,0.2)]">
           <div className="mb-5">
             <h2 className="text-lg font-semibold">Publish New Notice</h2>
 

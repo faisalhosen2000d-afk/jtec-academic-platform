@@ -308,7 +308,7 @@ export default function NoticeCreateForm({
           </p>
         </div>
 
-        <div>
+        {hasDepartment && (<div className="grid grid-cols-1 gap-3 sm:grid-cols-3 pt-1"><div>
           <label
             htmlFor="notice-batch"
             className="mb-2 block text-sm font-medium"
@@ -339,7 +339,7 @@ export default function NoticeCreateForm({
           </label>
 
           <ModernDropdown name="target_term_id" value={selectedTermId} onChange={setSelectedTermId} disabled={!canPublish || isSubmitting || !hasDepartment || !selectedLevelId} placeholder={!hasDepartment ? "Select a Department First" : !selectedLevelId ? "Select a Level First" : "All Terms"} options={[{ value: "", label: !hasDepartment ? "Select a Department First" : !selectedLevelId ? "Select a Level First" : "All Terms" }, ...(hasDepartment && selectedLevelId ? terms.filter((t) => t.level_id === selectedLevelId).map((t) => ({ value: t.id, label: t.name })) : [])]} />
-        </div>
+        </div></div>)}
 
         <div className="md:col-span-2">
           <label

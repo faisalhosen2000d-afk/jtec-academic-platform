@@ -2,10 +2,70 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Search, Filter, Trash2 } from "lucide-react";
+import { Search, Filter, Trash2, ChevronDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const NOTICES_PER_PAGE = 10;
+
+function ListFilterDropdown({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const out = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", out);
+    return () => document.removeEventListener("mousedown", out);
+  }, []);
+
+  const currentLabel = options.find((o) => o.value === value)?.label || "All Categories";
+
+  return (
+    <div ref={ref} className="relative min-w-[175px]">
+      <button
+        type="button"
+        onClick={() => setOpen((p) => !p)}
+        className={`flex h-10 w-full items-center justify-between gap-2 rounded-xl border px-3.5 text-xs font-medium transition-all cursor-pointer ${
+          open
+            ? "border-cyan-400/80 bg-slate-900 text-white ring-2 ring-cyan-500/20"
+            : "border-cyan-500/25 bg-gradient-to-r from-slate-950 via-cyan-950/25 to-slate-950 text-slate-200 hover:border-cyan-400/50"
+        }`}
+      >
+        <span className="truncate">{currentLabel}</span>
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180 text-cyan-400" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute right-0 z-50 mt-2 w-full min-w-[190px] max-h-56 overflow-y-auto rounded-2xl border border-slate-700/80 bg-[#0B1224]/95 p-1.5 shadow-2xl backdrop-blur-xl">
+          {options.map((opt) => {
+            const active = opt.value === value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors cursor-pointer ${
+                  active ? "bg-cyan-500/15 font-semibold text-cyan-300" : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                }`}
+              >
+                <span className="truncate">{opt.label}</span>
+                {active && <Check className="h-3.5 w-3.5 shrink-0 text-cyan-400" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function NoticeList({
   children,
@@ -81,19 +141,7 @@ export default function NoticeList({
 
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-slate-400 shrink-0 hidden sm:block" />
-            <select
-              value={category}
-              onChange={(event) => setCategory(event.target.value)}
-              aria-label="Filter notices by category"
-              className="w-full sm:w-56 h-10 rounded-xl border border-input bg-slate-950/90 text-slate-100 border-slate-700/80 px-3 text-xs font-medium text-slate-100 focus:ring-2 focus:ring-primary focus:outline-none"
-            >
-              <option value="all">All Categories</option>
-              {categories.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
+            <ListFilterDropdown value={category} onChange={setCategory} options={[{ value: "all", label: "All Categories" }, ...categories.map((c) => ({ value: c.id, label: c.name }))]} />
           </div>
         </div>
 
