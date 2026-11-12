@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { ChevronDown, Check } from "lucide-react";
 import { publishNotice } from "@/server/actions/notices";
 import { Button } from "@/components/ui/button";
 
@@ -21,6 +22,96 @@ type NoticeCreateFormProps = {
   terms: TermOption[];
   canPublish: boolean;
 };
+
+function ModernDropdown({
+  name,
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled = false,
+}: {
+  name?: string;
+  value: string;
+  onChange: (val: string) => void;
+  options: { value: string; label: string }[];
+  placeholder: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, []);
+
+  const selectedLabel =
+    options.find((o) => o.value === value)?.label || placeholder;
+
+  return (
+    <div ref={containerRef} className="relative">
+      {name && <input type="hidden" name={name} value={value} />}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((prev) => !prev)}
+        className={`flex h-10 w-full items-center justify-between gap-2 rounded-xl border px-3.5 text-xs font-medium transition-all ${
+          disabled
+            ? "cursor-not-allowed border-slate-800 bg-slate-950/50 text-slate-500 opacity-60"
+            : open
+              ? "cursor-pointer border-cyan-400/80 bg-slate-900 text-white ring-2 ring-cyan-500/20"
+              : "cursor-pointer border-slate-700/80 bg-slate-950/90 text-slate-200 hover:border-slate-600 hover:bg-slate-900"
+        }`}
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-200 ${
+            open ? "rotate-180 text-cyan-400" : ""
+          }`}
+        />
+      </button>
+
+      {open && !disabled && (
+        <div className="absolute left-0 right-0 z-50 mt-2 max-h-56 overflow-y-auto rounded-2xl border border-slate-700/80 bg-[#0B1224]/95 p-1.5 shadow-2xl backdrop-blur-xl">
+          {options.map((opt) => {
+            const isSelected = opt.value === value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors cursor-pointer ${
+                  isSelected
+                    ? "bg-cyan-500/15 font-semibold text-cyan-300"
+                    : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                }`}
+              >
+                <span className="truncate">{opt.label}</span>
+                {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-cyan-400" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function NoticeCreateForm({
   departments,
@@ -101,7 +192,7 @@ export default function NoticeCreateForm({
       className="space-y-6"
     >
       {!canPublish && (
-        <div className="rounded-lg border border-slate-700/80 bg-slate-900/40 p-4 text-sm text-slate-400">
+        <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 text-sm text-slate-400">
           You do not currently have permission to publish notices.
           Please contact the Super Admin.
         </div>
@@ -111,7 +202,7 @@ export default function NoticeCreateForm({
         <div
           className={`rounded-lg border p-4 text-sm ${
             messageType === "success"
-              ? "border-slate-700/80 bg-slate-900/40"
+              ? "border-slate-800 bg-slate-900/40"
               : "border-destructive/40 bg-destructive/10 text-destructive"
           }`}
         >
@@ -136,7 +227,7 @@ export default function NoticeCreateForm({
             required
             disabled={!canPublish || isSubmitting}
             placeholder="Enter notice title"
-            className="w-full rounded-md border border-input bg-slate-950/90 text-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
+            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
           />
         </div>
 
@@ -156,7 +247,7 @@ export default function NoticeCreateForm({
             required
             disabled={!canPublish || isSubmitting}
             placeholder="Write the notice content..."
-            className="w-full rounded-md border border-input bg-slate-950/90 text-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
+            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
           />
         </div>
 
@@ -168,43 +259,7 @@ export default function NoticeCreateForm({
             Category
           </label>
 
-          <select
-            id="notice-category"
-            name="category_id"
-            value={selectedCategoryId}
-            onChange={(event) => {
-              const value = event.target.value;
-              setSelectedCategoryId(value);
-
-              const selectedCategory = categories.find(
-                (category) => category.id === value,
-              );
-
-              if (selectedCategory?.name !== "Others") {
-                setCustomCategoryName("");
-              }
-            }}
-            disabled={!canPublish || isSubmitting}
-            className="w-full rounded-md border border-input bg-slate-950/90 text-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
-          >
-            <option value="">No Category</option>
-
-            {categories
-              .filter((category) => category.name !== "Others")
-              .map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-
-            {categories
-              .filter((category) => category.name === "Others")
-              .map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-          </select>
+          <ModernDropdown name="category_id" value={selectedCategoryId} onChange={(val) => { setSelectedCategoryId(val); if (val !== "other") { setCustomCategoryName(""); } }} disabled={isSubmitting || !canPublish} placeholder="No Category" options={[{ value: "", label: "No Category" }, ...categories.map((c) => ({ value: c.id, label: c.name }))]} />
 
           {isOthersCategory && (
             <div className="mt-3">
@@ -227,7 +282,7 @@ export default function NoticeCreateForm({
                 required
                 disabled={!canPublish || isSubmitting}
                 placeholder="Enter custom category name"
-                className="w-full rounded-md border border-input bg-slate-950/90 text-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
+                className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
               />
 
               <p className="mt-1 text-xs text-slate-400">
@@ -245,24 +300,7 @@ export default function NoticeCreateForm({
             Department
           </label>
 
-          <select
-            id="notice-department"
-            name="target_department_id"
-            value={selectedDepartmentId}
-            onChange={(event) =>
-              handleDepartmentChange(event.target.value)
-            }
-            disabled={!canPublish || isSubmitting}
-            className="w-full rounded-md border border-input bg-slate-950/90 text-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
-          >
-            <option value="">All Students</option>
-
-            {departments.map((department) => (
-              <option key={department.id} value={department.id}>
-                {department.name}
-              </option>
-            ))}
-          </select>
+          <ModernDropdown name="target_department_id" value={selectedDepartmentId} onChange={handleDepartmentChange} disabled={isSubmitting || !canPublish} placeholder="All Students" options={[{ value: "", label: "All Students" }, ...departments.map((d) => ({ value: d.id, label: d.name }))]} />
 
           <p className="mt-1 text-xs text-slate-400">
             Select All Students for a college-wide notice, or choose a
@@ -278,25 +316,7 @@ export default function NoticeCreateForm({
             Batch
           </label>
 
-          <select
-            id="notice-batch"
-            name="target_batch_id"
-            value={selectedBatchId}
-            onChange={(event) => setSelectedBatchId(event.target.value)}
-            disabled={!canPublish || isSubmitting || !hasDepartment}
-            className="w-full rounded-md border border-input bg-slate-950/90 text-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
-          >
-            <option value="">
-              {hasDepartment ? "All Batches" : "Select a Department First"}
-            </option>
-
-            {hasDepartment &&
-              batches.map((batch) => (
-                <option key={batch.id} value={batch.id}>
-                  {batch.name}
-                </option>
-              ))}
-          </select>
+          <ModernDropdown name="target_batch_id" value={selectedBatchId} onChange={setSelectedBatchId} disabled={!canPublish || isSubmitting || !hasDepartment} placeholder={hasDepartment ? "All Batches" : "Select a Department First"} options={[{ value: "", label: hasDepartment ? "All Batches" : "Select a Department First" }, ...(hasDepartment ? batches.map((b) => ({ value: b.id, label: b.name })) : [])]} />
         </div>
 
         <div>
@@ -307,25 +327,7 @@ export default function NoticeCreateForm({
             Level
           </label>
 
-          <select
-            id="notice-level"
-            name="target_level_id"
-            value={selectedLevelId}
-            onChange={(event) => handleLevelChange(event.target.value)}
-            disabled={!canPublish || isSubmitting || !hasDepartment}
-            className="w-full rounded-md border border-input bg-slate-950/90 text-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
-          >
-            <option value="">
-              {hasDepartment ? "All Levels" : "Select a Department First"}
-            </option>
-
-            {hasDepartment &&
-              levels.map((level) => (
-                <option key={level.id} value={level.id}>
-                  {level.name}
-                </option>
-              ))}
-          </select>
+          <ModernDropdown name="target_level_id" value={selectedLevelId} onChange={handleLevelChange} disabled={!canPublish || isSubmitting || !hasDepartment} placeholder={hasDepartment ? "All Levels" : "Select a Department First"} options={[{ value: "", label: hasDepartment ? "All Levels" : "Select a Department First" }, ...(hasDepartment ? levels.map((l) => ({ value: l.id, label: l.name })) : [])]} />
         </div>
 
         <div>
@@ -336,35 +338,7 @@ export default function NoticeCreateForm({
             Term
           </label>
 
-          <select
-            id="notice-term"
-            name="target_term_id"
-            value={selectedTermId}
-            onChange={(event) => setSelectedTermId(event.target.value)}
-            disabled={
-              !canPublish ||
-              isSubmitting ||
-              !hasDepartment ||
-              !selectedLevelId
-            }
-            className="w-full rounded-md border border-input bg-slate-950/90 text-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
-          >
-            <option value="">
-              {!hasDepartment
-                ? "Select a Department First"
-                : !selectedLevelId
-                  ? "Select a Level First"
-                  : "All Terms"}
-            </option>
-
-            {hasDepartment &&
-              selectedLevelId &&
-              visibleTerms.map((term) => (
-                <option key={term.id} value={term.id}>
-                  {term.name}
-                </option>
-              ))}
-          </select>
+          <ModernDropdown name="target_term_id" value={selectedTermId} onChange={setSelectedTermId} disabled={!canPublish || isSubmitting || !hasDepartment || !selectedLevelId} placeholder={!hasDepartment ? "Select a Department First" : !selectedLevelId ? "Select a Level First" : "All Terms"} options={[{ value: "", label: !hasDepartment ? "Select a Department First" : !selectedLevelId ? "Select a Level First" : "All Terms" }, ...(hasDepartment && selectedLevelId ? terms.filter((t) => t.level_id === selectedLevelId).map((t) => ({ value: t.id, label: t.name })) : [])]} />
         </div>
 
         <div className="md:col-span-2">
@@ -384,7 +358,7 @@ export default function NoticeCreateForm({
             type="file"
             accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
             disabled={!canPublish || isSubmitting}
-            className="w-full rounded-md border border-input bg-slate-950/90 text-slate-100 px-3 py-2 text-sm file:mr-4 file:rounded-lg file:border file:border-cyan-500/30 file:bg-cyan-500/15 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-cyan-300 hover:file:bg-cyan-500/25 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium disabled:cursor-not-allowed disabled:bg-slate-900/40"
+            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm file:mr-4 file:rounded-lg file:border file:border-cyan-500/30 file:bg-cyan-500/15 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-cyan-300 hover:file:bg-cyan-500/25 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium disabled:cursor-not-allowed disabled:bg-slate-900/40"
           />
 
           <p className="mt-1 text-xs text-slate-400">
