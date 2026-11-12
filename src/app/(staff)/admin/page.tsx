@@ -278,13 +278,13 @@ export default async function AdminDashboardPage() {
                   <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
                   {pendingMaterials} Awaiting Approval
                 </span>
-                <Link
+                <div className="flex items-center gap-2"><Link href="/admin/materials-library" className="inline-flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-300 transition-colors hover:border-sky-500/40 hover:text-sky-300"><span>Library</span></Link><Link
                   href="/admin/materials-review"
                   className="inline-flex items-center gap-1.5 rounded-xl border border-sky-500/30 bg-sky-500/15 px-3.5 py-2 text-xs font-bold text-sky-300 transition-all hover:bg-sky-500/25 hover:text-sky-200"
                 >
                   <span>Inspect Materials</span>
                   <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                </Link>
+                </Link></div>
               </div>
             </div>
 
