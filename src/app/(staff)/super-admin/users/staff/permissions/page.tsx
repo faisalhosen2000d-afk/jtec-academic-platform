@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { Button } from "@/components/ui/button";
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  KeyRound,
+  Plus,
+  Save,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 
 type AdminAccount = {
@@ -34,18 +43,13 @@ async function saveStaffScope(formData: FormData) {
   const departmentId = String(formData.get("department_id") ?? "").trim();
   const scopeId = String(formData.get("scope_id") ?? "").trim();
 
-  const canVerifyStudents =
-    formData.get("can_verify_students") === "on";
-  const canVerifyResults =
-    formData.get("can_verify_results") === "on";
+  const canVerifyStudents = formData.get("can_verify_students") === "on";
+  const canVerifyResults = formData.get("can_verify_results") === "on";
   const canManageUploadPermission =
     formData.get("can_manage_upload_permission") === "on";
-  const canApproveMaterials =
-    formData.get("can_approve_materials") === "on";
-  const canPublishNotices =
-    formData.get("can_publish_notices") === "on";
-  const canDeleteNotices =
-    formData.get("can_delete_notices") === "on";
+  const canApproveMaterials = formData.get("can_approve_materials") === "on";
+  const canPublishNotices = formData.get("can_publish_notices") === "on";
+  const canDeleteNotices = formData.get("can_delete_notices") === "on";
 
   if (!adminId) {
     redirect(
@@ -80,15 +84,11 @@ async function saveStaffScope(formData: FormData) {
     .maybeSingle();
 
   if (!targetAdmin || targetAdmin.role !== "admin") {
-    redirect(
-      "/super-admin/users/staff/permissions?error=Invalid%20Admin",
-    );
+    redirect("/super-admin/users/staff/permissions?error=Invalid%20Admin");
   }
 
   const normalizedDepartmentId =
-    departmentId === "all" || departmentId === ""
-      ? null
-      : departmentId;
+    departmentId === "all" || departmentId === "" ? null : departmentId;
 
   if (scopeId) {
     const { error } = await supabase
@@ -120,10 +120,7 @@ async function saveStaffScope(formData: FormData) {
     if (normalizedDepartmentId === null) {
       existingQuery = existingQuery.is("department_id", null);
     } else {
-      existingQuery = existingQuery.eq(
-        "department_id",
-        normalizedDepartmentId,
-      );
+      existingQuery = existingQuery.eq("department_id", normalizedDepartmentId);
     }
 
     const { data: existingScope, error: existingScopeError } =
@@ -144,8 +141,9 @@ async function saveStaffScope(formData: FormData) {
           can_verify_students: canVerifyStudents,
           can_verify_results: canVerifyResults,
           can_manage_upload_permission: canManageUploadPermission,
-          can_delete_notices: canDeleteNotices,
           can_approve_materials: canApproveMaterials,
+          can_publish_notices: canPublishNotices,
+          can_delete_notices: canDeleteNotices,
         })
         .eq("id", existingScope.id);
 
@@ -157,19 +155,17 @@ async function saveStaffScope(formData: FormData) {
         );
       }
     } else {
-      const { error } = await supabase
-        .from("staff_scopes")
-        .insert({
-          profile_id: adminId,
-          department_id: normalizedDepartmentId,
-          can_verify_students: canVerifyStudents,
-          can_verify_results: canVerifyResults,
-          can_manage_upload_permission: canManageUploadPermission,
-          can_approve_materials: canApproveMaterials,
-          can_publish_notices: canPublishNotices,
-          can_delete_notices: canDeleteNotices,
-          granted_by: user.id,
-        });
+      const { error } = await supabase.from("staff_scopes").insert({
+        profile_id: adminId,
+        department_id: normalizedDepartmentId,
+        can_verify_students: canVerifyStudents,
+        can_verify_results: canVerifyResults,
+        can_manage_upload_permission: canManageUploadPermission,
+        can_approve_materials: canApproveMaterials,
+        can_publish_notices: canPublishNotices,
+        can_delete_notices: canDeleteNotices,
+        granted_by: user.id,
+      });
 
       if (error) {
         redirect(
@@ -182,7 +178,6 @@ async function saveStaffScope(formData: FormData) {
   }
 
   revalidatePath("/super-admin/users/staff/permissions");
-
   redirect("/super-admin/users/staff/permissions?saved=1");
 }
 
@@ -231,9 +226,42 @@ async function deleteStaffScope(formData: FormData) {
   }
 
   revalidatePath("/super-admin/users/staff/permissions");
-
   redirect("/super-admin/users/staff/permissions?saved=1");
 }
+
+const CAPABILITIES = [
+  {
+    name: "can_verify_students",
+    label: "Student Verification",
+    description: "Allow verification of students in this scope.",
+  },
+  {
+    name: "can_verify_results",
+    label: "Student Result Upload",
+    description: "Allow uploading and publishing student results in this scope.",
+  },
+  {
+    name: "can_manage_upload_permission",
+    label: "Upload Permission Management",
+    description: "Allow changing student material-upload permission.",
+  },
+  {
+    name: "can_approve_materials",
+    label: "Material Approval",
+    description: "Allow approval of student-submitted materials.",
+  },
+  {
+    name: "can_publish_notices",
+    label: "Publish Notices",
+    description: "Allow publishing notices within this department scope.",
+  },
+  {
+    name: "can_delete_notices",
+    label: "Delete Notices",
+    description:
+      "Allow permanently deleting notices within this department scope.",
+  },
+] as const;
 
 export default async function StaffPermissionsPage({
   searchParams,
@@ -289,115 +317,149 @@ export default async function StaffPermissionsPage({
   const departmentList = (departments ?? []) as Department[];
   const staffScopes = (scopes ?? []) as StaffScope[];
 
-  const adminMap = new Map(
-    adminAccounts.map((admin) => [admin.id, admin]),
-  );
-
+  const adminMap = new Map(adminAccounts.map((admin) => [admin.id, admin]));
   const departmentMap = new Map(
     departmentList.map((department) => [department.id, department]),
   );
 
-  return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="mb-1 text-sm font-medium text-muted-foreground">
-              Super Admin
-            </p>
+  const globalScopesCount = staffScopes.filter(
+    (s) => s.department_id === null,
+  ).length;
 
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+  return (
+    <div className="min-h-screen bg-[#060A12] text-slate-100">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/4 h-96 w-96 rounded-full bg-violet-500/5 blur-3xl" />
+      </div>
+
+      <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#060A12]/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/40 bg-violet-500/15 px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest text-violet-300 shadow-[0_0_18px_rgba(139,92,246,0.22)]">
+                <KeyRound className="h-3 w-3" />
+                Staff Permissions
+              </span>
+              <span className="text-xs text-slate-400">Super Admin</span>
+            </div>
+            <h1 className="mt-2 font-serif text-2xl font-bold tracking-tight text-white sm:text-3xl">
               Staff Permissions
             </h1>
-
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="mt-1 text-xs text-slate-400 sm:text-sm">
               Manage department scope and capability permissions for Admin
               staff.
             </p>
           </div>
 
-          <Link href="/super-admin/users/staff">
-            <Button variant="outline">Back to Staff Management</Button>
+          <Link
+            href="/super-admin/users/staff"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-gradient-to-b from-slate-800/90 to-slate-900 px-4 py-2 text-xs font-semibold text-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:-translate-y-0.5 hover:border-violet-500/50 hover:text-violet-300 active:translate-y-0 active:scale-95"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to Staff Management</span>
           </Link>
         </div>
+      </header>
 
-        {params.saved === "1" && (
-          <div className="mb-6 rounded-lg border border-border bg-muted/40 p-4">
-            <p className="text-sm font-medium">
-              Staff permission settings saved successfully.
+      <main className="relative z-10 mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-violet-500/30 bg-[#0A1020] p-5 shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Admin Accounts
+            </p>
+            <p className="mt-2 font-serif text-3xl font-bold text-violet-300">
+              {adminAccounts.length}
             </p>
           </div>
-        )}
-
-        {params.error && (
-          <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-            <p className="text-sm font-medium text-destructive">
-              {params.error}
+          <div className="rounded-2xl border border-cyan-500/30 bg-[#0A1020] p-5 shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Configured Scopes
+            </p>
+            <p className="mt-2 font-serif text-3xl font-bold text-cyan-300">
+              {staffScopes.length}
             </p>
           </div>
-        )}
+          <div className="rounded-2xl border border-emerald-500/30 bg-[#0A1020] p-5 shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              All-Department Scopes
+            </p>
+            <p className="mt-2 font-serif text-3xl font-bold text-emerald-300">
+              {globalScopesCount}
+            </p>
+          </div>
+        </section>
 
-        <section className="mb-8 rounded-xl border border-border bg-card p-6 shadow-sm">
+        {params.saved === "1" ? (
+          <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/35 bg-emerald-500/10 px-5 py-3.5 text-xs font-semibold text-emerald-300">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>Staff permission settings saved successfully.</span>
+          </div>
+        ) : null}
+
+        {params.error ? (
+          <div className="flex items-center gap-3 rounded-2xl border border-rose-500/35 bg-rose-500/10 px-5 py-3.5 text-xs font-semibold text-rose-300">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{params.error}</span>
+          </div>
+        ) : null}
+
+        <section className="rounded-2xl border border-violet-500/30 bg-[#0A1020] p-6 shadow-xl">
           <div className="mb-5">
-            <h2 className="text-lg font-semibold">
+            <h2 className="font-serif text-lg font-bold text-white">
               Add Permission Scope
             </h2>
-
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-0.5 text-xs text-slate-400">
               Assign an Admin to a department and choose the capabilities
               available within that scope.
             </p>
           </div>
 
           {adminAccounts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-slate-400">
               No Admin accounts are available.
             </p>
           ) : (
             <form action={saveStaffScope} className="space-y-6">
               <div className="grid gap-5 md:grid-cols-2">
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label
                     htmlFor="admin_id"
-                    className="text-sm font-medium"
+                    className="block text-xs font-semibold text-slate-300"
                   >
-                    Admin
+                    Admin Account
                   </label>
-
                   <select
                     id="admin_id"
                     name="admin_id"
                     required
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                    defaultValue=""
+                    className="h-11 w-full rounded-xl border border-slate-700/80 bg-[#060A12] px-3.5 text-sm text-white [color-scheme:dark] transition-all focus:border-violet-400/80 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
                   >
-                    <option value="">Select Admin</option>
-
+                    <option value="" disabled>
+                      Select Admin
+                    </option>
                     {adminAccounts.map((admin) => (
                       <option key={admin.id} value={admin.id}>
-                        {admin.full_name} - {admin.email}
+                        {admin.full_name} ({admin.email})
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label
                     htmlFor="department_id"
-                    className="text-sm font-medium"
+                    className="block text-xs font-semibold text-slate-300"
                   >
                     Department Scope
                   </label>
-
                   <select
                     id="department_id"
                     name="department_id"
-                    defaultValue=""
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                    defaultValue="all"
+                    className="h-11 w-full rounded-xl border border-slate-700/80 bg-[#060A12] px-3.5 text-sm text-white [color-scheme:dark] transition-all focus:border-violet-400/80 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
                   >
-                    <option value="">
-                      All Departments
-                    </option>
-
+                    <option value="all">All Departments</option>
                     {departmentList.map((department) => (
                       <option key={department.id} value={department.id}>
                         {department.name}
@@ -407,293 +469,161 @@ export default async function StaffPermissionsPage({
                 </div>
               </div>
 
-              <div>
-                <h3 className="mb-3 text-sm font-semibold">
-                  Capabilities
-                </h3>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex items-start gap-3 rounded-lg border border-border p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {CAPABILITIES.map((cap) => (
+                  <label
+                    key={cap.name}
+                    className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-800 bg-[#060A12] p-4 transition-all hover:border-slate-700 has-[:checked]:border-violet-500/60 has-[:checked]:bg-violet-500/10"
+                  >
                     <input
                       type="checkbox"
-                      name="can_verify_students"
-                      className="mt-1"
+                      name={cap.name}
+                      className="mt-0.5 h-4 w-4 rounded accent-violet-500"
                     />
-
                     <span>
-                      <span className="block text-sm font-medium">
-                        Student Verification
+                      <span className="block text-xs font-bold text-white">
+                        {cap.label}
                       </span>
-
-                      <span className="block text-xs text-muted-foreground">
-                        Allow verification of students in this scope.
+                      <span className="mt-0.5 block text-[11px] text-slate-400">
+                        {cap.description}
                       </span>
                     </span>
                   </label>
-
-                  <label className="flex items-start gap-3 rounded-lg border border-border p-4">
-                    <input
-                      type="checkbox"
-                      name="can_verify_results"
-                      className="mt-1"
-                    />
-
-                    <span>
-                      <span className="block text-sm font-medium">
-                        Student Result Upload
-                      </span>
-
-                      <span className="block text-xs text-muted-foreground">
-                        Allow uploading and publishing student results in this scope.
-                      </span>
-                    </span>
-                  </label>
-
-                  <label className="flex items-start gap-3 rounded-lg border border-border p-4">
-                    <input
-                      type="checkbox"
-                      name="can_manage_upload_permission"
-                      className="mt-1"
-                    />
-
-                    <span>
-                      <span className="block text-sm font-medium">
-                        Upload Permission Management
-                      </span>
-
-                      <span className="block text-xs text-muted-foreground">
-                        Allow changing student material-upload permission.
-                      </span>
-                    </span>
-                  </label>
-
-                  <label className="flex items-start gap-3 rounded-lg border border-border p-4">
-                    <input
-                      type="checkbox"
-                      name="can_approve_materials"
-                      className="mt-1"
-                    />
-
-                    <span>
-                      <span className="block text-sm font-medium">
-                        Material Approval
-                      </span>
-
-                      <span className="block text-xs text-muted-foreground">
-                        Allow approval of student-submitted materials.
-                      </span>
-                    </span>
-                  </label>
-
-                  <label className="flex items-start gap-3 rounded-lg border border-border p-4">
-                    <input
-                      type="checkbox"
-                      name="can_publish_notices"
-                      className="mt-1"
-                    />
-
-                    <span>
-                      <span className="block text-sm font-medium">
-                        Publish Notices
-                      </span>
-
-                      <span className="block text-xs text-muted-foreground">
-                        Allow publishing notices within this department scope.
-                      </span>
-                    </span>
-                  </label>
-
-                    <label className="flex items-start gap-3 rounded-lg border border-border p-4">
-                      <input
-                        type="checkbox"
-                        name="can_delete_notices"
-                        className="mt-1"
-                      />
-
-                      <span>
-                        <span className="block text-sm font-medium">
-                          Delete Notices
-                        </span>
-                        <span className="block text-xs text-muted-foreground">
-                          Allow permanently deleting notices within this department scope.
-                        </span>
-                      </span>
-                    </label>
-                </div>
+                ))}
               </div>
 
-              <Button type="submit">Save Permission Scope</Button>
+              <button
+                type="submit"
+                className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 px-5 text-xs font-bold text-white shadow-[0_0_20px_rgba(139,92,246,0.3)] transition-all duration-150 hover:from-violet-400 hover:to-purple-400 active:scale-95"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Save Permission Scope</span>
+              </button>
             </form>
           )}
         </section>
 
-        <section className="rounded-xl border border-border bg-card shadow-sm">
-          <div className="border-b border-border p-5">
-            <h2 className="text-lg font-semibold">
+        <section className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl">
+          <div className="mb-5">
+            <h2 className="font-serif text-lg font-bold text-white">
               Current Permission Scopes
             </h2>
-
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-0.5 text-xs text-slate-400">
               Existing Admin permission scopes currently configured in the
               platform.
             </p>
           </div>
 
           {staffScopes.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="font-medium">No permission scopes configured.</p>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                Add a scope above to grant capabilities to an Admin.
-              </p>
-            </div>
+            <p className="text-xs text-slate-400">
+              No permission scopes configured yet.
+            </p>
           ) : (
-            <div className="divide-y divide-border">
+            <div className="space-y-5">
               {staffScopes.map((scope) => {
                 const admin = adminMap.get(scope.profile_id);
+                if (!admin) return null;
 
-                if (!admin) {
-                  return null;
-                }
-
-                const department = scope.department_id
-                  ? departmentMap.get(scope.department_id)?.name ??
-                    "Unknown Department"
+                const deptName = scope.department_id
+                  ? (departmentMap.get(scope.department_id)?.name ??
+                    "Unknown Department")
                   : "All Departments";
 
                 return (
-                  <div key={scope.id} className="p-6">
-                    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div
+                    key={scope.id}
+                    className="rounded-xl border border-slate-800/90 bg-[#060A12]/80 p-5"
+                  >
+                    <div className="mb-4 flex flex-col gap-3 border-b border-slate-800/80 pb-4 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <h3 className="font-semibold">{admin.full_name}</h3>
-
-                        <p className="text-sm text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-bold text-white">
+                            {admin.full_name}
+                          </h3>
+                          <span className="rounded-full border border-violet-500/35 bg-violet-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-violet-300">
+                            {deptName}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-slate-400">
                           {admin.email}
-                        </p>
-
-                        <p className="mt-1 text-sm font-medium">
-                          Scope: {department}
                         </p>
                       </div>
 
                       <form action={deleteStaffScope}>
-                        <input
-                          type="hidden"
-                          name="scope_id"
-                          value={scope.id}
-                        />
-
-                        <Button
+                        <input type="hidden" name="scope_id" value={scope.id} />
+                        <button
                           type="submit"
-                          variant="outline"
+                          className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-3 text-xs font-semibold text-rose-300 transition-all hover:border-rose-400 hover:bg-rose-500/25 active:scale-95"
                         >
-                          Remove Scope
-                        </Button>
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Remove Scope</span>
+                        </button>
                       </form>
                     </div>
 
-                    <form action={saveStaffScope} className="space-y-5">
+                    <form action={saveStaffScope} className="space-y-4">
+                      <input type="hidden" name="scope_id" value={scope.id} />
                       <input
                         type="hidden"
                         name="admin_id"
                         value={scope.profile_id}
                       />
 
-                      <input
-                        type="hidden"
-                        name="scope_id"
-                        value={scope.id}
-                      />
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="flex items-start gap-3 rounded-lg border border-border p-4">
-                          <input
-                            type="checkbox"
-                            name="can_verify_students"
-                            defaultChecked={scope.can_verify_students}
-                            className="mt-1"
-                          />
-
-                          <span className="text-sm font-medium">
-                            Student Verification
-                          </span>
+                      <div className="max-w-sm space-y-1.5">
+                        <label
+                          htmlFor={`department-${scope.id}`}
+                          className="block text-xs font-semibold text-slate-300"
+                        >
+                          Department Scope
                         </label>
-
-                        <label className="flex items-start gap-3 rounded-lg border border-border p-4">
-                          <input
-                            type="checkbox"
-                            name="can_verify_results"
-                            defaultChecked={scope.can_verify_results}
-                            className="mt-1"
-                          />
-
-                          <span className="text-sm font-medium">
-                            Student Result Upload
-                          </span>
-                        </label>
-
-                        <label className="flex items-start gap-3 rounded-lg border border-border p-4">
-                          <input
-                            type="checkbox"
-                            name="can_manage_upload_permission"
-                            defaultChecked={
-                              scope.can_manage_upload_permission
-                            }
-                            className="mt-1"
-                          />
-
-                          <span className="text-sm font-medium">
-                            Upload Permission Management
-                          </span>
-                        </label>
-
-                        <label className="flex items-start gap-3 rounded-lg border border-border p-4">
-                          <input
-                            type="checkbox"
-                            name="can_approve_materials"
-                            defaultChecked={
-                              scope.can_approve_materials
-                            }
-                            className="mt-1"
-                          />
-
-                          <span className="text-sm font-medium">
-                            Material Approval
-                          </span>
-                        </label>
-
-                        <label className="flex items-start gap-3 rounded-lg border border-border p-4">
-                          <input
-                            type="checkbox"
-                            name="can_publish_notices"
-                            defaultChecked={
-                              scope.can_publish_notices
-                            }
-                            className="mt-1"
-                          />
-
-                          <span className="text-sm font-medium">
-                            Publish Notices
-                          </span>
-                        </label>
-
-                          <label className="flex items-start gap-3 rounded-lg border border-border p-4">
-                            <input
-                              type="checkbox"
-                              name="can_delete_notices"
-                              defaultChecked={scope.can_delete_notices}
-                              className="mt-1"
-                            />
-
-                            <span className="text-sm font-medium">
-                              Delete Notices
-                            </span>
-                          </label>
+                        <select
+                          id={`department-${scope.id}`}
+                          name="department_id"
+                          defaultValue={scope.department_id ?? "all"}
+                          className="h-10 w-full rounded-xl border border-slate-700/80 bg-[#0A1020] px-3 text-xs text-white [color-scheme:dark] transition-all focus:border-violet-400/80 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                        >
+                          <option value="all">All Departments</option>
+                          {departmentList.map((department) => (
+                            <option key={department.id} value={department.id}>
+                              {department.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
-                      <Button type="submit">
-                        Update Permissions
-                      </Button>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {CAPABILITIES.map((cap) => (
+                          <label
+                            key={cap.name}
+                            className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-800 bg-[#0A1020] px-3.5 py-2.5 text-xs font-medium text-slate-300 transition-all hover:border-slate-700 has-[:checked]:border-violet-500/60 has-[:checked]:bg-violet-500/10 has-[:checked]:text-white"
+                          >
+                            <input
+                              type="checkbox"
+                              name={cap.name}
+                              defaultChecked={Boolean(scope[cap.name])}
+                              className="h-4 w-4 rounded accent-violet-500"
+                            />
+                            <span>{cap.label}</span>
+                          </label>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                        <p className="text-xs text-slate-400">
+                          Current scope:{" "}
+                          <span className="font-semibold text-slate-200">
+                            {deptName}
+                          </span>
+                        </p>
+
+                        <button
+                          type="submit"
+                          className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 px-4 text-xs font-bold text-white shadow-[0_0_16px_rgba(139,92,246,0.25)] transition-all hover:from-violet-400 hover:to-purple-400 active:scale-95"
+                        >
+                          <Save className="h-3.5 w-3.5" />
+                          <span>Update Permissions</span>
+                        </button>
+                      </div>
                     </form>
                   </div>
                 );
@@ -702,20 +632,18 @@ export default async function StaffPermissionsPage({
           )}
         </section>
 
-        <section className="mt-8 rounded-xl border border-border bg-muted/40 p-5">
-          <h2 className="text-base font-semibold">
-            Permission Security
-          </h2>
-
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        <section className="flex items-start gap-3 rounded-2xl border border-slate-800/80 bg-[#0A1020]/70 px-5 py-4 text-xs text-slate-400">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-violet-400" />
+          <p className="leading-relaxed">
+            <span className="font-semibold text-slate-200">
+              Permission Security:
+            </span>{" "}
             Only Super Admin can create, update, or remove Admin permission
-            scopes. Admin capabilities remain subject to the server-side
-            database permission checks.
+            scopes. Admin capabilities remain subject to server-side database
+            permission checks.
           </p>
         </section>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
-
-
