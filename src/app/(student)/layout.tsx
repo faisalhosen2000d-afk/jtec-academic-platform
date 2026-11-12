@@ -80,7 +80,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
           className={`w-full border-b px-4 py-2.5 text-xs transition-colors z-40 relative flex items-center justify-between ${
             isRejected
               ? "bg-red-950/80 border-red-500/40 text-red-200"
-              : "bg-amber-950/60 border-b border-amber-500/30 shadow-md text-amber-200"
+              : "bg-[#0A1020] border-amber-500/30 text-slate-200 shadow-md"
           }`}
         >
           <div className="flex items-center gap-2 max-w-4xl">
@@ -98,7 +98,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
                 </>
               ) : (
                 <>
-                  <strong>Verification in Review:</strong> Your Student ID card photo is currently awaiting institutional review. Academic records and materials will unlock automatically upon approval.
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[11px] font-bold uppercase tracking-wider mr-2">Verification in Review</span> Your Student ID card photo is currently awaiting institutional review. Academic records and materials will unlock automatically upon approval.
                 </>
               )}
             </span>
@@ -106,7 +106,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
 
           <Link
             href="/profile"
-            className="flex items-center gap-1 font-bold underline hover:opacity-80 shrink-0 ml-4"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 font-semibold transition-colors shrink-0 ml-4"
           >
             <span>Profile Details</span>
             <ArrowRight className="w-3.5 h-3.5" />
