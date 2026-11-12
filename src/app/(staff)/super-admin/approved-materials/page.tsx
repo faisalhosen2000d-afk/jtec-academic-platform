@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, FolderCheck, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import DeleteApprovedMaterialButton from "./DeleteApprovedMaterialButton";
+import ApprovedMaterialsClient, {
+  type ApprovedMaterialRow,
+} from "./ApprovedMaterialsClient";
 
 type ApprovedMaterial = {
   id: string;
@@ -21,18 +23,11 @@ type ApprovedMaterial = {
 };
 
 function formatFileSize(bytes: number) {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   if (bytes < 1024 * 1024 * 1024) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
-
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
@@ -59,156 +54,159 @@ export default async function ApprovedMaterialsPage() {
 
   const serviceSupabase = createServiceRoleClient();
 
-  const { data, error } = await serviceSupabase
-    .from("materials")
-    .select(`
-      id,
-      title,
-      description,
-      topic,
-      file_type,
-      file_size_bytes,
-      views_count,
-      downloads_count,
-      created_at,
-      uploader_id,
-      subject_id,
-      file_path
-    `)
-    .eq("status", "approved")
-    .order("created_at", { ascending: false });
+  const [materialsRes, subjectsRes, profilesRes] = await Promise.all([
+    serviceSupabase
+      .from("materials")
+      .select(
+        "id, title, description, topic, file_type, file_size_bytes, views_count, downloads_count, created_at, uploader_id, subject_id, file_path",
+      )
+      .eq("status", "approved")
+      .order("created_at", { ascending: false }),
+    serviceSupabase.from("subjects").select("id, subject_name, subject_code"),
+    serviceSupabase.from("profiles").select("id, full_name"),
+  ]);
 
-  const materials = (data ?? []) as ApprovedMaterial[];
+  const materials = (materialsRes.data ?? []) as ApprovedMaterial[];
+  const subjects = (subjectsRes.data ?? []) as Array<{
+    id: string;
+    subject_name: string;
+    subject_code: string;
+  }>;
+  const profiles = (profilesRes.data ?? []) as Array<{
+    id: string;
+    full_name: string | null;
+  }>;
+
+  const subjectMap = new Map(
+    subjects.map((s) => [s.id, s.subject_code ? `${s.subject_code} · ${s.subject_name}` : s.subject_name]),
+  );
+  const profileMap = new Map(
+    profiles.map((p) => [p.id, p.full_name?.trim() || "Unknown User"]),
+  );
+
+  const enrichedMaterials: ApprovedMaterialRow[] = materials.map((m) => ({
+    id: m.id,
+    title: m.title,
+    description: m.description,
+    topic: m.topic,
+    file_type: m.file_type,
+    file_size_bytes: m.file_size_bytes,
+    views_count: m.views_count,
+    downloads_count: m.downloads_count,
+    created_at: m.created_at,
+    subjectLabel: subjectMap.get(m.subject_id) ?? "General Subject",
+    uploaderName: profileMap.get(m.uploader_id) ?? "Unknown Uploader",
+  }));
+
+  const totalViews = materials.reduce((sum, m) => sum + (m.views_count ?? 0), 0);
+  const totalDownloads = materials.reduce(
+    (sum, m) => sum + (m.downloads_count ?? 0),
+    0,
+  );
+  const totalBytes = materials.reduce(
+    (sum, m) => sum + (m.file_size_bytes ?? 0),
+    0,
+  );
 
   return (
-    <main className="min-h-screen bg-muted/30 p-6">
-      <div className="mx-auto w-full max-w-7xl space-y-6">
-        <section className="rounded-xl border border-border bg-background p-6 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Super Admin
-              </p>
-
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-                Approved Materials
-              </h1>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                Manage materials that have already been approved and are
-                available to students.
-              </p>
-            </div>
-
-            <Link href="/super-admin">
-              <Button variant="outline">Back to Super Admin</Button>
-            </Link>
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-border bg-background p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">
-                Approved Materials
-              </h2>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                Only Super Admin can manage deletion of these materials.
-              </p>
-            </div>
-
-            <div className="rounded-full border border-border px-3 py-1 text-sm font-medium text-foreground">
-              {materials.length} approved
-            </div>
-          </div>
-
-          {error ? (
-            <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-              Unable to load approved materials.
-            </div>
-          ) : materials.length === 0 ? (
-            <div className="mt-6 rounded-lg border border-dashed border-border p-8 text-center">
-              <p className="font-medium text-foreground">
-                No approved materials
-              </p>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                There are currently no approved materials.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-6 space-y-4">
-              {materials.map((material) => (
-                <article
-                  key={material.id}
-                  className="rounded-xl border border-border p-5"
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0">
-                      <h3 className="text-lg font-semibold text-foreground">
-                        {material.title}
-                      </h3>
-
-                      {material.topic && (
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          Topic: {material.topic}
-                        </p>
-                      )}
-
-                      {material.description && (
-                        <p className="mt-3 text-sm text-muted-foreground">
-                          {material.description}
-                        </p>
-                      )}
-
-                      <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <span className="rounded-full border border-border px-2.5 py-1">
-                          {material.file_type}
-                        </span>
-
-                        <span className="rounded-full border border-border px-2.5 py-1">
-                          {formatFileSize(material.file_size_bytes)}
-                        </span>
-
-                        <span className="rounded-full border border-border px-2.5 py-1">
-                          {material.views_count} views
-                        </span>
-
-                        <span className="rounded-full border border-border px-2.5 py-1">
-                          {material.downloads_count} downloads
-                        </span>
-
-                        <span className="rounded-full border border-border px-2.5 py-1">
-                          Approved
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 text-sm text-muted-foreground">
-                      {new Date(material.created_at).toLocaleString()}
-                    </div>
-                  </div>
-
-                  <div className="mt-5 flex flex-col gap-4 border-t border-border pt-4 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Material ID
-                      </p>
-
-                      <p className="mt-1 break-all font-mono text-xs text-foreground">
-                        {material.id}
-                      </p>
-                    </div>
-
-                    <DeleteApprovedMaterialButton materialId={material.id} />
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+    <div className="min-h-screen bg-[#060A12] text-slate-100">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/4 h-96 w-96 rounded-full bg-emerald-500/5 blur-3xl" />
+        <div className="absolute top-1/3 right-1/4 h-80 w-80 rounded-full bg-sky-500/5 blur-3xl" />
       </div>
-    </main>
+
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#060A12]/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest text-emerald-300 shadow-[0_0_18px_rgba(16,185,129,0.22)]">
+                <FolderCheck className="h-3 w-3" />
+                Approved Materials
+              </span>
+              <span className="text-xs text-slate-400">Super Admin</span>
+            </div>
+            <h1 className="mt-2 font-serif text-2xl font-bold tracking-tight text-white sm:text-3xl">
+              Approved Materials
+            </h1>
+            <p className="mt-1 text-xs text-slate-400 sm:text-sm">
+              Manage materials that have already been approved and are available
+              to students.
+            </p>
+          </div>
+
+          <Link
+            href="/super-admin"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-gradient-to-b from-slate-800/90 to-slate-900 px-4 py-2 text-xs font-semibold text-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:-translate-y-0.5 hover:border-emerald-500/50 hover:text-emerald-300 active:translate-y-0 active:scale-95"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to Super Admin</span>
+          </Link>
+        </div>
+      </header>
+
+      <main className="relative z-10 mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        {/* 4 Live KPI Cards */}
+        <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="rounded-2xl border border-emerald-500/30 bg-[#0A1020] p-5 shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Approved Materials
+            </p>
+            <p className="mt-2 font-serif text-3xl font-bold text-emerald-300">
+              {materials.length}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-sky-500/30 bg-[#0A1020] p-5 shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Total Views
+            </p>
+            <p className="mt-2 font-serif text-3xl font-bold text-sky-300">
+              {totalViews.toLocaleString()}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-cyan-500/30 bg-[#0A1020] p-5 shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Total Downloads
+            </p>
+            <p className="mt-2 font-serif text-3xl font-bold text-cyan-300">
+              {totalDownloads.toLocaleString()}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-amber-500/30 bg-[#0A1020] p-5 shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Total Storage
+            </p>
+            <p className="mt-2 font-serif text-3xl font-bold text-amber-300">
+              {formatFileSize(totalBytes)}
+            </p>
+          </div>
+        </section>
+
+        {materialsRes.error ? (
+          <div className="rounded-2xl border border-rose-500/35 bg-rose-500/10 p-6">
+            <p className="text-sm font-semibold text-rose-300">
+              Unable to load approved materials.
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              {materialsRes.error.message}
+            </p>
+          </div>
+        ) : (
+          <ApprovedMaterialsClient materials={enrichedMaterials} />
+        )}
+
+        {/* Slim RLS Footer */}
+        <section className="flex items-start gap-3 rounded-2xl border border-slate-800/80 bg-[#0A1020]/70 px-5 py-4 text-xs text-slate-400">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+          <p className="leading-relaxed">
+            <span className="font-semibold text-slate-200">
+              Storage &amp; Database Integrity:
+            </span>{" "}
+            Deleting a material permanently removes both its database record and
+            uploaded file via server-side Super Admin verification.
+          </p>
+        </section>
+      </main>
+    </div>
   );
 }

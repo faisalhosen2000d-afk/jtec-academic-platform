@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import {
   deleteApprovedMaterial,
   type DeleteApprovedMaterialResult,
@@ -10,10 +10,12 @@ import {
 
 type DeleteApprovedMaterialButtonProps = {
   materialId: string;
+  title?: string;
 };
 
 export default function DeleteApprovedMaterialButton({
   materialId,
+  title,
 }: DeleteApprovedMaterialButtonProps) {
   const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,10 +33,7 @@ export default function DeleteApprovedMaterialButton({
     }
 
     window.addEventListener("keydown", handleEscape);
-
-    return () => {
-      window.removeEventListener("keydown", handleEscape);
-    };
+    return () => window.removeEventListener("keydown", handleEscape);
   }, [isModalOpen, isDeleting]);
 
   function openModal() {
@@ -73,13 +72,18 @@ export default function DeleteApprovedMaterialButton({
 
   return (
     <>
-      <Button type="button" variant="outline" onClick={openModal}>
-        Delete Material
-      </Button>
+      <button
+        type="button"
+        onClick={openModal}
+        className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-3.5 text-xs font-semibold text-rose-300 transition-all duration-150 hover:border-rose-400 hover:bg-rose-500/25 active:scale-95"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        <span>Delete Material</span>
+      </button>
 
       {isModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
@@ -88,7 +92,7 @@ export default function DeleteApprovedMaterialButton({
           }}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl"
+            className="w-full max-w-md rounded-2xl border border-rose-500/35 bg-[#0A1020] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.85)]"
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-material-title"
@@ -96,68 +100,67 @@ export default function DeleteApprovedMaterialButton({
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="flex items-start gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="h-5 w-5"
-                  aria-hidden="true"
-                >
-                  <path d="M12 9v4" />
-                  <path d="M12 17h.01" />
-                  <path d="M10.3 3.8 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3l-7.5-13.2a2 2 0 0 0-3.4 0Z" />
-                </svg>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-rose-500/40 bg-rose-500/15 text-rose-300">
+                <AlertTriangle className="h-5 w-5" />
               </div>
 
               <div className="min-w-0">
                 <h2
                   id="delete-material-title"
-                  className="text-lg font-semibold text-foreground"
+                  className="font-serif text-lg font-bold text-white"
                 >
                   Delete Material?
                 </h2>
 
+                {title ? (
+                  <p className="mt-1 truncate text-xs font-semibold text-rose-300">
+                    {title}
+                  </p>
+                ) : null}
+
                 <p
                   id="delete-material-description"
-                  className="mt-2 text-sm leading-6 text-muted-foreground"
+                  className="mt-2 text-xs leading-relaxed text-slate-400"
                 >
-                  This action will permanently delete the approved material,
-                  its database record, and its uploaded file. This action
-                  cannot be undone.
+                  This action will permanently delete the approved material, its
+                  database record, and its uploaded file. This action cannot be
+                  undone.
                 </p>
               </div>
             </div>
 
             {error && (
               <div
-                className="mt-5 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+                className="mt-4 rounded-xl border border-rose-500/35 bg-rose-500/10 p-3 text-xs text-rose-300"
                 role="alert"
               >
                 {error}
               </div>
             )}
 
-            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button
+            <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+              <button
                 type="button"
-                variant="outline"
                 onClick={closeModal}
                 disabled={isDeleting}
+                className="inline-flex h-9 cursor-pointer items-center justify-center rounded-lg border border-slate-700 bg-slate-900 px-4 text-xs font-semibold text-slate-300 transition-all hover:border-slate-500 hover:text-white active:scale-95 disabled:opacity-50"
               >
                 Cancel
-              </Button>
+              </button>
 
-              <Button
+              <button
                 type="button"
-                variant="outline"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-rose-500 to-rose-600 px-4 text-xs font-bold text-white shadow-[0_0_16px_rgba(244,63,94,0.35)] transition-all hover:from-rose-400 hover:to-rose-500 active:scale-95 disabled:opacity-60"
               >
-                {isDeleting ? "Deleting..." : "Delete Material"}
-              </Button>
+                {isDeleting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                <span>{isDeleting ? "Deleting..." : "Delete Material"}</span>
+              </button>
             </div>
           </div>
         </div>
