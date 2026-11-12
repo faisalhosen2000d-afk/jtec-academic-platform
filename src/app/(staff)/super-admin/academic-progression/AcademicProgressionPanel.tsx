@@ -805,42 +805,56 @@ export default function AcademicProgressionPanel({
 
                 <details className="mt-3 text-xs">
                   <summary className="cursor-pointer font-medium text-slate-400 hover:text-violet-300">
-                    Technical details
+                    Change summary &amp; audit reference
                   </summary>
-                  <div className="mt-2 space-y-2 rounded-lg border border-slate-800 bg-[#0A1020] p-3 text-slate-300">
-                    <div>
-                      <p className="text-[11px] font-semibold text-slate-400">
-                        Operation ID
+                  <div className="mt-2.5 grid gap-3 rounded-xl border border-slate-800 bg-[#0A1020] p-4 text-slate-300 sm:grid-cols-2">
+                    <div className="space-y-1.5 rounded-lg border border-slate-800/80 bg-[#060A12]/70 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                        Previous Academic State
                       </p>
-                      <p className="mt-0.5 break-all font-mono">
-                        {item.operation_id}
+                      <p className="text-xs text-slate-200">
+                        <span className="text-slate-400">Batch:</span>{" "}
+                        {batch?.name || "Not available"}
+                      </p>
+                      <p className="text-xs text-slate-200">
+                        <span className="text-slate-400">Level:</span>{" "}
+                        {previousLevel?.name || "Unknown"}
+                      </p>
+                      <p className="text-xs text-slate-200">
+                        <span className="text-slate-400">Term:</span>{" "}
+                        {previousTerm?.name || "Unknown"}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-[11px] font-semibold text-slate-400">
-                        Student profile ID
+
+                    <div className="space-y-1.5 rounded-lg border border-violet-500/25 bg-violet-950/15 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-violet-300">
+                        Updated Academic State
                       </p>
-                      <p className="mt-0.5 break-all font-mono">
-                        {item.student_profile_id}
+                      <p className="text-xs text-slate-100">
+                        <span className="text-slate-400">Batch:</span>{" "}
+                        {batches.find((entry) => entry.id === item.new_state.batch_id)?.name || batch?.name || "Not available"}
+                      </p>
+                      <p className="text-xs text-slate-100">
+                        <span className="text-slate-400">Level:</span>{" "}
+                        {newLevel?.name || "Unknown"}
+                      </p>
+                      <p className="text-xs text-slate-100">
+                        <span className="text-slate-400">Term:</span>{" "}
+                        {newTerm?.name || "Unknown"}
                       </p>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <p className="text-[11px] font-semibold text-slate-400">
-                          Previous state (JSON)
-                        </p>
-                        <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words text-[11px] text-slate-300">
-                          {JSON.stringify(item.previous_state, null, 2)}
-                        </pre>
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-semibold text-slate-400">
-                          New state (JSON)
-                        </p>
-                        <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words text-[11px] text-slate-300">
-                          {JSON.stringify(item.new_state, null, 2)}
-                        </pre>
-                      </div>
+
+                    <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-2.5 text-[11px] text-slate-400">
+                      <span>
+                        Student:{" "}
+                        <strong className="text-slate-200">
+                          {student?.full_name || "Unknown"}
+                        </strong>{" "}
+                        ({student?.student_id || "No Roll"})
+                      </span>
+                      <span className="font-mono">
+                        Audit Ref: {item.operation_id.slice(0, 8)}
+                      </span>
                     </div>
                   </div>
                 </details>
