@@ -37,6 +37,7 @@ export default function RegisterPage() {
   const [clientError, setClientError] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
+  const [regDodgeSide, setRegDodgeSide] = useState<1 | -1>(1);
 
   // File state for ID card
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
@@ -77,6 +78,10 @@ export default function RegisterPage() {
     const url = URL.createObjectURL(file);
     setIdCardPreview(url);
   };
+
+  const step1Ready = formDataValues.student_id.trim().length > 0 && Boolean(idCardFile);
+  const step2Ready = formDataValues.full_name.trim().length > 0 && formDataValues.email.trim().includes("@");
+  const step3Ready = formDataValues.password.length >= 8 && formDataValues.password === formDataValues.confirm_password;
 
   const validateAndAdvance = (targetStep: number) => {
     setClientError("");
@@ -293,14 +298,38 @@ export default function RegisterPage() {
                 </div>
 
                 {/* Advance Button */}
-                <Button
-                  type="button"
-                  onClick={() => validateAndAdvance(2)}
-                  className="w-full h-11 rounded-xl bg-gradient-to-r from-red-600 via-red-600 to-red-700 font-bold text-white shadow-lg shadow-red-700/30 hover:from-red-500 hover:to-red-600 transition-all flex items-center justify-center gap-2"
-                >
-                  <span>Continue to Identity Details</span>
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
+                <div className={`relative flex h-11 w-full items-center justify-center rounded-xl transition-all duration-300 ${step1Ready ? "border-transparent bg-transparent" : "overflow-hidden border border-slate-800/80 bg-[#060A12]/80 px-1.5"}`}>
+                  {!step1Ready && (
+                    <span className="pointer-events-none select-none text-[11px] font-medium text-slate-500">
+                      Enter Roll &amp; upload ID card to unlock
+                    </span>
+                  )}
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (!step1Ready) { setRegDodgeSide((s) => (s === 1 ? -1 : 1)); return; }
+                      validateAndAdvance(2);
+                    }}
+                    onMouseEnter={() => { if (!step1Ready) setRegDodgeSide((s) => (s === 1 ? -1 : 1)); }}
+                    className={
+                      step1Ready
+                        ? "w-full h-11 cursor-pointer rounded-xl bg-gradient-to-r from-red-600 via-red-600 to-red-700 font-bold text-white shadow-[0_0_24px_rgba(220,38,38,0.35)] hover:brightness-110 hover:shadow-[0_0_28px_rgba(220,38,38,0.55)] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        : `absolute h-8 w-36 cursor-not-allowed rounded-lg border border-slate-700 bg-slate-900/95 text-xs font-semibold text-slate-300 shadow-lg transition-transform duration-300 ease-out ${regDodgeSide === 1 ? "translate-x-[68px]" : "-translate-x-[68px]"}`
+                    }
+                  >
+                    {step1Ready ? (
+                      <>
+                        <span>Continue to Identity Details</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    ) : (
+                      <span className="flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Continue</span>
+                      </span>
+                    )}
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -365,14 +394,38 @@ export default function RegisterPage() {
                     <ArrowLeft className="w-4 h-4 mr-1.5" />
                     <span>Back</span>
                   </Button>
-                  <Button
-                    type="button"
-                    onClick={() => validateAndAdvance(3)}
-                    className="w-2/3 h-11 rounded-xl bg-gradient-to-r from-red-600 via-red-600 to-red-700 font-bold text-white shadow-lg shadow-red-700/30 hover:from-red-500 hover:to-red-600 transition-all flex items-center justify-center gap-2"
-                  >
-                    <span>Proceed to Password</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
+                  <div className={`relative flex h-11 w-2/3 items-center justify-center rounded-xl transition-all duration-300 ${step2Ready ? "border-transparent bg-transparent" : "overflow-hidden border border-slate-800/80 bg-[#060A12]/80 px-1.5"}`}>
+                    {!step2Ready && (
+                      <span className="pointer-events-none select-none text-[11px] font-medium text-slate-500">
+                        Fill name &amp; email
+                      </span>
+                    )}
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (!step2Ready) { setRegDodgeSide((s) => (s === 1 ? -1 : 1)); return; }
+                        validateAndAdvance(3);
+                      }}
+                      onMouseEnter={() => { if (!step2Ready) setRegDodgeSide((s) => (s === 1 ? -1 : 1)); }}
+                      className={
+                        step2Ready
+                          ? "w-full h-11 cursor-pointer rounded-xl bg-gradient-to-r from-red-600 via-red-600 to-red-700 font-bold text-white shadow-[0_0_24px_rgba(220,38,38,0.35)] hover:brightness-110 hover:shadow-[0_0_28px_rgba(220,38,38,0.55)] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                          : `absolute h-8 w-28 cursor-not-allowed rounded-lg border border-slate-700 bg-slate-900/95 text-xs font-semibold text-slate-300 shadow-lg transition-transform duration-300 ease-out ${regDodgeSide === 1 ? "translate-x-[44px]" : "-translate-x-[44px]"}`
+                      }
+                    >
+                      {step2Ready ? (
+                        <>
+                          <span>Continue</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      ) : (
+                        <span className="flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Continue</span>
+                        </span>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
@@ -489,14 +542,38 @@ export default function RegisterPage() {
                     <ArrowLeft className="w-4 h-4 mr-1.5" />
                     <span>Back</span>
                   </Button>
-                  <Button
-                    type="button"
-                    onClick={() => validateAndAdvance(4)}
-                    className="w-2/3 h-11 rounded-xl bg-gradient-to-r from-red-600 via-red-600 to-red-700 font-bold text-white shadow-lg shadow-red-700/30 hover:from-red-500 hover:to-red-600 transition-all flex items-center justify-center gap-2"
-                  >
-                    <span>Review Summary Slip</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
+                  <div className={`relative flex h-11 w-2/3 items-center justify-center rounded-xl transition-all duration-300 ${step3Ready ? "border-transparent bg-transparent" : "overflow-hidden border border-slate-800/80 bg-[#060A12]/80 px-1.5"}`}>
+                    {!step3Ready && (
+                      <span className="pointer-events-none select-none text-[11px] font-medium text-slate-500">
+                        Match 8+ char password
+                      </span>
+                    )}
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (!step3Ready) { setRegDodgeSide((s) => (s === 1 ? -1 : 1)); return; }
+                        validateAndAdvance(4);
+                      }}
+                      onMouseEnter={() => { if (!step3Ready) setRegDodgeSide((s) => (s === 1 ? -1 : 1)); }}
+                      className={
+                        step3Ready
+                          ? "w-full h-11 cursor-pointer rounded-xl bg-gradient-to-r from-red-600 via-red-600 to-red-700 font-bold text-white shadow-[0_0_24px_rgba(220,38,38,0.35)] hover:brightness-110 hover:shadow-[0_0_28px_rgba(220,38,38,0.55)] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                          : `absolute h-8 w-28 cursor-not-allowed rounded-lg border border-slate-700 bg-slate-900/95 text-xs font-semibold text-slate-300 shadow-lg transition-transform duration-300 ease-out ${regDodgeSide === 1 ? "translate-x-[44px]" : "-translate-x-[44px]"}`
+                      }
+                    >
+                      {step3Ready ? (
+                        <>
+                          <span>Continue</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      ) : (
+                        <span className="flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Continue</span>
+                        </span>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}

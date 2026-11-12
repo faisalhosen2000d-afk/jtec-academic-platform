@@ -523,9 +523,8 @@ export default function ModernAuthCard({
                   <Button
                     type="submit"
                     disabled={studentPending}
-                    onMouseEnter={() => {
-                      if (!studentReady) setDodgeSide((s) => (s === 1 ? -1 : 1));
-                    }}
+                    onClick={(e) => { if (!studentReady) { e.preventDefault(); setDodgeSide((s) => (s === 1 ? -1 : 1)); } }}
+                    onMouseEnter={() => { if (!studentReady) setDodgeSide((s) => (s === 1 ? -1 : 1)); }}
                     className={
                       studentReady
                         ? `${studentSubmitCls} h-12 w-full transition-all duration-200 hover:brightness-110 hover:shadow-[0_0_28px_rgba(220,38,38,0.55)] active:scale-[0.98]`
@@ -628,9 +627,8 @@ export default function ModernAuthCard({
                   <Button
                     type="submit"
                     disabled={staffPending}
-                    onMouseEnter={() => {
-                      if (!staffReady) setDodgeSide((s) => (s === 1 ? -1 : 1));
-                    }}
+                    onClick={(e) => { if (!staffReady) { e.preventDefault(); setDodgeSide((s) => (s === 1 ? -1 : 1)); } }}
+                    onMouseEnter={() => { if (!staffReady) setDodgeSide((s) => (s === 1 ? -1 : 1)); }}
                     className={
                       staffReady
                         ? `${staffSubmitCls} h-12 w-full transition-all duration-200 hover:brightness-110 hover:shadow-[0_0_28px_rgba(245,158,11,0.55)] active:scale-[0.98]`
