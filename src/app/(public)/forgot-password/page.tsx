@@ -242,7 +242,7 @@ export default function ForgotPasswordPage() {
             <div className="mt-6 border-t border-slate-800/80 pt-5 text-center">
               <Link
                 href="/login"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-400 transition-colors hover:text-amber-300"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-amber-500/35 bg-gradient-to-b from-slate-800/90 to-slate-900 px-5 py-2.5 text-xs font-semibold text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:-translate-y-0.5 hover:border-amber-400/75 hover:text-amber-200 hover:shadow-[0_0_22px_rgba(245,158,11,0.28)] active:translate-y-0 active:scale-95"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 <span>Back to Sign In</span>

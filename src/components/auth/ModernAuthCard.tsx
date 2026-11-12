@@ -548,7 +548,7 @@ export default function ModernAuthCard({
                     onMouseEnter={() => { if (!studentReady) setDodgeSide((s) => (s === 1 ? -1 : 1)); }}
                     className={
                       studentReady
-                        ? `${studentSubmitCls} h-12 w-full transition-all duration-200 hover:brightness-110 hover:shadow-[0_0_28px_rgba(220,38,38,0.55)] active:scale-[0.98]`
+                        ? `${studentSubmitCls} h-12 w-full bg-gradient-to-r from-red-600 via-red-600 to-amber-600 transition-all duration-200 hover:brightness-110 hover:shadow-[0_0_32px_rgba(245,158,11,0.5)] active:scale-[0.97]`
                         : `absolute h-9 w-40 cursor-not-allowed rounded-lg border border-slate-700 bg-slate-900/95 text-xs font-semibold text-slate-300 shadow-lg transition-transform duration-300 ease-out ${
                             dodgeSide === 1 ? "translate-x-[68px]" : "-translate-x-[68px]"
                           }`
@@ -652,7 +652,7 @@ export default function ModernAuthCard({
                     onMouseEnter={() => { if (!staffReady) setDodgeSide((s) => (s === 1 ? -1 : 1)); }}
                     className={
                       staffReady
-                        ? `${staffSubmitCls} h-12 w-full transition-all duration-200 hover:brightness-110 hover:shadow-[0_0_28px_rgba(245,158,11,0.55)] active:scale-[0.98]`
+                        ? `${staffSubmitCls} h-12 w-full transition-all duration-200 hover:brightness-110 hover:shadow-[0_0_32px_rgba(245,158,11,0.6)] active:scale-[0.97]`
                         : `absolute h-9 w-40 cursor-not-allowed rounded-lg border border-slate-700 bg-slate-900/95 text-xs font-semibold text-slate-300 shadow-lg transition-transform duration-300 ease-out ${
                             dodgeSide === 1 ? "translate-x-[68px]" : "-translate-x-[68px]"
                           }`
