@@ -1,33 +1,15 @@
 import Link from "next/link";
+import { ArrowLeft, BookOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import {
-  createSubject,
-  updateSubject,
-  deleteSubject,
-} from "./actions";
+import { createSubject, deleteSubject, updateSubject } from "./actions";
 import { SubjectForm } from "./subject-form";
-import { SubjectItem } from "./subject-item";
+import { SubjectsBrowser } from "./SubjectsBrowser";
 
-type Department = {
-  id: string;
-  name: string;
-  code: string;
-};
+export const dynamic = "force-dynamic";
 
-type Level = {
-  id: string;
-  name: string;
-  sort_order: number;
-};
-
-type Term = {
-  id: string;
-  level_id: string;
-  name: string;
-  sort_order: number;
-};
-
+type Department = { id: string; name: string; code: string };
+type Level = { id: string; name: string; sort_order: number };
+type Term = { id: string; level_id: string; name: string; sort_order: number };
 type Subject = {
   id: string;
   department_id: string;
@@ -45,19 +27,20 @@ export default async function SubjectsPage() {
 
   if (userError || !userData.user) {
     return (
-      <main className="min-h-screen bg-background px-4 py-10">
-        <div className="mx-auto max-w-4xl rounded-xl border border-border bg-card p-6">
-          <h1 className="text-xl font-semibold">
+      <main className="flex min-h-screen items-center justify-center bg-[#060A12] px-4 py-10 text-slate-100">
+        <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-[#0A1020] p-6 shadow-2xl">
+          <h1 className="font-serif text-xl font-bold text-white">
             Access Denied
           </h1>
-
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-slate-400">
             You must be logged in to access this page.
           </p>
-
           <div className="mt-5">
-            <Link href="/staff-login">
-              <Button>Go to Staff Login</Button>
+            <Link
+              href="/staff-login"
+              className="inline-flex items-center rounded-xl bg-sky-500 px-4 py-2 text-xs font-bold text-slate-950 transition-all hover:bg-sky-400"
+            >
+              Go to Staff Login
             </Link>
           </div>
         </div>
@@ -65,30 +48,28 @@ export default async function SubjectsPage() {
     );
   }
 
-  const { data: profile, error: profileError } =
-    await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", userData.user.id)
-      .single();
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userData.user.id)
+    .single();
 
   if (profileError || profile?.role !== "super_admin") {
     return (
-      <main className="min-h-screen bg-background px-4 py-10">
-        <div className="mx-auto max-w-4xl rounded-xl border border-border bg-card p-6">
-          <h1 className="text-xl font-semibold">
+      <main className="flex min-h-screen items-center justify-center bg-[#060A12] px-4 py-10 text-slate-100">
+        <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-[#0A1020] p-6 shadow-2xl">
+          <h1 className="font-serif text-xl font-bold text-white">
             Access Denied
           </h1>
-
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-slate-400">
             Only Super Admin can manage subjects.
           </p>
-
           <div className="mt-5">
-            <Link href="/super-admin">
-              <Button variant="outline">
-                Back to Super Admin
-              </Button>
+            <Link
+              href="/super-admin"
+              className="inline-flex items-center rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-200 hover:border-sky-500/50"
+            >
+              Back to Super Admin
             </Link>
           </div>
         </div>
@@ -106,17 +87,14 @@ export default async function SubjectsPage() {
       .from("departments")
       .select("id, name, code")
       .order("name", { ascending: true }),
-
     supabase
       .from("levels")
       .select("id, name, sort_order")
       .order("sort_order", { ascending: true }),
-
     supabase
       .from("terms")
       .select("id, level_id, name, sort_order")
       .order("sort_order", { ascending: true }),
-
     supabase
       .from("subjects")
       .select(
@@ -131,45 +109,48 @@ export default async function SubjectsPage() {
   const subjectRows = (subjects ?? []) as Subject[];
 
   const loadError =
-    departmentsError ||
-    levelsError ||
-    termsError ||
-    subjectsError;
+    departmentsError || levelsError || termsError || subjectsError;
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="mb-1 text-sm font-medium text-muted-foreground">
-              Super Admin / Academic Structure
-            </p>
+    <div className="min-h-screen bg-[#060A12] text-slate-100">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/4 h-96 w-96 rounded-full bg-sky-500/5 blur-3xl" />
+      </div>
 
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+      <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#060A12]/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/15 px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest text-sky-300 shadow-[0_0_18px_rgba(56,189,248,0.28)]">
+                <BookOpen className="h-3 w-3" />
+                Subjects
+              </span>
+              <span className="text-xs text-slate-400">Academic Structure</span>
+            </div>
+            <h1 className="mt-2 font-serif text-2xl font-bold tracking-tight text-white sm:text-3xl">
               Subjects
             </h1>
-
-            <p className="mt-2 text-sm text-muted-foreground">
-              Manage subjects by department, level, and term.
+            <p className="mt-1 text-xs text-slate-400 sm:text-sm">
+              Manage subjects and assign them to departments, levels, and terms.
             </p>
           </div>
 
-          <Link href="/super-admin/academic-structure">
-            <Button variant="outline">
-              Back to Academic Structure
-            </Button>
+          <Link
+            href="/super-admin/academic-structure"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-gradient-to-b from-slate-800/90 to-slate-900 px-4 py-2 text-xs font-semibold text-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:-translate-y-0.5 hover:border-sky-500/50 hover:text-sky-300 active:translate-y-0 active:scale-95"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to Academic Structure</span>
           </Link>
         </div>
+      </header>
 
-        {/* Add Subject */}
-        <section className="mb-8 rounded-xl border border-border bg-card p-6 shadow-sm">
+      <main className="relative z-10 mx-auto w-full max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        {/* Add Subject Card */}
+        <section className="rounded-2xl border border-sky-500/35 bg-[#0A1020] p-6 shadow-[0_0_35px_rgba(56,189,248,0.08)] transition-all duration-300 hover:border-sky-400/60 hover:shadow-[0_0_45px_rgba(56,189,248,0.16)]">
           <div className="mb-5">
-            <h2 className="text-lg font-semibold">
-              Add Subject
-            </h2>
-
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h2 className="text-base font-semibold text-white">Add Subject</h2>
+            <p className="mt-0.5 text-xs text-slate-400">
               Add a subject to a specific department, level, and term.
             </p>
           </div>
@@ -182,181 +163,24 @@ export default async function SubjectsPage() {
           />
         </section>
 
-        {/* Summary */}
-        <section className="mb-8 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <p className="text-sm text-muted-foreground">
-              Departments
+        {/* Subjects Browser */}
+        {loadError ? (
+          <section className="rounded-2xl border border-rose-500/40 bg-[#0A1020] p-6">
+            <p className="text-xs font-semibold text-rose-400">
+              Failed to load academic structure: {loadError.message}
             </p>
-
-            <p className="mt-1 text-2xl font-bold">
-              {departmentRows.length}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <p className="text-sm text-muted-foreground">
-              Levels
-            </p>
-
-            <p className="mt-1 text-2xl font-bold">
-              {levelRows.length}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <p className="text-sm text-muted-foreground">
-              Total Subjects
-            </p>
-
-            <p className="mt-1 text-2xl font-bold">
-              {subjectRows.length}
-            </p>
-          </div>
-        </section>
-
-        {/* Subject List */}
-        <section className="rounded-xl border border-border bg-card shadow-sm">
-          <div className="border-b border-border p-6">
-            <h2 className="text-lg font-semibold">
-              Subject List
-            </h2>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              Subjects are organized by department, level, and term.
-            </p>
-          </div>
-
-          {loadError ? (
-            <div className="p-6">
-              <p className="text-sm text-destructive">
-                Failed to load academic structure.
-              </p>
-
-              <p className="mt-2 text-xs text-muted-foreground">
-                {loadError.message}
-              </p>
-            </div>
-          ) : departmentRows.length === 0 ? (
-            <div className="p-6">
-              <p className="text-sm text-muted-foreground">
-                No departments configured.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-8 p-6">
-              {departmentRows.map((department) => (
-                <div
-                  key={department.id}
-                  className="rounded-xl border border-border bg-background"
-                >
-                  <div className="border-b border-border p-5">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">
-                          Department
-                        </p>
-
-                        <h3 className="mt-1 text-lg font-semibold">
-                          {department.name}
-                        </h3>
-                      </div>
-
-                      <span className="rounded-full border border-border px-3 py-1 text-xs font-medium">
-                        {department.code}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-5 p-5">
-                    {levelRows.map((level) => {
-                      const levelTerms = termRows.filter(
-                        (term) =>
-                          term.level_id === level.id,
-                      );
-
-                      const departmentSubjects =
-                        subjectRows.filter(
-                          (subject) =>
-                            subject.department_id ===
-                              department.id &&
-                            subject.level_id === level.id,
-                        );
-
-                      return (
-                        <div
-                          key={level.id}
-                          className="rounded-lg border border-border bg-card p-4"
-                        >
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-semibold">
-                              {level.name}
-                            </h4>
-
-                            <span className="text-xs text-muted-foreground">
-                              {departmentSubjects.length} subjects
-                            </span>
-                          </div>
-
-                          <div className="mt-4 grid gap-4 md:grid-cols-2">
-                            {levelTerms.map((term) => {
-                              const termSubjects =
-                                departmentSubjects.filter(
-                                  (subject) =>
-                                    subject.term_id === term.id,
-                                );
-
-                              return (
-                                <div
-                                  key={term.id}
-                                  className="rounded-lg border border-border p-4"
-                                >
-                                  <div className="mb-3 flex items-center justify-between">
-                                    <h5 className="font-medium">
-                                      {term.name}
-                                    </h5>
-
-                                    <span className="text-xs text-muted-foreground">
-                                      {termSubjects.length} subjects
-                                    </span>
-                                  </div>
-
-                                  {termSubjects.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                      No subjects configured.
-                                    </p>
-                                  ) : (
-                                    <div className="space-y-3">
-                                      {termSubjects.map(
-                                        (subject) => (
-                                          <SubjectItem
-                                            key={subject.id}
-                                            subject={subject}
-                                            updateAction={
-                                              updateSubject
-                                            }
-                                            deleteAction={
-                                              deleteSubject
-                                            }
-                                          />
-                                        ),
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-    </main>
+          </section>
+        ) : (
+          <SubjectsBrowser
+            departments={departmentRows}
+            levels={levelRows}
+            terms={termRows}
+            subjects={subjectRows}
+            updateAction={updateSubject}
+            deleteAction={deleteSubject}
+          />
+        )}
+      </main>
+    </div>
   );
 }
