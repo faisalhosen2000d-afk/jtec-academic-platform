@@ -147,9 +147,9 @@ export default async function AdminStudentVerificationPage() {
             </p>
           </div>
 
-          <Link href="/admin/students">
+          <Link href="/admin">
             <Button className="rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:border-amber-400 hover:text-white">
-              Back to Student Management
+              Back to Admin Console
             </Button>
           </Link>
         </div>
