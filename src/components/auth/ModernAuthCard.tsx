@@ -326,19 +326,19 @@ export default function ModernAuthCard({
           </div>
 
           <div className="relative z-10 my-auto max-w-lg space-y-5 py-8">
-            <h1 className={heroTitleCls}>
+            <h1 className={`${heroTitleCls} auth-stagger`} style={{ animationDelay: "80ms" }}>
               Jhenaidah Textile{" "}
-              <span className="text-amber-400">Engineering College</span>
+              <span className="auth-gold-text">Engineering College</span>
             </h1>
 
-            <p className="text-sm leading-relaxed text-slate-300/90">
+            <p className="auth-stagger text-sm leading-relaxed text-slate-300/90" style={{ animationDelay: "200ms" }}>
               Access your personalized student dashboard, official semester
               transcript, approved course materials, and departmental circulars
               in one unified operating system.
             </p>
 
             <div className="grid gap-3 pt-2">
-              <div className={featureCardCls}>
+              <div className={`${featureCardCls} auth-stagger transition-all duration-300 hover:translate-x-1 hover:border-amber-500/40`} style={{ animationDelay: "320ms" }}>
                 <div className={iconAmberCls}>
                   <Award className="h-4 w-4" />
                 </div>
@@ -352,7 +352,7 @@ export default function ModernAuthCard({
                 </div>
               </div>
 
-              <div className={featureCardCls}>
+              <div className={`${featureCardCls} auth-stagger transition-all duration-300 hover:translate-x-1 hover:border-amber-500/40`} style={{ animationDelay: "320ms" }}>
                 <div className={iconRedCls}>
                   <BookOpen className="h-4 w-4" />
                 </div>
@@ -368,7 +368,7 @@ export default function ModernAuthCard({
             </div>
           </div>
 
-          <div className={statusRowCls}>
+          <div className={`${statusRowCls} auth-stagger`} style={{ animationDelay: "540ms" }}>
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
