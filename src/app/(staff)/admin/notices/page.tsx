@@ -133,34 +133,43 @@ export default async function AdminNoticesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col gap-4 rounded-xl border border-slate-800 bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+    <main className="min-h-screen bg-[#060A12] text-slate-100">
+      <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#060A12]/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div>
-            <p className="mb-1 text-sm font-medium text-slate-400">
-              JTEC Academic Platform
-            </p>
-
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Notice Management
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-cyan-400">
+                <BellRing className="h-3 w-3" />
+                Campus Announcements
+              </span>
+              <span className="text-xs text-slate-400">Staff Administration</span>
+            </div>
+            <h1 className="mt-1 font-serif text-xl font-bold text-white sm:text-2xl">
+              Notices &amp; Circulars
             </h1>
-
-            <p className="mt-2 text-sm text-slate-400">
-              Create, manage, and publish academic notices for targeted
-              students.
-            </p>
           </div>
-
-          <Link href={profile.role === "super_admin" ? "/super-admin" : "/admin"}>
-            <Button variant="outline">
-              {profile.role === "super_admin"
-                ? "Back to Super Admin Dashboard"
-                : "Back to Admin Dashboard"}
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2.5">
+            <Link
+              href="/admin/notices/bulk-delete"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2 text-xs font-semibold text-rose-300 transition-all hover:bg-rose-500/20"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Bulk Delete</span>
+            </Link>
+            <Link
+              href={profile.role === "super_admin" ? "/super-admin" : "/admin"}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-200 transition-all hover:border-cyan-500/50 hover:text-cyan-300"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>{profile.role === "super_admin" ? "Back to Super Admin" : "Back to Admin Console"}</span>
+            </Link>
+          </div>
         </div>
+      </header>
 
-        <section className="mb-8 rounded-xl border border-slate-800 bg-card p-6 shadow-sm">
+      <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+          <section className="lg:col-span-5 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl">
           <div className="mb-5">
             <h2 className="text-lg font-semibold">Create Notice</h2>
 
@@ -180,7 +189,7 @@ export default async function AdminNoticesPage() {
           />
         </section>
 
-        <section className="rounded-xl border border-slate-800 bg-card shadow-sm">
+        <section className="lg:col-span-7 rounded-2xl border border-slate-800/90 bg-[#0A1020] shadow-xl">
           <div className="flex flex-col gap-4 border-b border-slate-800 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-semibold">Existing Notices</h2>
@@ -272,7 +281,8 @@ export default async function AdminNoticesPage() {
           </div>
 
         </section>      </div>
-    </main>
+            </div>
+      </main>
   );
 }
 
