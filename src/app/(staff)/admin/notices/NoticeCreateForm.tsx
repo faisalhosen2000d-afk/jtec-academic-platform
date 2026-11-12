@@ -384,7 +384,7 @@ export default function NoticeCreateForm({
             type="file"
             accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
             disabled={!canPublish || isSubmitting}
-            className="w-full rounded-md border border-input bg-slate-950/90 text-slate-100 px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium disabled:cursor-not-allowed disabled:bg-slate-900/40"
+            className="w-full rounded-md border border-input bg-slate-950/90 text-slate-100 px-3 py-2 text-sm file:mr-4 file:rounded-lg file:border file:border-cyan-500/30 file:bg-cyan-500/15 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-cyan-300 hover:file:bg-cyan-500/25 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium disabled:cursor-not-allowed disabled:bg-slate-900/40"
           />
 
           <p className="mt-1 text-xs text-slate-400">
@@ -411,10 +411,7 @@ export default function NoticeCreateForm({
       </div>
 
       <div className="flex gap-3">
-        <Button
-          type="submit"
-          disabled={!canPublish || isSubmitting}
-        >
+        <Button type="submit" disabled={isSubmitting || !canPublish} className="w-full h-11 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-300 hover:to-cyan-400 text-slate-950 font-bold text-sm shadow-[0_0_25px_rgba(6,182,212,0.35)] transition-all cursor-pointer">
           {isSubmitting ? "Publishing..." : "Publish Notice"}
         </Button>
       </div>

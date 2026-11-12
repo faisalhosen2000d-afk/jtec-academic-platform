@@ -75,7 +75,7 @@ export default function NoticeList({
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search notices by title, content..."
               aria-label="Search notices"
-              className="w-full h-10 pl-10 pr-3 rounded-xl border border-input bg-slate-950 text-xs text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary focus:outline-none"
+              className="w-full h-10 pl-10 pr-3 rounded-xl border border-input bg-slate-950/90 text-slate-100 border-slate-700/80 text-xs text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-primary focus:outline-none"
             />
           </div>
 
@@ -85,7 +85,7 @@ export default function NoticeList({
               value={category}
               onChange={(event) => setCategory(event.target.value)}
               aria-label="Filter notices by category"
-              className="w-full sm:w-56 h-10 rounded-xl border border-input bg-slate-950 px-3 text-xs font-medium text-slate-100 focus:ring-2 focus:ring-primary focus:outline-none"
+              className="w-full sm:w-56 h-10 rounded-xl border border-input bg-slate-950/90 text-slate-100 border-slate-700/80 px-3 text-xs font-medium text-slate-100 focus:ring-2 focus:ring-primary focus:outline-none"
             >
               <option value="all">All Categories</option>
               {categories.map((item) => (
@@ -97,14 +97,7 @@ export default function NoticeList({
           </div>
         </div>
 
-        {canDelete && (
-          <Link href="/admin/notices/bulk-delete" className="shrink-0">
-            <Button variant="outline" className="w-full sm:w-auto h-8 px-3 text-xs text-destructive hover:bg-destructive/10">
-              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-              Bulk Delete Notices
-            </Button>
-          </Link>
-        )}
+        
       </div>
 
       <div className="divide-y divide-slate-800">

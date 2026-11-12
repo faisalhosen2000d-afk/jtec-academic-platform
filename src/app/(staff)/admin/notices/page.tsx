@@ -169,9 +169,9 @@ export default async function AdminNoticesPage() {
 
       <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
-          <section className="lg:col-span-5 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl">
+          <section className="lg:col-span-5 rounded-2xl border border-cyan-500/35 bg-[#0A1020] p-6 shadow-[0_0_35px_rgba(6,182,212,0.08)]">
           <div className="mb-5">
-            <h2 className="text-lg font-semibold">Create Notice</h2>
+            <h2 className="text-lg font-semibold">Publish New Notice</h2>
 
             <p className="mt-1 text-sm text-slate-400">
               Publish notices to all students or to a specific department
@@ -192,7 +192,7 @@ export default async function AdminNoticesPage() {
         <section className="lg:col-span-7 rounded-2xl border border-slate-800/90 bg-[#0A1020] shadow-xl">
           <div className="flex flex-col gap-4 border-b border-slate-800 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-semibold">Existing Notices</h2>
+              <h2 className="text-lg font-semibold">Published Notices</h2>
               <p className="mt-1 text-sm text-slate-400">
                 Published and archived notices will appear here.
               </p>
