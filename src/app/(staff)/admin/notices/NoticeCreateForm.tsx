@@ -73,7 +73,7 @@ function ModernDropdown({
             ? "cursor-not-allowed border-slate-800 bg-slate-950/50 text-slate-500 opacity-60"
             : open
               ? "cursor-pointer border-cyan-400/80 bg-slate-900 text-white ring-2 ring-cyan-500/20"
-              : "cursor-pointer border-slate-700/80 bg-slate-950/90 text-slate-200 hover:border-slate-600 hover:bg-slate-900"
+              : "cursor-pointer border-cyan-500/25 bg-gradient-to-r from-slate-950 via-cyan-950/25 to-slate-950 text-slate-200 hover:border-cyan-400/50"
         }`}
       >
         <span className="truncate">{selectedLabel}</span>
@@ -242,7 +242,7 @@ export default function NoticeCreateForm({
           <textarea
             id="notice-content"
             name="content"
-            rows={7}
+            rows={3}
             maxLength={20000}
             required
             disabled={!canPublish || isSubmitting}

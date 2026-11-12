@@ -134,17 +134,17 @@ export default async function AdminNoticesPage() {
 
   return (
     <main className="min-h-screen bg-[#060A12] text-slate-100">
-      <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#060A12]/90 backdrop-blur-xl">
+      <header className="pt-6 pb-2">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-cyan-400">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-cyan-400 to-cyan-500 px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest text-slate-950 shadow-[0_0_18px_rgba(6,182,212,0.45)]">
                 <BellRing className="h-3 w-3" />
                 Campus Announcements
               </span>
               <span className="text-xs text-slate-400">Staff Administration</span>
             </div>
-            <h1 className="mt-1 font-serif text-xl font-bold text-white sm:text-2xl">
+            <h1 className="mt-2.5 font-serif text-2xl font-bold text-white sm:text-3xl">
               Notices &amp; Circulars
             </h1>
           </div>
@@ -189,8 +189,8 @@ export default async function AdminNoticesPage() {
           />
         </section>
 
-        <section className="lg:col-span-7 rounded-2xl border border-slate-800/90 bg-[#0A1020] shadow-xl">
-          <div className="flex flex-col gap-4 border-b border-slate-800 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <section className="lg:col-span-7 rounded-2xl border border-slate-800/90 bg-gradient-to-b from-cyan-950/25 via-[#0A1020] to-[#0A1020] shadow-xl">
+          <div className="flex flex-col gap-4 border-b border-slate-800/80 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-semibold">Published Notices</h2>
               <p className="mt-1 text-sm text-slate-400">
