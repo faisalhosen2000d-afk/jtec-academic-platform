@@ -33,7 +33,7 @@ export default async function AcademicProgressionPage() {
       supabase
         .from("profiles")
         .select(
-          "id,full_name,student_id,email,batch_id,current_level_id,current_term_id",
+          "id,full_name,student_id,email,avatar_url,batch_id,current_level_id,current_term_id",
         )
         .eq("role", "student")
         .order("full_name"),

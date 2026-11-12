@@ -60,6 +60,7 @@ type Student = {
   full_name: string | null;
   student_id: string | null;
   email: string | null;
+  avatar_url?: string | null;
   batch_id: string | null;
   current_level_id: string | null;
   current_term_id: string | null;
@@ -465,9 +466,17 @@ export default function AcademicProgressionPanel({
                     className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800/90 bg-[#060A12]/85 px-4 py-3 transition-all hover:border-violet-500/45 hover:bg-slate-900/50"
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-violet-500/40 bg-violet-500/15 text-xs font-bold text-violet-200 shadow-[0_0_12px_rgba(139,92,246,0.2)]">
-                        {initials}
-                      </div>
+                      {student.avatar_url ? (
+                        <img
+                          src={student.avatar_url}
+                          alt={name}
+                          className="h-9 w-9 shrink-0 rounded-full border border-violet-500/40 object-cover shadow-[0_0_12px_rgba(139,92,246,0.2)]"
+                        />
+                      ) : (
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-violet-500/40 bg-violet-500/15 text-xs font-bold text-violet-200 shadow-[0_0_12px_rgba(139,92,246,0.2)]">
+                          {initials}
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-white">
                           {name}
