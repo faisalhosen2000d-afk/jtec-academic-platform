@@ -163,7 +163,23 @@ export default function RegisterPage() {
         </div>
 
         {/* Wizard Container */}
-        <div className="rounded-2xl border border-slate-800/80 bg-[#0A1020]/90 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
+        <div className="group/auth relative overflow-hidden rounded-2xl border border-amber-500/20 bg-[#0A1020]/95 p-6 sm:p-8 shadow-[0_0_45px_rgba(245,158,11,0.12)] backdrop-blur-xl transition-shadow duration-500 hover:shadow-[0_0_65px_rgba(245,158,11,0.22)]">
+          <div
+            className="pointer-events-none absolute inset-0 rounded-2xl p-[1.5px]"
+            style={{
+              WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+              WebkitMaskComposite: "xor",
+              maskComposite: "exclude",
+            }}
+          >
+            <div
+              className="absolute inset-[-150%] animate-[spin_7s_linear_infinite] opacity-75 transition-opacity duration-500 group-hover/auth:opacity-100"
+              style={{
+                background:
+                  "conic-gradient(from 0deg, transparent 0deg, rgba(245,158,11,0.9) 60deg, rgba(239,68,68,0.75) 120deg, transparent 190deg, rgba(56,189,248,0.5) 260deg, transparent 340deg)",
+              }}
+            />
+          </div>
           {/* Progress Tracker (4 Steps) */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
@@ -555,7 +571,7 @@ export default function RegisterPage() {
                   <Button
                     type="submit"
                     disabled={isPending}
-                    className="w-full h-12 rounded-xl bg-gradient-to-r from-red-600 via-red-600 to-red-700 font-bold text-white shadow-xl shadow-red-700/30 hover:from-red-500 hover:to-red-600 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-60"
+                    className="w-full h-12 cursor-pointer rounded-xl bg-gradient-to-r from-red-600 via-red-600 to-red-700 font-bold text-white shadow-[0_0_24px_rgba(220,38,38,0.35)] transition-all duration-200 hover:-translate-y-0.5 hover:from-red-500 hover:to-red-600 hover:shadow-[0_0_32px_rgba(220,38,38,0.55)] active:scale-95 flex items-center justify-center gap-2 text-sm disabled:opacity-60"
                   >
                     {isPending ? (
                       <span className="flex items-center gap-2">

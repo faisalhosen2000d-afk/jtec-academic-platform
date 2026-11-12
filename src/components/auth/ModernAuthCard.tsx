@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -124,8 +124,8 @@ const statusRowCls = [
 ].join(" ");
 
 const authCardCls = [
-  "w-full max-w-md rounded-2xl border border-slate-800/80",
-  "bg-[#0A1020]/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8",
+  "group/auth relative overflow-hidden w-full max-w-md rounded-2xl border border-amber-500/20",
+  "bg-[#0A1020]/95 p-6 shadow-[0_0_45px_rgba(245,158,11,0.12)] backdrop-blur-xl transition-shadow duration-500 hover:shadow-[0_0_65px_rgba(245,158,11,0.22)] sm:p-8",
 ].join(" ");
 
 const tabWrapCls = [
@@ -246,6 +246,11 @@ export default function ModernAuthCard({
   const [typedStaffEmail, setTypedStaffEmail] = useState("");
   const [showStudentPass, setShowStudentPass] = useState(false);
   const [showStaffPass, setShowStaffPass] = useState(false);
+  const [typedStudentPass, setTypedStudentPass] = useState("");
+  const [typedStaffPass, setTypedStaffPass] = useState("");
+  const [dodgeSide, setDodgeSide] = useState<1 | -1>(1);
+  const studentReady = typedStudentId.trim().length > 0 && typedStudentPass.length > 0;
+  const staffReady = typedStaffEmail.trim().length > 0 && typedStaffPass.length > 0;
 
   const [studentState, studentFormAction, studentPending] = useActionState(
     async (_prevState: AuthActionResult, formData: FormData) => {
@@ -378,6 +383,22 @@ export default function ModernAuthCard({
         {/* RIGHT PANE */}
         <div className="flex w-full items-center justify-center px-4 py-12 lg:w-1/2 sm:px-8">
           <div className={authCardCls}>
+            <div
+              className="pointer-events-none absolute inset-0 rounded-2xl p-[1.5px]"
+              style={{
+                WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+                WebkitMaskComposite: "xor",
+                maskComposite: "exclude",
+              }}
+            >
+              <div
+                className="absolute inset-[-150%] animate-[spin_7s_linear_infinite] opacity-75 transition-opacity duration-500 group-hover/auth:opacity-100"
+                style={{
+                  background:
+                    "conic-gradient(from 0deg, transparent 0deg, rgba(245,158,11,0.9) 60deg, rgba(239,68,68,0.75) 120deg, transparent 190deg, rgba(56,189,248,0.5) 260deg, transparent 340deg)",
+                }}
+              />
+            </div>
             <div className="mb-6 text-center">
               <div className="relative mx-auto mb-3.5 inline-block group/crest">
                 <div className={logoGlowLgCls} />
@@ -443,7 +464,7 @@ export default function ModernAuthCard({
                       name="student_id"
                       type="text"
                       required
-                      defaultValue={typedStudentId}
+                      value={typedStudentId} onChange={(e) => setTypedStudentId(e.target.value)}
                       placeholder=" "
                       className={inputCls}
                     />
@@ -462,7 +483,7 @@ export default function ModernAuthCard({
                       <Lock className="h-4 w-4" />
                     </div>
                     <input
-                      id="password"
+                      id="password" value={typedStudentPass} onChange={(e) => setTypedStudentPass(e.target.value)}
                       name="password"
                       type={showStudentPass ? "text" : "password"}
                       required
@@ -493,23 +514,44 @@ export default function ModernAuthCard({
                   </div>
                 </div>
 
-                <Button
-                  type="submit"
-                  disabled={studentPending}
-                  className={studentSubmitCls}
-                >
-                  {studentPending ? (
-                    <span className="flex items-center gap-2">
-                      <span className={spinLightCls} />
-                      <span>Verifying Credentials...</span>
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2">
-                      <span>Sign In to Academic Dashboard</span>
-                      <ArrowRight className="h-4 w-4" />
+                <div className="relative flex h-12 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-800/80 bg-[#060A12]/80 px-1.5">
+                  {!studentReady && (
+                    <span className="pointer-events-none select-none text-[11px] font-medium text-slate-500">
+                      Fill ID &amp; password to unlock
                     </span>
                   )}
-                </Button>
+                  <Button
+                    type="submit"
+                    disabled={studentPending}
+                    onMouseEnter={() => {
+                      if (!studentReady) setDodgeSide((s) => (s === 1 ? -1 : 1));
+                    }}
+                    className={
+                      studentReady
+                        ? `${studentSubmitCls} h-10 w-full transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(220,38,38,0.5)] active:scale-95`
+                        : `absolute h-9 w-40 cursor-not-allowed rounded-lg border border-slate-700 bg-slate-900/95 text-xs font-semibold text-slate-300 shadow-lg transition-transform duration-300 ease-out ${
+                            dodgeSide === 1 ? "translate-x-[68px]" : "-translate-x-[68px]"
+                          }`
+                    }
+                  >
+                    {studentPending ? (
+                      <span className="flex items-center gap-2">
+                        <span className={spinLightCls} />
+                        <span>Verifying...</span>
+                      </span>
+                    ) : studentReady ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span>Sign In to Academic Dashboard</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-1.5">
+                        <Lock className="h-3.5 w-3.5 text-amber-400" />
+                        <span>Sign In</span>
+                      </span>
+                    )}
+                  </Button>
+                </div>
               </form>
             )}
 
@@ -527,7 +569,7 @@ export default function ModernAuthCard({
                       name="email"
                       type="email"
                       required
-                      defaultValue={typedStaffEmail}
+                      value={typedStaffEmail} onChange={(e) => setTypedStaffEmail(e.target.value)}
                       placeholder=" "
                       className={inputCls}
                     />
@@ -546,7 +588,7 @@ export default function ModernAuthCard({
                       <Lock className="h-4 w-4" />
                     </div>
                     <input
-                      id="staff-password"
+                      id="staff-password" value={typedStaffPass} onChange={(e) => setTypedStaffPass(e.target.value)}
                       name="password"
                       type={showStaffPass ? "text" : "password"}
                       required
@@ -577,23 +619,44 @@ export default function ModernAuthCard({
                   </div>
                 </div>
 
-                <Button
-                  type="submit"
-                  disabled={staffPending}
-                  className={staffSubmitCls}
-                >
-                  {staffPending ? (
-                    <span className="flex items-center gap-2">
-                      <span className={spinDarkCls} />
-                      <span>Authenticating Staff...</span>
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2">
-                      <span>Sign In as Staff / Administrator</span>
-                      <ArrowRight className="h-4 w-4" />
+                <div className="relative flex h-12 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-800/80 bg-[#060A12]/80 px-1.5">
+                  {!staffReady && (
+                    <span className="pointer-events-none select-none text-[11px] font-medium text-slate-500">
+                      Fill email &amp; password to unlock
                     </span>
                   )}
-                </Button>
+                  <Button
+                    type="submit"
+                    disabled={staffPending}
+                    onMouseEnter={() => {
+                      if (!staffReady) setDodgeSide((s) => (s === 1 ? -1 : 1));
+                    }}
+                    className={
+                      staffReady
+                        ? `${staffSubmitCls} h-10 w-full transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] active:scale-95`
+                        : `absolute h-9 w-40 cursor-not-allowed rounded-lg border border-slate-700 bg-slate-900/95 text-xs font-semibold text-slate-300 shadow-lg transition-transform duration-300 ease-out ${
+                            dodgeSide === 1 ? "translate-x-[68px]" : "-translate-x-[68px]"
+                          }`
+                    }
+                  >
+                    {staffPending ? (
+                      <span className="flex items-center gap-2">
+                        <span className={spinDarkCls} />
+                        <span>Authenticating...</span>
+                      </span>
+                    ) : staffReady ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span>Sign In as Staff / Administrator</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-1.5">
+                        <Lock className="h-3.5 w-3.5 text-amber-400" />
+                        <span>Staff Sign In</span>
+                      </span>
+                    )}
+                  </Button>
+                </div>
               </form>
             )}
 
