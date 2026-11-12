@@ -33,6 +33,14 @@ export interface LibraryMaterialItem {
   term_name: string;
 }
 
+export interface LibrarySubjectOption {
+  code: string;
+  name: string;
+  department_id: string | null;
+  level_id: string | null;
+  term_name: string;
+}
+
 export interface FilterOption {
   id: string;
   label: string;
@@ -40,45 +48,54 @@ export interface FilterOption {
 
 export function MaterialsLibraryClient({
   materials,
+  subjects,
   departments,
   levels,
-  terms,
 }: {
   materials: LibraryMaterialItem[];
+  subjects: LibrarySubjectOption[];
   departments: FilterOption[];
   levels: FilterOption[];
-  terms: FilterOption[];
 }) {
   const [search, setSearch] = useState("");
   const [deptId, setDeptId] = useState("all");
   const [levelId, setLevelId] = useState("all");
-  const [termId, setTermId] = useState("all");
+  const [termName, setTermName] = useState("all");
   const [subjectCode, setSubjectCode] = useState("all");
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Cascading subject list based on selected dept/level/term
+  // Cascading curriculum subjects based on selected Department, Level, and Term
   const availableSubjects = useMemo(() => {
     const map = new Map<string, string>();
-    materials.forEach((m) => {
-      if (deptId !== "all" && m.department_id !== deptId) return;
-      if (levelId !== "all" && m.level_id !== levelId) return;
-      if (termId !== "all" && m.term_id !== termId) return;
-      if (m.subject_code && !map.has(m.subject_code)) {
-        map.set(m.subject_code, `${m.subject_code} — ${m.subject_name}`);
+    const source = subjects.length > 0 ? subjects : materials.map((m) => ({
+      code: m.subject_code,
+      name: m.subject_name,
+      department_id: m.department_id,
+      level_id: m.level_id,
+      term_name: m.term_name,
+    }));
+
+    source.forEach((s) => {
+      if (deptId !== "all" && s.department_id !== deptId) return;
+      if (levelId !== "all" && s.level_id !== levelId) return;
+      if (termName !== "all" && s.term_name.toLowerCase() !== termName.toLowerCase()) return;
+      if (s.code && !map.has(s.code)) {
+        map.set(s.code, `${s.code} — ${s.name}`);
       }
     });
+
     return Array.from(map.entries())
       .map(([code, label]) => ({ code, label }))
       .sort((a, b) => a.code.localeCompare(b.code));
-  }, [materials, deptId, levelId, termId]);
+  }, [subjects, materials, deptId, levelId, termName]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return materials.filter((m) => {
       if (deptId !== "all" && m.department_id !== deptId) return false;
       if (levelId !== "all" && m.level_id !== levelId) return false;
-      if (termId !== "all" && m.term_id !== termId) return false;
+      if (termName !== "all" && m.term_name.toLowerCase() !== termName.toLowerCase()) return false;
       if (subjectCode !== "all" && m.subject_code !== subjectCode) return false;
       if (q) {
         const haystack =
@@ -87,13 +104,13 @@ export function MaterialsLibraryClient({
       }
       return true;
     });
-  }, [materials, deptId, levelId, termId, subjectCode, search]);
+  }, [materials, deptId, levelId, termName, subjectCode, search]);
 
   const resetFilters = () => {
     setSearch("");
     setDeptId("all");
     setLevelId("all");
-    setTermId("all");
+    setTermName("all");
     setSubjectCode("all");
   };
 
@@ -140,7 +157,6 @@ export function MaterialsLibraryClient({
 
   return (
     <div className="min-h-screen bg-[#060A12] text-slate-100">
-      {/* Header */}
       <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#060A12]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div>
@@ -169,7 +185,6 @@ export function MaterialsLibraryClient({
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 space-y-6">
-        {/* Search & Cascading Filters */}
         <section className="rounded-2xl border border-slate-800 bg-[#0A1020] p-5 shadow-xl space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
@@ -226,19 +241,16 @@ export function MaterialsLibraryClient({
             </select>
 
             <select
-              value={termId}
+              value={termName}
               onChange={(e) => {
-                setTermId(e.target.value);
+                setTermName(e.target.value);
                 setSubjectCode("all");
               }}
               className="h-10 rounded-xl border border-slate-700/80 bg-slate-950 px-3 text-xs font-medium text-slate-200 focus:border-sky-400 focus:outline-none"
             >
               <option value="all">All Terms</option>
-              {terms.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
+              <option value="Term 1">Term 1</option>
+              <option value="Term 2">Term 2</option>
             </select>
 
             <select
@@ -270,7 +282,6 @@ export function MaterialsLibraryClient({
           </div>
         )}
 
-        {/* Materials Grid */}
         {filtered.length === 0 ? (
           <div className="rounded-2xl border border-slate-800 bg-[#0A1020] p-12 text-center">
             <BookOpen className="mx-auto h-10 w-10 text-slate-600" />

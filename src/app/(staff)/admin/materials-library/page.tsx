@@ -139,16 +139,24 @@ export default async function AdminMaterialsLibraryPage() {
     .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name))
     .map((l) => ({ id: l.id, label: l.name }));
 
-  const terms = Array.from(termMap.values())
-    .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name))
-    .map((t) => ({ id: t.id, label: t.name }));
+  const subjectOptions = rawSubjects.map((s) => {
+    const tId = s.term_id ? String(s.term_id) : "";
+    const tObj = tId ? termMap.get(tId) : undefined;
+    return {
+      code: String(s.subject_code || ""),
+      name: String(s.subject_name || ""),
+      department_id: s.department_id ? String(s.department_id) : null,
+      level_id: s.level_id ? String(s.level_id) : null,
+      term_name: tObj?.name || "",
+    };
+  });
 
   return (
     <MaterialsLibraryClient
       materials={items}
+      subjects={subjectOptions}
       departments={departments}
       levels={levels}
-      terms={terms}
     />
   );
 }
