@@ -114,7 +114,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
         </div>
       )}
 
-      <StudentAccessGateWrapper
+      <StudentAccessGateWrapper userId={user.id}
         isApproved={isApproved}
         verificationStatus={profile?.verification_status}
         rejectionReason={profile?.verification_rejection_reason}

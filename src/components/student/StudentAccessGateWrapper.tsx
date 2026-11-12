@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { isRouteAllowedForPendingStudent } from "@/lib/permissions/verification-gate";
 import { StudentVerificationRestrictedView } from "@/components/student/StudentVerificationRestrictedView";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
@@ -22,13 +23,57 @@ export function StudentAccessGateWrapper({
   isApproved,
   verificationStatus,
   rejectionReason,
+  userId,
 }: {
   children: ReactNode;
   isApproved: boolean;
   verificationStatus?: string;
   rejectionReason?: string | null;
+  userId?: string;
 }) {
   const pathname = usePathname();
+
+  useEffect(() => {
+    if (isApproved || !userId) return;
+
+    let cancelled = false;
+    const supabase = createClient();
+
+    const checkVerification = async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("is_verified, verification_status")
+          .eq("id", userId)
+          .maybeSingle();
+
+        const row = data as { is_verified?: boolean; verification_status?: string } | null;
+        if (
+          !cancelled &&
+          row &&
+          (row.is_verified === true || row.verification_status === "approved")
+        ) {
+          window.location.reload();
+        }
+      } catch {
+        // Ignore transient network errors
+      }
+    };
+
+    checkVerification();
+
+    const onFocus = () => {
+      checkVerification();
+    };
+    window.addEventListener("focus", onFocus);
+    const interval = setInterval(checkVerification, 10000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      clearInterval(interval);
+    };
+  }, [isApproved, userId, pathname]);
 
   // Approved students or Staff get full unrestricted access
   if (isApproved) {
