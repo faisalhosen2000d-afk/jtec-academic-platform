@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ChevronDown, Check } from "lucide-react";
 import { publishNotice } from "@/server/actions/notices";
 import { Button } from "@/components/ui/button";
+import { ChevronDown, Check, Paperclip, Pin } from "lucide-react";
 
 type Option = {
   id: string;
@@ -121,11 +121,10 @@ export default function NoticeCreateForm({
   terms,
   canPublish,
 }: NoticeCreateFormProps) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [messageType, setMessageType] = useState<"success" | "error">(
-    "error",
-  );
+  const [messageType, setMessageType] = useState<"success" | "error">("error");
 
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
   const [selectedBatchId, setSelectedBatchId] = useState("");
@@ -133,6 +132,7 @@ export default function NoticeCreateForm({
   const [selectedTermId, setSelectedTermId] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [customCategoryName, setCustomCategoryName] = useState("");
+  const [isPinned, setIsPinned] = useState(false);
 
   const hasDepartment = Boolean(selectedDepartmentId);
   const isOthersCategory =
@@ -159,236 +159,260 @@ export default function NoticeCreateForm({
     setIsSubmitting(true);
     setMessage(null);
 
-    const result = await publishNotice(formData);
+    try {
+      const result = await publishNotice(formData);
 
-    if (result.success) {
-      setMessageType("success");
-      setMessage("Notice published successfully.");
-
-      const form = document.getElementById(
-        "notice-create-form",
-      ) as HTMLFormElement | null;
-
-      form?.reset();
-
-      setSelectedDepartmentId("");
-      setSelectedBatchId("");
-      setSelectedLevelId("");
-      setSelectedTermId("");
-      setSelectedCategoryId("");
-      setCustomCategoryName("");
-    } else {
+      if (result.success) {
+        setMessageType("success");
+        setMessage("Notice published successfully.");
+        formRef.current?.reset();
+        setSelectedDepartmentId("");
+        setSelectedBatchId("");
+        setSelectedLevelId("");
+        setSelectedTermId("");
+        setSelectedCategoryId("");
+        setCustomCategoryName("");
+        setIsPinned(false);
+      } else {
+        setMessageType("error");
+        setMessage(result.error || "Failed to publish notice.");
+      }
+    } catch {
       setMessageType("error");
-      setMessage(result.error);
+      setMessage("Unexpected error while publishing notice.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setIsSubmitting(false);
   }
 
   return (
-    <form
-      id="notice-create-form"
-      action={handleSubmit}
-      className="space-y-6"
-    >
-      {!canPublish && (
-        <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 text-sm text-slate-400">
-          You do not currently have permission to publish notices.
-          Please contact the Super Admin.
-        </div>
-      )}
-
+    <form ref={formRef} action={handleSubmit} className="space-y-4">
       {message && (
         <div
-          className={`rounded-lg border p-4 text-sm ${
+          className={`rounded-xl border px-3.5 py-2.5 text-xs font-medium ${
             messageType === "success"
-              ? "border-slate-800 bg-slate-900/40"
-              : "border-destructive/40 bg-destructive/10 text-destructive"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+              : "border-rose-500/30 bg-rose-500/10 text-rose-300"
           }`}
         >
           {message}
         </div>
       )}
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <div className="md:col-span-2">
-          <label
-            htmlFor="notice-title"
-            className="mb-2 block text-sm font-medium"
-          >
-            Notice Title
-          </label>
+      {/* Floating Notched Notice Title */}
+      <div className="relative pt-1">
+        <input
+          id="notice-title"
+          name="title"
+          type="text"
+          required
+          disabled={isSubmitting || !canPublish}
+          placeholder=" "
+          className="peer h-11 w-full rounded-xl border border-slate-700/80 bg-slate-950/90 px-3.5 text-sm text-white placeholder-transparent transition-all focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/25 focus:shadow-[0_0_20px_rgba(6,182,212,0.18)]"
+        />
+        <label
+          htmlFor="notice-title"
+          className="pointer-events-none absolute left-3.5 top-4 text-xs font-medium text-slate-400 transition-all duration-200 peer-focus:-top-1.5 peer-focus:left-3 peer-focus:bg-[#0A1020] peer-focus:px-1.5 peer-focus:text-[11px] peer-focus:font-semibold peer-focus:text-cyan-400 peer-[:not(:placeholder-shown)]:-top-1.5 peer-[:not(:placeholder-shown)]:left-3 peer-[:not(:placeholder-shown)]:bg-[#0A1020] peer-[:not(:placeholder-shown)]:px-1.5 peer-[:not(:placeholder-shown)]:text-[11px] peer-[:not(:placeholder-shown)]:font-semibold peer-[:not(:placeholder-shown)]:text-cyan-400"
+        >
+          Notice Title
+        </label>
+      </div>
 
-          <input
-            id="notice-title"
-            name="title"
-            type="text"
-            maxLength={300}
-            required
-            disabled={!canPublish || isSubmitting}
-            placeholder="Enter notice title"
-            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label
-            htmlFor="notice-content"
-            className="mb-2 block text-sm font-medium"
-          >
-            Notice Content
-          </label>
-
-          <textarea
-            id="notice-content"
-            name="content"
-            rows={3}
-            maxLength={20000}
-            required
-            disabled={!canPublish || isSubmitting}
-            placeholder="Write the notice content..."
-            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="notice-category"
-            className="mb-2 block text-sm font-medium"
-          >
+      {/* Category & Department (2-col clean grid) */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             Category
           </label>
-
-          <ModernDropdown name="category_id" value={selectedCategoryId} onChange={(val) => { setSelectedCategoryId(val); if (val !== "other") { setCustomCategoryName(""); } }} disabled={isSubmitting || !canPublish} placeholder="No Category" options={[{ value: "", label: "No Category" }, ...categories.map((c) => ({ value: c.id, label: c.name }))]} />
-
-          {isOthersCategory && (
-            <div className="mt-3">
-              <label
-                htmlFor="custom-category-name"
-                className="mb-2 block text-sm font-medium"
-              >
-                Custom Category
-              </label>
-
-              <input
-                id="custom-category-name"
-                name="custom_category"
-                type="text"
-                value={customCategoryName}
-                onChange={(event) =>
-                  setCustomCategoryName(event.target.value)
-                }
-                maxLength={100}
-                required
-                disabled={!canPublish || isSubmitting}
-                placeholder="Enter custom category name"
-                className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-slate-900/40"
-              />
-
-              <p className="mt-1 text-xs text-slate-400">
-                This category will be saved for future notices.
-              </p>
-            </div>
-          )}
+          <ModernDropdown
+            name="category_id"
+            value={selectedCategoryId}
+            onChange={(val) => {
+              setSelectedCategoryId(val);
+              const cat = categories.find((c) => c.id === val);
+              if (cat?.name !== "Others") setCustomCategoryName("");
+            }}
+            disabled={isSubmitting || !canPublish}
+            placeholder="No Category"
+            options={[
+              { value: "", label: "No Category" },
+              ...categories
+                .filter((c) => c.name !== "Others")
+                .map((c) => ({ value: c.id, label: c.name })),
+              ...categories
+                .filter((c) => c.name === "Others")
+                .map((c) => ({ value: c.id, label: c.name })),
+            ]}
+          />
         </div>
 
-        <div>
-          <label
-            htmlFor="notice-department"
-            className="mb-2 block text-sm font-medium"
-          >
-            Department
+        <div className="space-y-1.5">
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            Target Scope
           </label>
-
-          <ModernDropdown name="target_department_id" value={selectedDepartmentId} onChange={handleDepartmentChange} disabled={isSubmitting || !canPublish} placeholder="All Students" options={[{ value: "", label: "All Students" }, ...departments.map((d) => ({ value: d.id, label: d.name }))]} />
-
-          <p className="mt-1 text-xs text-slate-400">
-            Select All Students for a college-wide notice, or choose a
-            department for optional batch, level, and term targeting.
-          </p>
+          <ModernDropdown
+            name="target_department_id"
+            value={selectedDepartmentId}
+            onChange={handleDepartmentChange}
+            disabled={isSubmitting || !canPublish}
+            placeholder="All Students"
+            options={[
+              { value: "", label: "All Students" },
+              ...departments.map((d) => ({ value: d.id, label: d.name })),
+            ]}
+          />
         </div>
+      </div>
 
-        {hasDepartment && (<div className="grid grid-cols-1 gap-3 sm:grid-cols-3 pt-1"><div>
+      {isOthersCategory && (
+        <div className="relative pt-1">
+          <input
+            id="notice-custom-category"
+            name="custom_category_name"
+            type="text"
+            required
+            value={customCategoryName}
+            onChange={(e) => setCustomCategoryName(e.target.value)}
+            disabled={isSubmitting || !canPublish}
+            placeholder=" "
+            className="peer h-10 w-full rounded-xl border border-slate-700/80 bg-slate-950/90 px-3.5 text-xs text-white placeholder-transparent transition-all focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+          />
           <label
-            htmlFor="notice-batch"
-            className="mb-2 block text-sm font-medium"
+            htmlFor="notice-custom-category"
+            className="pointer-events-none absolute left-3.5 top-3.5 text-xs font-medium text-slate-400 transition-all duration-200 peer-focus:-top-1.5 peer-focus:left-3 peer-focus:bg-[#0A1020] peer-focus:px-1.5 peer-focus:text-[10px] peer-focus:font-semibold peer-focus:text-cyan-400 peer-[:not(:placeholder-shown)]:-top-1.5 peer-[:not(:placeholder-shown)]:left-3 peer-[:not(:placeholder-shown)]:bg-[#0A1020] peer-[:not(:placeholder-shown)]:px-1.5 peer-[:not(:placeholder-shown)]:text-[10px] peer-[:not(:placeholder-shown)]:text-cyan-400"
           >
-            Batch
+            Custom Category Name
           </label>
-
-          <ModernDropdown name="target_batch_id" value={selectedBatchId} onChange={setSelectedBatchId} disabled={!canPublish || isSubmitting || !hasDepartment} placeholder={hasDepartment ? "All Batches" : "Select a Department First"} options={[{ value: "", label: hasDepartment ? "All Batches" : "Select a Department First" }, ...(hasDepartment ? batches.map((b) => ({ value: b.id, label: b.name })) : [])]} />
         </div>
+      )}
 
-        <div>
-          <label
-            htmlFor="notice-level"
-            className="mb-2 block text-sm font-medium"
-          >
-            Level
-          </label>
+      {/* Optional Batch / Level / Term — only shown when a specific Department is selected */}
+      {hasDepartment && (
+        <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-800/80 bg-slate-950/50 p-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Batch
+            </label>
+            <ModernDropdown
+              name="target_batch_id"
+              value={selectedBatchId}
+              onChange={setSelectedBatchId}
+              disabled={isSubmitting || !canPublish}
+              placeholder="All Batches"
+              options={[
+                { value: "", label: "All Batches" },
+                ...batches.map((b) => ({ value: b.id, label: b.name })),
+              ]}
+            />
+          </div>
 
-          <ModernDropdown name="target_level_id" value={selectedLevelId} onChange={handleLevelChange} disabled={!canPublish || isSubmitting || !hasDepartment} placeholder={hasDepartment ? "All Levels" : "Select a Department First"} options={[{ value: "", label: hasDepartment ? "All Levels" : "Select a Department First" }, ...(hasDepartment ? levels.map((l) => ({ value: l.id, label: l.name })) : [])]} />
+          <div className="space-y-1">
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Level
+            </label>
+            <ModernDropdown
+              name="target_level_id"
+              value={selectedLevelId}
+              onChange={handleLevelChange}
+              disabled={isSubmitting || !canPublish}
+              placeholder="All Levels"
+              options={[
+                { value: "", label: "All Levels" },
+                ...levels.map((l) => ({ value: l.id, label: l.name })),
+              ]}
+            />
+          </div>
+
+          <div className="space-y-1 sm:col-span-2">
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Term
+            </label>
+            <ModernDropdown
+              name="target_term_id"
+              value={selectedTermId}
+              onChange={setSelectedTermId}
+              disabled={isSubmitting || !canPublish || !selectedLevelId}
+              placeholder={selectedLevelId ? "All Terms" : "Select a Level First"}
+              options={[
+                {
+                  value: "",
+                  label: selectedLevelId ? "All Terms" : "Select a Level First",
+                },
+                ...visibleTerms.map((t) => ({ value: t.id, label: t.name })),
+              ]}
+            />
+          </div>
         </div>
+      )}
 
-        <div>
-          <label
-            htmlFor="notice-term"
-            className="mb-2 block text-sm font-medium"
-          >
-            Term
-          </label>
+      {/* Floating Notched Notice Content */}
+      <div className="relative pt-1">
+        <textarea
+          id="notice-content"
+          name="content"
+          rows={3}
+          required
+          disabled={isSubmitting || !canPublish}
+          placeholder=" "
+          className="peer w-full rounded-xl border border-slate-700/80 bg-slate-950/90 px-3.5 py-3 text-sm text-white placeholder-transparent transition-all focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/25 focus:shadow-[0_0_20px_rgba(6,182,212,0.18)]"
+        />
+        <label
+          htmlFor="notice-content"
+          className="pointer-events-none absolute left-3.5 top-4 text-xs font-medium text-slate-400 transition-all duration-200 peer-focus:-top-1.5 peer-focus:left-3 peer-focus:bg-[#0A1020] peer-focus:px-1.5 peer-focus:text-[11px] peer-focus:font-semibold peer-focus:text-cyan-400 peer-[:not(:placeholder-shown)]:-top-1.5 peer-[:not(:placeholder-shown)]:left-3 peer-[:not(:placeholder-shown)]:bg-[#0A1020] peer-[:not(:placeholder-shown)]:px-1.5 peer-[:not(:placeholder-shown)]:text-[11px] peer-[:not(:placeholder-shown)]:font-semibold peer-[:not(:placeholder-shown)]:text-cyan-400"
+        >
+          Notice Content
+        </label>
+      </div>
 
-          <ModernDropdown name="target_term_id" value={selectedTermId} onChange={setSelectedTermId} disabled={!canPublish || isSubmitting || !hasDepartment || !selectedLevelId} placeholder={!hasDepartment ? "Select a Department First" : !selectedLevelId ? "Select a Level First" : "All Terms"} options={[{ value: "", label: !hasDepartment ? "Select a Department First" : !selectedLevelId ? "Select a Level First" : "All Terms" }, ...(hasDepartment && selectedLevelId ? terms.filter((t) => t.level_id === selectedLevelId).map((t) => ({ value: t.id, label: t.name })) : [])]} />
-        </div></div>)}
-
-        <div className="md:col-span-2">
-          <label
-            htmlFor="notice-attachment"
-            className="mb-2 block text-sm font-medium"
-          >
-            Attachment
-            <span className="ml-1 font-normal text-slate-400">
-              (Optional)
-            </span>
-          </label>
-
+      {/* Compact Attachment + Amber Pin Toggle Row */}
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-800/80 bg-slate-950/60 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Paperclip className="h-4 w-4 shrink-0 text-cyan-400" />
           <input
             id="notice-attachment"
             name="attachment"
             type="file"
             accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-            disabled={!canPublish || isSubmitting}
-            className="w-full rounded-md border border-input bg-slate-950 px-3 py-2 text-sm file:mr-4 file:rounded-lg file:border file:border-cyan-500/30 file:bg-cyan-500/15 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-cyan-300 hover:file:bg-cyan-500/25 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium disabled:cursor-not-allowed disabled:bg-slate-900/40"
+            disabled={isSubmitting || !canPublish}
+            className="w-full text-xs text-slate-400 file:mr-3 file:rounded-lg file:border file:border-cyan-500/30 file:bg-cyan-500/15 file:px-2.5 file:py-1 file:text-[11px] file:font-semibold file:text-cyan-300 hover:file:bg-cyan-500/25 cursor-pointer"
           />
-
-          <p className="mt-1 text-xs text-slate-400">
-            PDF, JPG, JPEG, PNG, DOC, or DOCX. Maximum file size: 100 MB.
-          </p>
         </div>
 
-        <div className="md:col-span-2 flex items-center gap-3">
-          <input
-            id="notice-pinned"
-            name="is_pinned"
-            type="checkbox"
-            disabled={!canPublish || isSubmitting}
-            className="h-4 w-4 rounded border-input"
-          />
-
-          <label
-            htmlFor="notice-pinned"
-            className="text-sm font-medium"
+        <div className="flex items-center gap-2.5 shrink-0">
+          <input type="hidden" name="is_pinned" value={isPinned ? "on" : ""} />
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-300">
+            <Pin className="h-3.5 w-3.5 text-amber-400" />
+            Pin to Top
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isPinned}
+            onClick={() => setIsPinned(!isPinned)}
+            disabled={isSubmitting || !canPublish}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+              isPinned
+                ? "bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]"
+                : "bg-slate-700"
+            }`}
           >
-            Pin this notice
-          </label>
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ${
+                isPinned ? "translate-x-5" : "translate-x-0"
+              }`}
+            />
+          </button>
         </div>
       </div>
 
-      <div className="flex gap-3">
-        <Button type="submit" disabled={isSubmitting || !canPublish} className="w-full h-11 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-300 hover:to-cyan-400 text-slate-950 font-bold text-sm shadow-[0_0_25px_rgba(6,182,212,0.35)] transition-all cursor-pointer">
-          {isSubmitting ? "Publishing..." : "Publish Notice"}
-        </Button>
-      </div>
+      {/* Glowing Cyan Publish Button */}
+      <Button
+        type="submit"
+        disabled={isSubmitting || !canPublish}
+        className="w-full h-11 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-300 hover:to-cyan-400 text-slate-950 font-bold text-sm shadow-[0_0_24px_rgba(6,182,212,0.35)] hover:shadow-[0_0_36px_rgba(6,182,212,0.55)] transition-all cursor-pointer"
+      >
+        {isSubmitting ? "Publishing Notice..." : "Publish Notice"}
+      </Button>
     </form>
   );
 }
