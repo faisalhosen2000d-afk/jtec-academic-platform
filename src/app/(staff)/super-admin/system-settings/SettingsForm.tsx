@@ -183,7 +183,7 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-emerald-500/30 bg-[#0A1020] p-5 shadow-lg">
+        <div className="rounded-2xl border border-emerald-500/30 bg-[#0A1020] p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-400/60 hover:bg-[#0D162B] hover:shadow-[0_10px_30px_rgba(16,185,129,0.14)]">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
             Registration Gate
           </p>
@@ -196,7 +196,7 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-cyan-500/30 bg-[#0A1020] p-5 shadow-lg">
+        <div className="rounded-2xl border border-cyan-500/30 bg-[#0A1020] p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400/60 hover:bg-[#0D162B] hover:shadow-[0_10px_30px_rgba(6,182,212,0.14)]">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
             Max Upload Limit
           </p>
@@ -205,7 +205,7 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-amber-500/30 bg-[#0A1020] p-5 shadow-lg">
+        <div className="rounded-2xl border border-amber-500/30 bg-[#0A1020] p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-400/60 hover:bg-[#0D162B] hover:shadow-[0_10px_30px_rgba(245,158,11,0.14)]">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
             Maintenance Mode
           </p>
@@ -348,7 +348,7 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
       </div>
 
       {/* Scheduled System Maintenance Mode */}
-      <section className="space-y-5 rounded-2xl border border-amber-500/30 bg-[#0A1020] p-6 shadow-xl">
+      <section className="space-y-5 rounded-2xl border border-amber-500/30 bg-[#0A1020] p-6 shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-400/55 hover:bg-[#0D162B] hover:shadow-[0_14px_36px_rgba(245,158,11,0.12)]">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/35 bg-amber-500/15 text-amber-300">
