@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Pencil } from "lucide-react";
 import { updateStudentFullName } from "@/server/actions/student-profile";
 
 type StudentFullNameEditorProps = {
@@ -64,15 +65,14 @@ export default function StudentFullNameEditor({
   }
 
   return (
-    <section className="rounded-xl border border-border bg-background p-6 shadow-sm">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+    <div className="rounded-xl border border-slate-800 bg-[#0E172A] p-4">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-foreground">
+          <h3 className="text-sm font-bold text-white">
             Full Name
-          </h2>
-
-          <p className="mt-1 text-sm text-muted-foreground">
-            You can update your full name without changing your academic records.
+          </h3>
+          <p className="mt-0.5 text-xs text-slate-400">
+            Update your display name without changing academic records.
           </p>
         </div>
 
@@ -80,22 +80,16 @@ export default function StudentFullNameEditor({
           <button
             type="button"
             onClick={handleEdit}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-[#0A1020] px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-500/45 hover:text-cyan-300"
           >
+            <Pencil className="h-3 w-3" />
             Edit
           </button>
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
         <div>
-          <label
-            htmlFor="student-full-name"
-            className="text-sm font-medium text-foreground"
-          >
-            Your Full Name
-          </label>
-
           <input
             id="student-full-name"
             type="text"
@@ -105,22 +99,22 @@ export default function StudentFullNameEditor({
             maxLength={120}
             required
             disabled={!editing || saving}
-            className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-80"
+            className="h-10 w-full rounded-xl border border-slate-800 bg-[#0A1020] px-3.5 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-cyan-500/60 focus:ring-2 focus:ring-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-75"
           />
 
           {editing && (
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-[11px] text-slate-400">
               Maximum 120 characters.
             </p>
           )}
         </div>
 
         {editing && (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2.5">
             <button
               type="submit"
               disabled={saving || !name.trim()}
-              className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl bg-emerald-400 px-4 py-2 text-xs font-bold text-slate-950 shadow-[0_0_18px_rgba(52,211,153,0.25)] transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>
@@ -129,7 +123,7 @@ export default function StudentFullNameEditor({
               type="button"
               onClick={handleCancel}
               disabled={saving}
-              className="rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl border border-slate-700 bg-[#0A1020] px-4 py-2 text-xs font-semibold text-slate-300 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
             </button>
@@ -138,13 +132,15 @@ export default function StudentFullNameEditor({
 
         {status && (
           <p
-            className="text-sm text-muted-foreground"
+            className={`text-xs font-medium ${
+              status.includes("success") ? "text-emerald-400" : "text-rose-400"
+            }`}
             aria-live="polite"
           >
             {status}
           </p>
         )}
       </form>
-    </section>
+    </div>
   );
 }
