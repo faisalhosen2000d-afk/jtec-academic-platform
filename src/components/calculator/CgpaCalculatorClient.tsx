@@ -211,7 +211,7 @@ export function CgpaCalculatorClient({
   return (
     <div className="space-y-5">
       {/* Hero Banner */}
-      <section className="dash-stagger-1 relative overflow-hidden rounded-2xl border border-violet-500/30 bg-gradient-to-br from-[#131024] via-[#0A1120] to-[#070C17] p-5 sm:p-6 shadow-[0_0_36px_rgba(139,92,246,0.08)]">
+      <section className="dash-stagger-1 relative overflow-hidden rounded-2xl border border-violet-500/30 bg-gradient-to-br from-[#131024] via-[#0A1120] to-[#070C17] p-5 sm:p-6 shadow-[0_0_36px_rgba(139,92,246,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-400/60 hover:shadow-[0_12px_32px_rgba(139,92,246,0.16)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-400 px-3 py-0.5 text-[10.5px] font-bold uppercase tracking-wider text-slate-950">
@@ -258,7 +258,7 @@ export function CgpaCalculatorClient({
       </section>
 
       {/* Department Selector */}
-      <section className="dash-stagger-2 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-3 shadow-lg transition-all duration-200 hover:border-slate-700">
+      <section className="dash-stagger-2 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-3 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400/50 hover:bg-[#0D162B] hover:shadow-[0_10px_26px_rgba(6,182,212,0.12)]">
         <span className="px-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
           Department:
         </span>
@@ -383,7 +383,7 @@ export function CgpaCalculatorClient({
           </div>
 
           {/* Term-by-Term Cumulative Planner Table */}
-          <div className="overflow-hidden rounded-2xl border border-slate-800/90 bg-[#0A1020] shadow-xl transition-all duration-200 hover:border-cyan-500/35">
+          <div className="overflow-hidden rounded-2xl border border-slate-800/90 bg-[#0A1020] shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400/45 hover:shadow-[0_12px_32px_rgba(6,182,212,0.12)]">
             <div className="flex flex-col justify-between gap-3 border-b border-slate-800/80 p-4 sm:flex-row sm:items-center sm:p-5">
               <div>
                 <h3 className="font-serif text-base font-bold text-white">
@@ -510,7 +510,7 @@ export function CgpaCalculatorClient({
                               setSelectedTermKey(t.termKey);
                               setActiveMode("term");
                             }}
-                            className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold text-cyan-400 hover:text-cyan-300"
+                            className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-cyan-500/35 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-300 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-cyan-400/70 hover:bg-cyan-500/20 hover:text-cyan-200 active:scale-95"
                           >
                             Calculate by Courses <ArrowRight className="h-3.5 w-3.5" />
                           </button>
@@ -528,7 +528,7 @@ export function CgpaCalculatorClient({
       {activeMode === "term" && (
         <div className="dash-stagger-3 space-y-5">
           {/* Term Selector & Format */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-4 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-4 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400/45 hover:bg-[#0D162B] hover:shadow-[0_10px_26px_rgba(6,182,212,0.12)]">
             <div className="flex flex-wrap items-center gap-2">
               <span className="mr-1 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
                 Select Term:
@@ -586,7 +586,7 @@ export function CgpaCalculatorClient({
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-800/90 bg-[#0A1020] shadow-xl transition-all duration-200 hover:border-cyan-500/35">
+          <div className="overflow-hidden rounded-2xl border border-slate-800/90 bg-[#0A1020] shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400/45 hover:shadow-[0_12px_32px_rgba(6,182,212,0.12)]">
             <div className="flex items-center justify-between border-b border-slate-800/80 p-4 sm:p-5">
               <div>
                 <h3 className="font-serif text-base font-bold text-white">
