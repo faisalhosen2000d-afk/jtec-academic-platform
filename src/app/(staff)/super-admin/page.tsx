@@ -355,7 +355,7 @@ export default async function SuperAdminPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/super-admin/profile"
-              className="group inline-flex cursor-pointer items-center gap-3 rounded-2xl border border-amber-500/35 bg-gradient-to-b from-slate-800/90 to-[#0A1020] py-1.5 pl-2 pr-3.5 shadow-[0_2px_14px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:-translate-y-0.5 hover:border-amber-400/75 hover:bg-[#0D162B] hover:shadow-[0_0_24px_rgba(245,158,11,0.22)] active:translate-y-0 active:scale-95"
+              className="group inline-flex h-12 cursor-pointer items-center gap-3 rounded-2xl border border-amber-500/35 bg-gradient-to-b from-slate-800/90 to-[#0A1020] pl-2 pr-3.5 shadow-[0_2px_14px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:-translate-y-0.5 hover:border-amber-400/75 hover:bg-[#0D162B] hover:shadow-[0_0_24px_rgba(245,158,11,0.22)] active:translate-y-0 active:scale-95"
             >
               <div className="relative">
                 {(profile as { avatar_url?: string | null }).avatar_url ? (
@@ -385,7 +385,7 @@ export default async function SuperAdminPage() {
             <form action={handleSignOut}>
               <button
                 type="submit"
-                className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-rose-500/45 bg-gradient-to-b from-rose-500/25 to-rose-600/15 px-4 py-2 text-xs font-bold text-rose-200 shadow-[0_2px_12px_rgba(244,63,94,0.18),inset_0_1px_0_rgba(255,255,255,0.12)] transition-all duration-150 hover:-translate-y-0.5 hover:border-rose-400/80 hover:from-rose-500/35 hover:to-rose-600/25 hover:text-white hover:shadow-[0_0_22px_rgba(244,63,94,0.38)] active:translate-y-0 active:scale-95"
+                className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-2xl border border-rose-500/45 bg-gradient-to-b from-rose-500/25 to-rose-600/15 px-5 text-xs font-bold text-rose-200 shadow-[0_2px_12px_rgba(244,63,94,0.18),inset_0_1px_0_rgba(255,255,255,0.12)] transition-all duration-150 hover:-translate-y-0.5 hover:border-rose-400/80 hover:from-rose-500/35 hover:to-rose-600/25 hover:text-white hover:shadow-[0_0_22px_rgba(244,63,94,0.38)] active:translate-y-0 active:scale-95"
               >
                 <LogOut className="h-3.5 w-3.5" />
                 <span>Logout</span>
