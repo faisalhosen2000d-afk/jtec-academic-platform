@@ -200,7 +200,7 @@ export default async function StudentDashboardPage() {
       rawAdmin
         .from("term_results")
         .select(
-          "id, level_term_key, gpa, cgpa, status, term_retake_count, level_id, term_id",
+          "id, level_term_key, gpa, cgpa, status, term_retake_count, remarks, level_id, term_id",
         )
         .or(
           myCleanRoll
@@ -225,6 +225,7 @@ export default async function StudentDashboardPage() {
       cgpa: number | null;
       status?: string;
       term_retake_count: number;
+      remarks?: string | null;
       level_id?: string;
       term_id?: string;
     }>;
@@ -243,12 +244,38 @@ export default async function StudentDashboardPage() {
     }
 
     const passedUserTerms = userTerms.filter((t) => t.status !== "air_dropped");
-    trendPoints = passedUserTerms.map((t) => ({
-      termKey: t.level_term_key,
-      gpa: Number(t.gpa),
-      cgpa: t.cgpa !== null ? Number(t.cgpa) : null,
-      retakes: Number(t.term_retake_count) || 0,
-    }));
+    const seenRetakeCodes = new Set<string>();
+    let prevCumulativeRetakes = 0;
+    trendPoints = passedUserTerms.map((t) => {
+      const rawRemarks = (t.remarks ?? "").replace(/^Retakes:\s*/i, "").trim();
+      const codes =
+        !rawRemarks ||
+        rawRemarks === "0" ||
+        rawRemarks.toLowerCase() === "none" ||
+        rawRemarks.startsWith("Year Dropped")
+          ? []
+          : rawRemarks
+              .split(/[,;]+/)
+              .map((s) => s.trim())
+              .filter(Boolean);
+
+      let ownTermRetakes = 0;
+      if (codes.length > 0) {
+        const fresh = codes.filter((code) => !seenRetakeCodes.has(code));
+        codes.forEach((code) => seenRetakeCodes.add(code));
+        ownTermRetakes = fresh.length;
+      } else {
+        const currCumulative = Number(t.term_retake_count) || 0;
+        ownTermRetakes = Math.max(0, currCumulative - prevCumulativeRetakes);
+      }
+      prevCumulativeRetakes = Number(t.term_retake_count) || 0;
+      return {
+        termKey: t.level_term_key,
+        gpa: Number(t.gpa),
+        cgpa: t.cgpa !== null ? Number(t.cgpa) : null,
+        retakes: ownTermRetakes,
+      };
+    });
 
     const lastPassedTerm =
       passedUserTerms.length > 0
@@ -287,6 +314,7 @@ export default async function StudentDashboardPage() {
       gpa: number;
       cgpa: number | null;
       term_retake_count: number;
+      remarks?: string | null;
       status?: string;
     }>;
 
