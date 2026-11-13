@@ -44,7 +44,7 @@ function getDepartmentBadge(deptName?: string | null) {
 
   if (t.includes("APPAREL") || t.includes("AE")) {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-purple-200/90 bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:border-purple-800/60 dark:bg-purple-950/40 dark:text-purple-300">
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-purple-500/35 bg-purple-500/15 px-2 py-0.5 text-[11px] font-bold text-purple-300">
         <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
         AE • Apparel
       </span>
@@ -53,7 +53,7 @@ function getDepartmentBadge(deptName?: string | null) {
 
   if (t.includes("WET") || t.includes("WPE")) {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-cyan-200/90 bg-cyan-50 px-2 py-0.5 text-[11px] font-bold text-cyan-700 dark:border-cyan-800/60 dark:bg-cyan-950/40 dark:text-cyan-300">
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-[11px] font-bold text-cyan-300">
         <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
         WPE • Wet Process
       </span>
@@ -62,7 +62,7 @@ function getDepartmentBadge(deptName?: string | null) {
 
   if (t.includes("FABRIC") || t.includes("FE")) {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-emerald-200/90 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
         FE • Fabric
       </span>
@@ -71,7 +71,7 @@ function getDepartmentBadge(deptName?: string | null) {
 
   if (t.includes("YARN") || t.includes("YE")) {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-200/90 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-500/35 bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-300">
         <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
         YE • Yarn
       </span>
@@ -79,7 +79,7 @@ function getDepartmentBadge(deptName?: string | null) {
   }
 
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200/90 bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-700 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-[11px] font-bold text-slate-300">
       <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
       {deptName}
     </span>
