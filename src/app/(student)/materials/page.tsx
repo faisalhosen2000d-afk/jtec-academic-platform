@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Bookmark, BookOpen, Plus, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getAcademicTermNavigation } from "@/lib/academic-terms";
 import { redirect } from "next/navigation";

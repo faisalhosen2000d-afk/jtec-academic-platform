@@ -8,6 +8,7 @@ import {
   Eye,
   Download,
   HardDrive,
+  ArrowUpRight,
 } from "lucide-react";
 import UploaderContactProfile from "@/components/student/UploaderContactProfile";
 import MaterialBookmarkButton from "@/app/(student)/materials/[id]/MaterialBookmarkButton";
@@ -51,53 +52,71 @@ type MaterialCardProps = {
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 function getFileTypeBadge(fileType: string, title?: string) {
   const ft = (fileType || "").toLowerCase();
-  const ext = title && title.includes(".") ? title.split(".").pop()?.toLowerCase() : "";
+  const ext =
+    title && title.includes(".") ? title.split(".").pop()?.toLowerCase() : "";
 
   if (ft.includes("pdf") || ext === "pdf") {
     return {
       label: "PDF",
-      badgeClass: "bg-rose-50 text-rose-600 border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/60",
-      icon: <FileText className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+      badgeClass: "border-rose-500/40 bg-rose-500/15 text-rose-300",
+      icon: <FileText className="h-3.5 w-3.5 text-rose-400" />,
     };
   }
-  if (ft.includes("image") || ["png", "jpg", "jpeg", "webp", "gif"].includes(ext || "")) {
+  if (
+    ft.includes("image") ||
+    ["png", "jpg", "jpeg", "webp", "gif"].includes(ext || "")
+  ) {
     return {
       label: "IMAGE",
-      badgeClass: "bg-purple-50 text-purple-600 border-purple-200/80 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-900/60",
-      icon: <ImageIcon className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+      badgeClass: "border-violet-500/40 bg-violet-500/15 text-violet-300",
+      icon: <ImageIcon className="h-3.5 w-3.5 text-violet-400" />,
     };
   }
-  if (ft.includes("word") || ft.includes("officedocument.word") || ["doc", "docx"].includes(ext || "")) {
+  if (
+    ft.includes("word") ||
+    ft.includes("officedocument.word") ||
+    ["doc", "docx"].includes(ext || "")
+  ) {
     return {
-      label: "WORD",
-      badgeClass: "bg-blue-50 text-blue-600 border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/60",
-      icon: <FileText className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+      label: "DOCX",
+      badgeClass: "border-sky-500/40 bg-sky-500/15 text-sky-300",
+      icon: <FileText className="h-3.5 w-3.5 text-sky-400" />,
     };
   }
-  if (ft.includes("presentation") || ft.includes("powerpoint") || ["ppt", "pptx"].includes(ext || "")) {
+  if (
+    ft.includes("presentation") ||
+    ft.includes("powerpoint") ||
+    ["ppt", "pptx"].includes(ext || "")
+  ) {
     return {
-      label: "SLIDES",
-      badgeClass: "bg-amber-50 text-amber-600 border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/60",
-      icon: <Presentation className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+      label: "PPTX",
+      badgeClass: "border-amber-500/40 bg-amber-500/15 text-amber-300",
+      icon: <Presentation className="h-3.5 w-3.5 text-amber-400" />,
     };
   }
-  if (ft.includes("sheet") || ft.includes("excel") || ["xls", "xlsx", "csv"].includes(ext || "")) {
+  if (
+    ft.includes("sheet") ||
+    ft.includes("excel") ||
+    ["xls", "xlsx", "csv"].includes(ext || "")
+  ) {
     return {
-      label: "EXCEL",
-      badgeClass: "bg-emerald-50 text-emerald-600 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/60",
-      icon: <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+      label: "XLSX",
+      badgeClass: "border-emerald-500/40 bg-emerald-500/15 text-emerald-300",
+      icon: <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-400" />,
     };
   }
   return {
     label: "DOC",
-    badgeClass: "bg-slate-50 text-slate-600 border-slate-200/80 dark:bg-slate-900/40 dark:text-slate-400 dark:border-slate-800",
-    icon: <File className="h-3.5 w-3.5 text-slate-500" />
+    badgeClass: "border-slate-700 bg-slate-900 text-slate-300",
+    icon: <File className="h-3.5 w-3.5 text-slate-400" />,
   };
 }
 
@@ -107,182 +126,178 @@ function getDepartmentBadge(deptName?: string | null) {
 
   if (t.includes("APPAREL") || t.includes("AE")) {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-purple-200/90 bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:border-purple-800/60 dark:bg-purple-950/40 dark:text-purple-300">
-        <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
-        AE • Apparel
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-violet-500/35 bg-violet-500/15 px-2 py-0.5 text-[10px] font-bold text-violet-300">
+        <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
+        AE · Apparel
       </span>
     );
   }
 
   if (t.includes("WET") || t.includes("WPE")) {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-cyan-200/90 bg-cyan-50 px-2 py-0.5 text-[11px] font-bold text-cyan-700 dark:border-cyan-800/60 dark:bg-cyan-950/40 dark:text-cyan-300">
-        <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
-        WPE • Wet Process
-      </span>
-    );
-  }
-
-  if (t.includes("FABRIC") || t.includes("FE")) {
-    return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-emerald-200/90 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        FE • Fabric
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-[10px] font-bold text-cyan-300">
+        <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+        WPE · Wet Process
       </span>
     );
   }
 
   if (t.includes("YARN") || t.includes("YE")) {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-200/90 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-        YE • Yarn
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-500/35 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+        YE · Yarn
+      </span>
+    );
+  }
+
+  if (t.includes("FABRIC") || t.includes("FE")) {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        FE · Fabric
       </span>
     );
   }
 
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200/90 bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-700 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">
-      <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
       {deptName}
     </span>
   );
 }
 
-function HighlightText({
-  text,
-  searchQuery,
-}: {
-  text: string;
-  searchQuery?: string;
-}) {
-  const normalizedQuery = searchQuery?.trim() ?? "";
-  if (!normalizedQuery) return <>{text}</>;
+function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
-  const words = normalizedQuery
-    .split(/\s+/)
-    .filter(Boolean)
-    .sort((a, b) => b.length - a.length);
-
-  if (words.length === 0) return <>{text}</>;
-
-  const pattern = new RegExp(`(${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "gi");
-  const parts = text.split(pattern);
-
+function HighlightText({ text, query }: { text: string; query: string }) {
+  if (!query.trim()) return <>{text}</>;
+  const parts = text.split(new RegExp(`(${escapeRegExp(query.trim())})`, "gi"));
   return (
     <>
-      {parts.map((part, index) => {
-        const isMatch = words.some((w) => part.toLowerCase() === w.toLowerCase());
-        return isMatch ? (
-          <mark key={`${part}-${index}`} className="rounded bg-primary/20 px-0.5 text-foreground font-semibold">
+      {parts.map((part, i) =>
+        part.toLowerCase() === query.trim().toLowerCase() ? (
+          <mark
+            key={i}
+            className="rounded bg-amber-500/30 px-0.5 text-amber-200"
+          >
             {part}
           </mark>
         ) : (
-          <span key={`${part}-${index}`}>{part}</span>
-        );
-      })}
+          part
+        ),
+      )}
     </>
   );
 }
 
 export default function MaterialCard({
   material,
-  searchQuery,
+  searchQuery = "",
   initialBookmarked,
 }: MaterialCardProps) {
-  const fileBadge = getFileTypeBadge(material.file_type, material.title);
+  const badge = getFileTypeBadge(material.file_type, material.title);
 
   return (
-    <article className="flex h-full flex-col justify-between rounded-2xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+    <article className="group flex flex-col justify-between rounded-2xl border border-slate-800/90 bg-[#0A1020] p-5 shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/45 hover:bg-[#0D162B] hover:shadow-[0_14px_34px_rgba(16,185,129,0.12)]">
       <div>
-        {/* Top Header: Dynamic File Type Icon Badge & Status */}
-        <div className="flex items-center justify-between gap-3">
-          <div
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold uppercase tracking-wider ${fileBadge.badgeClass}`}
-          >
-            {fileBadge.icon}
-            <span>{fileBadge.label}</span>
-          </div>
-
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Approved
-          </span>
-        </div>
-
-        {/* Title */}
-        <h2 className="mt-3.5 line-clamp-2 text-base font-bold text-foreground">
-          <HighlightText text={material.title} searchQuery={searchQuery} />
-        </h2>
-
-        {/* Subject & Topic Capsule Box */}
-        {material.subject && (
-          <div className="mt-3 rounded-xl border border-border/60 bg-muted/30 p-2.5">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Subject
-            </p>
-            <p className="mt-0.5 line-clamp-1 text-xs font-semibold text-foreground">
-              {material.subject.subject_code} - {material.subject.subject_name}
-            </p>
-            {material.topic && (
-              <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground/80">Topic:</span>{" "}
-                <HighlightText text={material.topic} searchQuery={searchQuery} />
-              </p>
+        {/* Top Row: File Badge + Subject Pill + Bookmark */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span
+              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-bold ${badge.badgeClass}`}
+            >
+              {badge.icon}
+              {badge.label}
+            </span>
+            {material.subject && (
+              <span className="inline-flex items-center rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 font-mono text-[11px] font-bold text-cyan-300">
+                {material.subject.subject_code}
+              </span>
             )}
           </div>
-        )}
-
-        {/* Description */}
-        {material.description && (
-          <p className="mt-2.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-            <HighlightText text={material.description} searchQuery={searchQuery} />
-          </p>
-        )}
-      </div>
-
-      {/* Bottom Section: Uploader & Meta Stats & Actions */}
-      <div className="mt-4 pt-1">
-        {/* Uploader Profile with Signature Department Badge */}
-        {material.uploader && (
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <UploaderContactProfile
-                profile={material.uploader}
-                materialId={material.id}
-                departmentName={material.uploader.department_name}
-              />
-            </div>
-            {getDepartmentBadge(material.uploader.department_name)}
-          </div>
-        )}
-
-        {/* Meta Stats Bar with Icons */}
-        <div className="mt-3.5 flex items-center justify-between border-t border-border/60 pt-3 text-[11px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1 font-medium">
-            <Eye className="h-3.5 w-3.5 opacity-70" /> {material.views_count} Views
-          </span>
-          <span className="inline-flex items-center gap-1 font-medium">
-            <Download className="h-3.5 w-3.5 opacity-70" /> {material.downloads_count}
-          </span>
-          <span className="inline-flex items-center gap-1 font-medium">
-            <HardDrive className="h-3.5 w-3.5 opacity-70" /> {formatFileSize(material.file_size_bytes)}
-          </span>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="mt-3.5 grid grid-cols-2 gap-2.5">
-          <Link
-            href={`/materials/${material.id}`}
-            className="inline-flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-xs transition active:scale-[0.98]"
-          >
-            View Material
-          </Link>
 
           <MaterialBookmarkButton
             materialId={material.id}
             initialBookmarked={initialBookmarked}
           />
+        </div>
+
+        {/* Title & Subject Name */}
+        <Link
+          href={`/materials/${material.id}`}
+          className="mt-3 block transition-colors group-hover:text-emerald-300"
+        >
+          <h3 className="line-clamp-2 font-serif text-base font-bold leading-snug text-white transition-colors group-hover:text-emerald-200">
+            <HighlightText text={material.title} query={searchQuery} />
+          </h3>
+        </Link>
+
+        {material.subject && (
+          <p className="mt-1 line-clamp-1 text-xs font-medium text-slate-400">
+            {material.subject.subject_name}
+          </p>
+        )}
+
+        {/* Description / Topic */}
+        {(material.topic || material.description) && (
+          <p className="mt-2.5 line-clamp-2 text-xs leading-relaxed text-slate-400">
+            {material.topic && (
+              <span className="font-semibold text-slate-200">
+                <HighlightText text={material.topic} query={searchQuery} />
+                {material.description ? " · " : ""}
+              </span>
+            )}
+            {material.description && (
+              <HighlightText text={material.description} query={searchQuery} />
+            )}
+          </p>
+        )}
+      </div>
+
+      {/* Footer: Uploader + Icon Stats + Open */}
+      <div className="mt-4 space-y-3 border-t border-slate-800/80 pt-3.5">
+        {material.uploader && (
+          <div className="flex items-center justify-between gap-2">
+            <UploaderContactProfile
+              profile={material.uploader}
+              materialId={material.id}
+              departmentName={material.uploader.department_name}
+            />
+            {getDepartmentBadge(material.uploader.department_name)}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between text-[11px] text-slate-400">
+          <div className="flex items-center gap-3.5">
+            <span className="inline-flex items-center gap-1" title="Views">
+              <Eye className="h-3.5 w-3.5 text-cyan-400" />
+              <span className="font-medium text-slate-200">
+                {material.views_count}
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1" title="Downloads">
+              <Download className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="font-medium text-slate-200">
+                {material.downloads_count}
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1" title="File Size">
+              <HardDrive className="h-3.5 w-3.5 text-amber-400" />
+              <span className="font-medium text-slate-200">
+                {formatFileSize(material.file_size_bytes)}
+              </span>
+            </span>
+          </div>
+
+          <Link
+            href={`/materials/${material.id}`}
+            className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/35 bg-emerald-500/15 px-3 py-1.5 text-[11px] font-bold text-emerald-300 transition-all hover:border-emerald-400 hover:bg-emerald-500 hover:text-slate-950 active:scale-95"
+          >
+            <span>Open</span>
+            <ArrowUpRight className="h-3 w-3" />
+          </Link>
         </div>
       </div>
     </article>
