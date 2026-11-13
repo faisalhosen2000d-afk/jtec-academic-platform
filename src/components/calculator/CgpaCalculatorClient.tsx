@@ -209,107 +209,146 @@ export function CgpaCalculatorClient({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border bg-card p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-700 text-xs font-semibold">
-            <Calculator className="w-3.5 h-3.5" />
-            Official BUTEX / JTEC Curriculum Engine
+    <div className="space-y-5">
+      {/* Hero Banner */}
+      <section className="dash-stagger-1 relative overflow-hidden rounded-2xl border border-violet-500/30 bg-gradient-to-br from-[#131024] via-[#0A1120] to-[#070C17] p-5 sm:p-6 shadow-[0_0_36px_rgba(139,92,246,0.08)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-400 px-3 py-0.5 text-[10.5px] font-bold uppercase tracking-wider text-slate-950">
+              <Calculator className="h-3.5 w-3.5" />
+              Official BUTEX / JTEC Curriculum Engine
+            </span>
+
+            <h1 className="mt-2.5 font-serif text-2xl font-bold tracking-tight text-white sm:text-3xl">
+              CGPA Calculator &amp; Target Planner
+            </h1>
+
+            <p className="mt-1 text-xs sm:text-sm text-slate-400">
+              {studentName} {studentRoll ? `(${studentRoll})` : ""} &bull; Credit-weighted simulation &amp; target projection
+            </p>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">CGPA Calculator & Target Planner</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            {studentName} ({studentRoll}) &bull; Real-time credit weighted calculation & target projection
-          </p>
-        </div>
 
-        <div className="flex items-center rounded-xl bg-muted p-1 border shadow-inner">
-          <button
-            onClick={() => setActiveMode("cgpa")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-              activeMode === "cgpa" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5 inline mr-1.5" />
-            CGPA & Future Targets
-          </button>
-          <button
-            onClick={() => setActiveMode("term")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-              activeMode === "term" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5 inline mr-1.5" />
-            Term GPA by Courses
-          </button>
+          <div className="inline-flex rounded-xl border border-slate-800 bg-[#0B1324] p-1">
+            <button
+              type="button"
+              onClick={() => setActiveMode("cgpa")}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition ${
+                activeMode === "cgpa"
+                  ? "border border-violet-400/40 bg-violet-500/20 text-violet-200 shadow-sm"
+                  : "border border-transparent text-slate-400 hover:text-white"
+              }`}
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              CGPA &amp; Future Targets
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMode("term")}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition ${
+                activeMode === "term"
+                  ? "border border-violet-400/40 bg-violet-500/20 text-violet-200 shadow-sm"
+                  : "border border-transparent text-slate-400 hover:text-white"
+              }`}
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              Term GPA by Courses
+            </button>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="flex flex-wrap items-center gap-2 bg-card border rounded-2xl p-2.5 shadow-sm">
-        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-2">Department:</span>
+      {/* Department Selector */}
+      <section className="dash-stagger-2 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-3 shadow-lg">
+        <span className="px-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+          Department:
+        </span>
         {Object.values(ALL_CURRICULA).map((dept) => {
           const isSelected = selectedDeptId === dept.id;
           return (
             <button
               key={dept.id}
+              type="button"
               onClick={() => setSelectedDeptId(dept.id)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2 ${
+              className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-1.5 text-xs font-semibold transition ${
                 isSelected
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "bg-muted/50 text-foreground hover:bg-muted"
+                  ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-300"
+                  : "border-slate-800 bg-[#0E172A] text-slate-300 hover:border-slate-700 hover:text-white"
               }`}
             >
               <span>{dept.name} ({dept.shortName})</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? "bg-blue-500 text-white" : "bg-muted text-muted-foreground"}`}>
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                  isSelected
+                    ? "bg-cyan-400/20 text-cyan-200"
+                    : "bg-slate-800 text-slate-400"
+                }`}
+              >
                 {dept.totalCredits} Cr
               </span>
             </button>
           );
         })}
-      </div>
+      </section>
 
       {activeMode === "cgpa" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Current CGPA</span>
-              <div className="text-3xl font-extrabold text-blue-600">
-                {cgpaCalculation.currentCgpa > 0 ? cgpaCalculation.currentCgpa.toFixed(2) : "N/A"}
+        <div className="dash-stagger-3 space-y-5">
+          {/* 4 KPI Cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl border border-cyan-500/25 bg-[#0A1020] p-5 shadow-lg space-y-1">
+              <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                Current CGPA
+              </span>
+              <div className="text-3xl font-extrabold text-cyan-400">
+                {cgpaCalculation.currentCgpa > 0
+                  ? cgpaCalculation.currentCgpa.toFixed(2)
+                  : "N/A"}
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                Based on published results ({cgpaCalculation.completedCredits} credits completed)
+              <p className="text-[11px] text-slate-400">
+                Published ({cgpaCalculation.completedCredits} credits)
               </p>
             </div>
 
-            <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Projected Graduation CGPA</span>
-              <div className="text-3xl font-extrabold text-emerald-600">
-                {cgpaCalculation.projectedFinalCgpa > 0 ? cgpaCalculation.projectedFinalCgpa.toFixed(2) : "N/A"}
+            <div className="rounded-2xl border border-emerald-500/30 bg-[#0A1020] p-5 shadow-lg space-y-1">
+              <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                Projected Graduation CGPA
+              </span>
+              <div className="text-3xl font-extrabold text-emerald-400">
+                {cgpaCalculation.projectedFinalCgpa > 0
+                  ? cgpaCalculation.projectedFinalCgpa.toFixed(2)
+                  : "N/A"}
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[11px] text-slate-400">
                 Across {cgpaCalculation.totalIncludedCredits} included credits
               </p>
             </div>
 
-            <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Degree Progress</span>
-              <div className="text-2xl font-bold mt-1">
+            <div className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-5 shadow-lg space-y-1.5">
+              <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                Degree Progress
+              </span>
+              <div className="text-2xl font-bold text-white">
                 {cgpaCalculation.completedCredits} / {cgpaCalculation.totalCredits} Cr
               </div>
-              <div className="w-full bg-muted rounded-full h-2 mt-2 overflow-hidden">
+              <div className="h-2 w-full overflow-hidden rounded-full border border-slate-800 bg-[#0E172A]">
                 <div
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${(cgpaCalculation.completedCredits / cgpaCalculation.totalCredits) * 100}%` }}
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-500"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      (cgpaCalculation.completedCredits /
+                        Math.max(1, cgpaCalculation.totalCredits)) *
+                        100
+                    )}%`,
+                  }}
                 />
               </div>
             </div>
 
-            <div className="rounded-2xl border bg-amber-50/70 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/40 p-5 shadow-sm space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">Target Goal Finder</span>
-                <Sparkles className="w-4 h-4 text-amber-600" />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium">Desired CGPA:</span>
+            <div className="rounded-2xl border border-violet-500/35 bg-gradient-to-br from-violet-500/12 via-[#0A1020] to-[#0A1020] p-5 shadow-lg space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wider text-violet-300">
+                  <Sparkles className="h-3.5 w-3.5" /> Target Goal
+                </span>
                 <input
                   type="number"
                   step="0.01"
@@ -317,49 +356,58 @@ export function CgpaCalculatorClient({
                   max="4.00"
                   value={targetGoalCgpa}
                   onChange={(e) => setTargetGoalCgpa(e.target.value)}
-                  className="w-20 px-2 py-1 rounded-lg border bg-background text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-16 rounded-lg border border-slate-700 bg-[#0E172A] px-2 py-1 text-center font-mono text-xs font-bold text-white outline-none focus:border-violet-400"
                 />
               </div>
-              <p className="text-xs text-amber-900 dark:text-amber-300 leading-relaxed">
-                {cgpaCalculation.remainingCredits > 0 ? (
-                  cgpaCalculation.isGoalFeasible ? (
-                    <span>
-                      Target <b>{targetGoalCgpa}</b> পৌঁছাতে বাকি {cgpaCalculation.remainingCredits} ক্রেডিটে গড়ে <b>{Math.max(0, cgpaCalculation.neededAverageGpa).toFixed(2)}</b> GPA প্রয়োজন!
-                    </span>
-                  ) : (
-                    <span className="text-red-600 dark:text-red-400 font-semibold">
-                      এই টার্গেট পৌঁছাতে গড়ে {cgpaCalculation.neededAverageGpa.toFixed(2)} GPA লাগবে (যা ৪.০০ এর চেয়ে বেশি)।
-                    </span>
-                  )
-                ) : (
-                  <span>সবগুলো সিলেক্টেড টার্ম ইতিমধ্যে সম্পন্ন হয়েছে!</span>
-                )}
-              </p>
+              {cgpaCalculation.remainingCredits > 0 ? (
+                <>
+                  <div
+                    className={`text-2xl font-extrabold ${
+                      cgpaCalculation.isGoalFeasible
+                        ? "text-violet-300"
+                        : "text-rose-400"
+                    }`}
+                  >
+                    Req. Avg: {Math.max(0, cgpaCalculation.neededAverageGpa).toFixed(2)}
+                  </div>
+                  <p className="text-[11px] leading-snug text-slate-300">
+                    {cgpaCalculation.isGoalFeasible
+                      ? `Need ${Math.max(0, cgpaCalculation.neededAverageGpa).toFixed(2)} avg GPA across ${cgpaCalculation.remainingCredits} remaining credits.`
+                      : "Required GPA exceeds 4.00 max across remaining terms."}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-slate-400">All selected terms completed.</p>
+              )}
             </div>
           </div>
 
-          <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
-            <div className="p-4 sm:p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Term-by-Term Cumulative Planner Table */}
+          <div className="overflow-hidden rounded-2xl border border-slate-800/90 bg-[#0A1020] shadow-xl">
+            <div className="flex flex-col justify-between gap-3 border-b border-slate-800/80 p-4 sm:flex-row sm:items-center sm:p-5">
               <div>
-                <h3 className="text-base font-bold">Term-by-Term Cumulative Planner</h3>
-                <p className="text-xs text-muted-foreground">Adjust any term GPA (including published terms to simulate retake clearance) or toggle terms.</p>
+                <h3 className="font-serif text-base font-bold text-white">
+                  Term-by-Term Cumulative Planner
+                </h3>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  Adjust any term GPA (including published terms to simulate retake clearance) or toggle terms.
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={reloadPublishedResults}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium bg-background hover:bg-muted transition"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  Reset to Published Results
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={reloadPublishedResults}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700/80 bg-[#0E172A] px-3.5 py-1.5 text-xs font-semibold text-cyan-300 transition hover:border-cyan-500/40 hover:text-cyan-200"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset to Published Results
+              </button>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-xs sm:text-sm text-left">
-                <thead className="bg-muted/60 text-muted-foreground uppercase text-[11px] font-semibold">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <thead className="border-b border-slate-800/80 bg-[#0E172A] text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
                   <tr className="whitespace-nowrap">
-                    <th className="px-3 py-3 w-12 text-center">Include</th>
+                    <th className="w-12 px-3 py-3 text-center">Include</th>
                     <th className="px-4 py-3">Term</th>
                     <th className="px-3 py-3">Credits</th>
                     <th className="px-3 py-3">Status</th>
@@ -368,46 +416,61 @@ export function CgpaCalculatorClient({
                     <th className="px-4 py-3 text-right">Course Detail</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-slate-800/70">
                   {termPlanner.map((t, idx) => {
                     const isPublished = t.isPublished;
                     const qualityPoints = (t.gpa * t.credits).toFixed(2);
                     return (
-                      <tr key={t.termKey} className={`transition ${!t.isIncluded ? "opacity-50 bg-muted/20" : "hover:bg-muted/40"}`}>
-                        <td className="px-3 py-3 text-center whitespace-nowrap">
+                      <tr
+                        key={t.termKey}
+                        className={`transition ${
+                          !t.isIncluded
+                            ? "bg-[#070B14] opacity-45"
+                            : "hover:bg-[#0E172A]/70"
+                        }`}
+                      >
+                        <td className="whitespace-nowrap px-3 py-3 text-center">
                           <input
                             type="checkbox"
                             checked={t.isIncluded}
                             onChange={(e) => {
                               const checked = e.target.checked;
                               setTermPlanner((prev) =>
-                                prev.map((item) => (item.termKey === t.termKey ? { ...item, isIncluded: checked } : item))
+                                prev.map((item) =>
+                                  item.termKey === t.termKey
+                                    ? { ...item, isIncluded: checked }
+                                    : item
+                                )
                               );
                             }}
-                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            className="h-4 w-4 cursor-pointer rounded accent-cyan-400"
                           />
                         </td>
-                        <td className="px-4 py-3 font-bold whitespace-nowrap">
+                        <td className="whitespace-nowrap px-4 py-3 font-bold text-slate-100">
                           <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                            <span className="w-6 h-6 shrink-0 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 text-xs flex items-center justify-center font-bold">
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 text-xs font-bold text-cyan-300">
                               {idx + 1}
                             </span>
-                            <span>Level {t.termKey.split("-")[0]} Term {t.termKey.split("-")[1]} ({t.termKey})</span>
+                            <span>
+                              Level {t.termKey.split("-")[0]} Term {t.termKey.split("-")[1]} ({t.termKey})
+                            </span>
                           </span>
                         </td>
-                        <td className="px-3 py-3 font-semibold whitespace-nowrap">{t.credits} Cr</td>
-                        <td className="px-3 py-3 whitespace-nowrap">
+                        <td className="whitespace-nowrap px-3 py-3 font-semibold text-slate-300">
+                          {t.credits} Cr
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3">
                           {isPublished ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-400">
-                              <CheckCircle2 className="w-3 h-3 shrink-0" /> Published Result
+                            <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-emerald-500/35 bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                              <CheckCircle2 className="h-3 w-3 shrink-0" /> Published
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-400">
+                            <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-amber-500/35 bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-bold text-amber-300">
                               Target / Projected
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3">
                           <div className="flex items-center gap-2">
                             <input
                               type="number"
@@ -420,31 +483,36 @@ export function CgpaCalculatorClient({
                                 const val = parseFloat(e.target.value) || 0;
                                 setTermPlanner((prev) =>
                                   prev.map((item) =>
-                                    item.termKey === t.termKey ? { ...item, gpa: Math.min(4.0, Math.max(0, val)) } : item
+                                    item.termKey === t.termKey
+                                      ? { ...item, gpa: Math.min(4.0, Math.max(0, val)) }
+                                      : item
                                   )
                                 );
                               }}
-                              className={`w-20 px-2.5 py-1 rounded-lg border font-bold text-center text-sm ${
-                                isPublished ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-extrabold border-emerald-300" : "bg-background"
+                              className={`w-20 rounded-lg border px-2.5 py-1 text-center font-mono text-sm font-bold outline-none ${
+                                isPublished
+                                  ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                                  : "border-slate-700 bg-[#0E172A] text-white focus:border-cyan-400"
                               }`}
                             />
-                            <span className="text-[11px] font-semibold text-muted-foreground">
+                            <span className="text-[11px] font-semibold text-slate-400">
                               {gradePointToLetter(t.gpa)}
                             </span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 font-mono font-semibold text-muted-foreground">
-                          {t.isIncluded ? qualityPoints : "—"}
+                        <td className="px-3 py-3 font-mono font-semibold text-slate-400">
+                          {t.isIncluded ? qualityPoints : "\u2014"}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button
+                            type="button"
                             onClick={() => {
                               setSelectedTermKey(t.termKey);
                               setActiveMode("term");
                             }}
-                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-semibold whitespace-nowrap"
+                            className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold text-cyan-400 hover:text-cyan-300"
                           >
-                            Calculate by Courses <ArrowRight className="w-3.5 h-3.5" />
+                            Calculate by Courses <ArrowRight className="h-3.5 w-3.5" />
                           </button>
                         </td>
                       </tr>
@@ -458,18 +526,22 @@ export function CgpaCalculatorClient({
       )}
 
       {activeMode === "term" && (
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-card border rounded-2xl p-4 shadow-sm">
+        <div className="dash-stagger-3 space-y-5">
+          {/* Term Selector & Format */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-4 shadow-lg">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mr-1">Select Term:</span>
+              <span className="mr-1 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                Select Term:
+              </span>
               {currentCurriculum.terms.map((t) => (
                 <button
                   key={t.termKey}
+                  type="button"
                   onClick={() => setSelectedTermKey(t.termKey)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  className={`rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
                     selectedTermKey === t.termKey
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "bg-muted/50 text-foreground hover:bg-muted"
+                      ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-300"
+                      : "border-slate-800 bg-[#0E172A] text-slate-300 hover:border-slate-700 hover:text-white"
                   }`}
                 >
                   L{t.termKey.split("-")[0]} T{t.termKey.split("-")[1]} ({t.totalCredits} Cr)
@@ -477,27 +549,36 @@ export function CgpaCalculatorClient({
               ))}
             </div>
 
-            <div className="flex items-center gap-1 bg-muted p-1 rounded-xl border">
+            <div className="flex items-center gap-1 rounded-xl border border-slate-800 bg-[#0E172A] p-1">
               <button
+                type="button"
                 onClick={() => setInputFormat("point")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                  inputFormat === "point" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                  inputFormat === "point"
+                    ? "bg-violet-500/20 text-violet-200"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
                 Grade Point (0-4)
               </button>
               <button
+                type="button"
                 onClick={() => setInputFormat("letter")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                  inputFormat === "letter" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                  inputFormat === "letter"
+                    ? "bg-violet-500/20 text-violet-200"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
                 Letter (A+, A...)
               </button>
               <button
+                type="button"
                 onClick={() => setInputFormat("marks")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                  inputFormat === "marks" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                  inputFormat === "marks"
+                    ? "bg-violet-500/20 text-violet-200"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
                 Marks %
@@ -505,25 +586,28 @@ export function CgpaCalculatorClient({
             </div>
           </div>
 
-          <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
-            <div className="p-4 sm:p-5 border-b flex items-center justify-between">
+          <div className="overflow-hidden rounded-2xl border border-slate-800/90 bg-[#0A1020] shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-800/80 p-4 sm:p-5">
               <div>
-                <h3 className="text-base font-bold">
-                  {currentTermCurriculum.title} — Course Breakdown ({currentTermCurriculum.totalCredits} Credits)
+                <h3 className="font-serif text-base font-bold text-white">
+                  {currentTermCurriculum.title} &mdash; Course Breakdown ({currentTermCurriculum.totalCredits} Credits)
                 </h3>
-                <p className="text-xs text-muted-foreground">Input each course score using {inputFormat.toUpperCase()} format.</p>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  Input each course score using {inputFormat.toUpperCase()} format.
+                </p>
               </div>
               <button
+                type="button"
                 onClick={resetAllCourses}
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                className="inline-flex items-center gap-1 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20"
               >
-                <RotateCcw className="w-3 h-3" /> Clear Courses
+                <RotateCcw className="h-3 w-3" /> Clear Courses
               </button>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-xs sm:text-sm text-left">
-                <thead className="bg-muted/60 text-muted-foreground uppercase text-[11px] font-semibold">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <thead className="border-b border-slate-800/80 bg-[#0E172A] text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
                   <tr>
                     <th className="px-4 py-3">Code</th>
                     <th className="px-4 py-3">Course Title</th>
@@ -534,7 +618,7 @@ export function CgpaCalculatorClient({
                     <th className="px-4 py-3 text-right">Points Earned</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-slate-800/70">
                   {currentTermCurriculum.courses.map((course) => {
                     const currentPoint = courseGradeMap[course.code];
                     const hasEntry = currentPoint !== undefined;
@@ -542,17 +626,27 @@ export function CgpaCalculatorClient({
                     const earnedPoints = hasEntry ? (currentPoint * course.credits).toFixed(2) : "-";
 
                     return (
-                      <tr key={course.code} className="hover:bg-muted/40 transition">
-                        <td className="px-4 py-3 font-mono font-bold text-xs">{course.code}</td>
-                        <td className="px-4 py-3 font-medium">{course.name}</td>
+                      <tr key={course.code} className="transition hover:bg-[#0E172A]/70">
+                        <td className="px-4 py-3 font-mono text-xs font-bold text-cyan-300">
+                          {course.code}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-100">
+                          {course.name}
+                        </td>
                         <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            course.type === "theory" ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
-                          }`}>
+                          <span
+                            className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${
+                              course.type === "theory"
+                                ? "border-cyan-500/30 bg-cyan-500/15 text-cyan-300"
+                                : "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                            }`}
+                          >
                             {course.type.toUpperCase()}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-bold">{course.credits.toFixed(1)}</td>
+                        <td className="px-4 py-3 font-bold text-slate-200">
+                          {course.credits.toFixed(1)}
+                        </td>
                         <td className="px-4 py-3">
                           {inputFormat === "point" && (
                             <input
@@ -562,16 +656,20 @@ export function CgpaCalculatorClient({
                               max="4.00"
                               placeholder="0.00 - 4.00"
                               value={currentPoint !== undefined ? currentPoint : ""}
-                              onChange={(e) => handleCourseGradeChange(course.code, parseFloat(e.target.value) || 0)}
-                              className="w-28 px-2.5 py-1 rounded-lg border bg-background text-sm font-semibold"
+                              onChange={(e) =>
+                                handleCourseGradeChange(course.code, parseFloat(e.target.value) || 0)
+                              }
+                              className="w-28 rounded-lg border border-slate-700 bg-[#0E172A] px-2.5 py-1 text-sm font-semibold text-white placeholder:text-slate-500 outline-none focus:border-cyan-400"
                             />
                           )}
 
                           {inputFormat === "letter" && (
                             <select
                               value={hasEntry ? letter : ""}
-                              onChange={(e) => handleCourseGradeChange(course.code, letterToGradePoint(e.target.value))}
-                              className="w-28 px-2 py-1 rounded-lg border bg-background text-sm font-semibold"
+                              onChange={(e) =>
+                                handleCourseGradeChange(course.code, letterToGradePoint(e.target.value))
+                              }
+                              className="w-28 rounded-lg border border-slate-700 bg-[#0E172A] px-2 py-1 text-sm font-semibold text-white outline-none focus:border-cyan-400"
                             >
                               <option value="">Select</option>
                               {BUTEX_GRADING_SCALE.map((g) => (
@@ -603,20 +701,20 @@ export function CgpaCalculatorClient({
                                   handleCourseGradeChange(course.code, marksToGradePoint(m));
                                 }
                               }}
-                              className="w-28 px-2.5 py-1 rounded-lg border bg-background text-sm font-semibold"
+                              className="w-28 rounded-lg border border-slate-700 bg-[#0E172A] px-2.5 py-1 text-sm font-semibold text-white placeholder:text-slate-500 outline-none focus:border-cyan-400"
                             />
                           )}
                         </td>
                         <td className="px-4 py-3">
                           {hasEntry ? (
-                            <span className="font-bold text-blue-600">
+                            <span className="font-bold text-cyan-400">
                               {currentPoint.toFixed(2)} ({letter})
                             </span>
                           ) : (
-                            <span className="text-muted-foreground/60 text-xs">Pending</span>
+                            <span className="text-xs text-slate-500">Pending</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 font-mono font-bold text-right text-emerald-600">
+                        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">
                           {earnedPoints}
                         </td>
                       </tr>
@@ -626,29 +724,31 @@ export function CgpaCalculatorClient({
               </table>
             </div>
 
-            <div className="p-4 sm:p-6 bg-muted/30 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col justify-between gap-4 border-t border-slate-800/80 bg-[#0E172A]/80 p-4 sm:flex-row sm:items-center sm:p-6">
               <div>
-                <span className="text-xs font-semibold uppercase text-muted-foreground">Calculated Term GPA</span>
-                <div className="text-3xl font-extrabold text-blue-600 mt-0.5">
+                <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                  Calculated Term GPA
+                </span>
+                <div className="mt-0.5 text-3xl font-extrabold text-cyan-400">
                   {termCalculation.termGpa.toFixed(2)}
-                  <span className="text-sm font-semibold text-muted-foreground ml-2">
+                  <span className="ml-2 text-sm font-semibold text-slate-300">
                     ({gradePointToLetter(termCalculation.termGpa)})
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Graded {termCalculation.gradedCredits} of {termCalculation.totalTermCredits} credits &bull; {termCalculation.totalQualityPoints.toFixed(2)} Quality Points
+                <p className="mt-0.5 text-xs text-slate-400">
+                  Graded {termCalculation.gradedCredits} of {termCalculation.totalTermCredits} credits &bull;{" "}
+                  {termCalculation.totalQualityPoints.toFixed(2)} Quality Points
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={applyTermGpaToPlanner}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-xs shadow-sm hover:bg-blue-700 transition flex items-center gap-2"
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  Save & Apply to CGPA Planner
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={applyTermGpaToPlanner}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-2.5 text-xs font-bold text-slate-950 shadow-[0_0_20px_rgba(52,211,153,0.25)] transition hover:bg-emerald-300"
+              >
+                <TrendingUp className="h-4 w-4" />
+                Save &amp; Apply to CGPA Planner
+              </button>
             </div>
           </div>
         </div>

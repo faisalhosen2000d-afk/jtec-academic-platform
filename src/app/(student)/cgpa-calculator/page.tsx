@@ -65,18 +65,33 @@ export default async function CgpaCalculatorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col lg:flex-row">
-      <StudentSidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <StudentHeader />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto space-y-6">
-          <CgpaCalculatorClient
-            studentName={profile?.full_name || "Student"}
-            studentRoll={profile?.student_id || ""}
-            defaultDepartmentId={defaultDeptId}
-            publishedResults={publishedResults}
-          />
-        </main>
+    <div className="min-h-screen bg-[#060A12] text-slate-100">
+      <style>{`
+        @keyframes dashFadeUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .dash-stagger-1 { animation: dashFadeUp 0.45s ease-out both; }
+        .dash-stagger-2 { animation: dashFadeUp 0.45s ease-out 0.08s both; }
+        .dash-stagger-3 { animation: dashFadeUp 0.45s ease-out 0.16s both; }
+      `}</style>
+      <div className="flex min-h-screen">
+        <StudentSidebar />
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <StudentHeader />
+
+          <main className="flex-1 p-5 sm:p-6">
+            <div className="mx-auto w-full max-w-6xl space-y-5">
+              <CgpaCalculatorClient
+                studentName={profile?.full_name || "Student"}
+                studentRoll={profile?.student_id || ""}
+                defaultDepartmentId={defaultDeptId}
+                publishedResults={publishedResults}
+              />
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );
