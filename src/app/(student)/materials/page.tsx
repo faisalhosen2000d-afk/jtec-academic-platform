@@ -276,6 +276,14 @@ export default async function MaterialsPage() {
 
   return (
     <div className="min-h-screen bg-[#060A12] text-slate-100">
+      <style>{`
+        @keyframes dashFadeUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .dash-stagger-1 { animation: dashFadeUp 0.45s ease-out both; }
+        .dash-stagger-2 { animation: dashFadeUp 0.45s ease-out 0.08s both; }
+      `}</style>
       <div className="flex min-h-screen">
         <StudentSidebar />
 
@@ -285,7 +293,7 @@ export default async function MaterialsPage() {
           <main className="flex-1 p-6">
             <div className="mx-auto w-full max-w-7xl space-y-6">
               {/* Study Vault Hero Banner */}
-              <section className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-[#0B1C1E] via-[#0A1120] to-[#070C17] p-6 sm:p-7 shadow-[0_0_40px_rgba(16,185,129,0.08)]">
+              <section className="dash-stagger-1 relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-[#0B1C1E] via-[#0A1120] to-[#070C17] p-6 sm:p-7 shadow-[0_0_40px_rgba(16,185,129,0.08)]">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <span className="inline-flex items-center rounded-full bg-emerald-400 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-950">
