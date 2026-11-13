@@ -221,6 +221,7 @@ export default function MaterialCard({
           <MaterialBookmarkButton
             materialId={material.id}
             initialBookmarked={initialBookmarked}
+            variant="icon"
           />
         </div>
 

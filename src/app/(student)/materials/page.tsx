@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bookmark, BookOpen, Plus, UploadCloud } from "lucide-react";
+import { Bookmark, CheckCircle2, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getAcademicTermNavigation } from "@/lib/academic-terms";
 import { redirect } from "next/navigation";
@@ -275,7 +275,7 @@ export default async function MaterialsPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-[#060A12] text-slate-100">
       <div className="flex min-h-screen">
         <StudentSidebar />
 
@@ -284,22 +284,45 @@ export default async function MaterialsPage() {
 
           <main className="flex-1 p-6">
             <div className="mx-auto w-full max-w-7xl space-y-6">
-              {/* Page Header */}
-              <section>
-                <p className="text-sm text-muted-foreground">
-                  Student Portal
-                </p>
+              {/* Study Vault Hero Banner */}
+              <section className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-[#0B1C1E] via-[#0A1120] to-[#070C17] p-6 sm:p-7 shadow-[0_0_40px_rgba(16,185,129,0.08)]">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <span className="inline-flex items-center rounded-full bg-emerald-400 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-950">
+                      Study Vault
+                    </span>
 
-                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-                  Academic Materials
-                </h1>
+                    <h1 className="mt-3 font-serif text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                      Academic Materials
+                    </h1>
 
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Browse approved academic materials available to you.
-                </p>
+                    <div className="mt-4 flex flex-wrap items-center gap-2.5">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-700/80 bg-[#0B1324] px-3 py-1.5 text-xs font-medium text-slate-200">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                        {materialList.length} Approved Materials
+                      </span>
+
+                      <Link
+                        href="/bookmarks"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-700/80 bg-[#0B1324] px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-emerald-500/40 hover:text-emerald-300"
+                      >
+                        <Bookmark className="h-3.5 w-3.5 text-amber-400" />
+                        {bookmarkedMaterialIds.size} Bookmarked
+                      </Link>
+                    </div>
+                  </div>
+
+                  <Link
+                    href="/upload"
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 text-sm font-bold text-slate-950 shadow-[0_0_24px_rgba(52,211,153,0.35)] transition hover:bg-emerald-300 active:scale-[0.98]"
+                  >
+                    <Plus className="h-4 w-4 stroke-[2.5]" />
+                    Upload Material
+                  </Link>
+                </div>
               </section>
 
-              {/* Materials Search */}
+              {/* Materials Search & Grid */}
               <MaterialsSearch
                 subjects={curriculumSubjects ?? []}
                 materials={materialList}
@@ -307,17 +330,6 @@ export default async function MaterialsPage() {
                 terms={termOptions}
                 currentTermId={profile.current_term_id}
               />
-
-              {/* Materials Count */}
-              <section className="rounded-xl border border-border bg-background p-5 shadow-sm">
-                <p className="text-sm text-muted-foreground">
-                  Available Materials
-                </p>
-
-                <p className="mt-1 text-2xl font-semibold text-foreground">
-                  {materialList.length}
-                </p>
-              </section>
             </div>
           </main>
         </div>

@@ -231,14 +231,14 @@ export default function UploaderContactProfile({
             className="h-9 w-9 rounded-full object-cover"
           />
         ) : (
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-sm font-semibold text-slate-200">
             {profile.full_name.charAt(0).toUpperCase()}
           </div>
         )}
 
         <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">Uploaded by</p>
-          <p className="truncate text-sm font-medium text-foreground">
+          <p className="text-[11px] text-slate-400">Uploaded by</p>
+          <p className="truncate text-sm font-semibold text-slate-100">
             {profile.full_name}
           </p>
         </div>
@@ -250,7 +250,7 @@ export default function UploaderContactProfile({
           onClick={() => setOpen(false)}
         >
           <div
-            className="max-h-[82vh] w-full max-w-[420px] overflow-y-auto rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-2xl animate-in zoom-in-95 duration-150"
+            className="max-h-[82vh] w-full max-w-[420px] overflow-y-auto rounded-2xl border border-slate-800 bg-[#0A1020] text-slate-100 p-5 shadow-2xl animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header Profile Card with Department Badge */}
