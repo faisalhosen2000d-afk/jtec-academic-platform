@@ -382,10 +382,10 @@ export function StudentHeader() {
                 ? "pointer-events-auto opacity-100"
                 : "pointer-events-none opacity-0"
             }`}
-            aria-hidden={!drawerOpen}
+            
           >
             <div
-              onClick={() => setDrawerOpen(false)}
+              onClick={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); setDrawerOpen(false); }}
               className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             />
 
@@ -398,7 +398,7 @@ export function StudentHeader() {
                 <Link
                   href="/dashboard"
                   prefetch={true}
-                  onClick={() => setDrawerOpen(false)}
+                  onClick={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); setDrawerOpen(false); }}
                   className="flex items-center gap-3"
                 >
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-400/50 bg-gradient-to-br from-emerald-400/25 to-cyan-500/20 font-serif text-sm font-bold text-emerald-300 shadow-[0_0_18px_rgba(16,185,129,0.25)]">
@@ -416,7 +416,7 @@ export function StudentHeader() {
 
                 <button
                   type="button"
-                  onClick={() => setDrawerOpen(false)}
+                  onClick={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); setDrawerOpen(false); }}
                   className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-800 bg-[#0A1020] text-slate-400 transition hover:border-slate-700 hover:text-white active:scale-95"
                   aria-label="Close navigation menu"
                 >
@@ -443,7 +443,7 @@ export function StudentHeader() {
                       key={item.href}
                       href={item.href}
                       prefetch={true}
-                      onClick={() => setDrawerOpen(false)}
+                      onClick={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); setDrawerOpen(false); }}
                       className={`flex items-center gap-3 rounded-xl border px-3.5 py-3 text-xs font-semibold transition-all active:scale-[0.98] ${
                         isActive
                           ? "border-emerald-400/40 bg-gradient-to-r from-emerald-500/20 via-cyan-500/15 to-transparent text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.16)]"

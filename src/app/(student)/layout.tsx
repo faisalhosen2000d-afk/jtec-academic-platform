@@ -7,7 +7,6 @@ import { getActivePlatformSettings, isMaintenanceCurrentlyActive, isStudentAutho
 import { StudentAccessGateWrapper } from "@/components/student/StudentAccessGateWrapper";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
-import { StudentMobileNav } from "@/components/dashboard/student-mobile-nav";
 import { Clock, AlertCircle, ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -130,13 +129,12 @@ export default async function StudentLayout({ children }: { children: ReactNode 
             <div className="flex min-w-0 flex-1 flex-col">
               <StudentHeader />
 
-              <div className="flex flex-1 flex-col pb-20 lg:pb-0">
+              <div className="flex flex-1 flex-col">
                 {children}
               </div>
             </div>
           </div>
         </div>
-      <StudentMobileNav />
       </StudentAccessGateWrapper>
     </>
   );
