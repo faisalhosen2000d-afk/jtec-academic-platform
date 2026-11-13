@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
+
 
 export type StaffProfileActionResult = {
   success: boolean;
@@ -44,8 +44,8 @@ export async function updateStaffProfile(
     return { success: false, message: "Full name must be at least 2 characters." };
   }
 
-  const serviceRole = createServiceRoleClient();
-  const { error } = await serviceRole
+
+  const { error } = await supabase
     .from("profiles")
     .update({
       full_name: fullName,
