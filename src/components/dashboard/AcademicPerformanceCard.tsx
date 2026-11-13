@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, TrendingUp } from "lucide-react";
+import { Activity, AlertTriangle, TrendingUp } from "lucide-react";
 import { CollapsibleSectionCard } from "./CollapsibleSectionCard";
 
 export type TermTrendPoint = {
   termKey: string;
   gpa: number;
   cgpa: number | null;
+  retakes?: number;
 };
 
 type AcademicPerformanceCardProps = {
@@ -32,10 +33,10 @@ export function AcademicPerformanceCard({
   }, []);
 
   const chartWidth = 540;
-  const chartHeight = 190;
+  const chartHeight = 200;
   const padLeft = 42;
   const padRight = 24;
-  const padTop = 22;
+  const padTop = 28;
   const padBottom = 30;
   const innerW = chartWidth - padLeft - padRight;
   const innerH = chartHeight - padTop - padBottom;
@@ -58,7 +59,7 @@ export function AcademicPerformanceCard({
           : padLeft + (i / (terms.length - 1)) * innerW;
       const clamped = Math.min(maxY, Math.max(computedMinY, t.gpa));
       const y = padTop + ((maxY - clamped) / spanY) * innerH;
-      return { ...t, x, y };
+      return { ...t, retakes: t.retakes ?? 0, x, y };
     });
 
     if (pts.length === 1) {
@@ -90,7 +91,6 @@ export function AcademicPerformanceCard({
     hoveredIdx !== null ? hoveredIdx : points.length > 0 ? points.length - 1 : null;
   const activePoint = activeIdx !== null ? points[activeIdx] ?? null : null;
 
-  // Semi-circular Gauge math (radius 74)
   const gaugeRadius = 74;
   const semiCircumference = Math.PI * gaugeRadius;
   const normalizedScore =
@@ -99,6 +99,7 @@ export function AcademicPerformanceCard({
   const currentOffset = mounted ? targetOffset : semiCircumference;
 
   const yTicks = [4.0, (4.0 + minY) / 2, minY];
+  const hasAnyRetakes = points.some((p) => p.retakes > 0);
 
   return (
     <CollapsibleSectionCard
@@ -143,11 +144,20 @@ export function AcademicPerformanceCard({
           {/* Left: Smooth SVG Area-Line Chart */}
           <div className="lg:col-span-8 rounded-xl border border-slate-800/80 bg-[#060A12] p-4">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Term GPA Trajectory
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  Term GPA Trajectory
+                </span>
+                {hasAnyRetakes ? (
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-medium text-amber-300/90">
+                    <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.9)]" />
+                    Retake in term
+                  </span>
+                ) : null}
+              </div>
+
               {activePoint ? (
-                <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
+                <div className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
                   <span>Term {activePoint.termKey}</span>
                   <span className="text-slate-500">·</span>
                   <span>GPA {activePoint.gpa.toFixed(2)}</span>
@@ -156,6 +166,16 @@ export function AcademicPerformanceCard({
                       <span className="text-slate-500">·</span>
                       <span className="text-cyan-300">
                         CGPA {activePoint.cgpa.toFixed(2)}
+                      </span>
+                    </>
+                  ) : null}
+                  {activePoint.retakes > 0 ? (
+                    <>
+                      <span className="text-slate-500">·</span>
+                      <span className="inline-flex items-center gap-1 text-amber-300">
+                        <AlertTriangle className="h-3 w-3" />
+                        {activePoint.retakes}{" "}
+                        {activePoint.retakes === 1 ? "Retake" : "Retakes"}
                       </span>
                     </>
                   ) : null}
@@ -180,7 +200,6 @@ export function AcademicPerformanceCard({
                 </linearGradient>
               </defs>
 
-              {/* Horizontal Grid Lines */}
               {yTicks.map((tick, idx) => {
                 const span = Math.max(0.5, 4.0 - minY);
                 const y = padTop + ((4.0 - tick) / span) * innerH;
@@ -207,12 +226,10 @@ export function AcademicPerformanceCard({
                 );
               })}
 
-              {/* Area Fill */}
               {areaPath ? (
                 <path d={areaPath} fill="url(#jtecAreaGrad)" />
               ) : null}
 
-              {/* Animated Line */}
               {linePath ? (
                 <path
                   d={linePath}
@@ -224,9 +241,9 @@ export function AcademicPerformanceCard({
                 />
               ) : null}
 
-              {/* Interactive Nodes & X Labels */}
               {points.map((pt, i) => {
                 const isSelected = activeIdx === i;
+                const hasRetake = pt.retakes > 0;
                 return (
                   <g
                     key={pt.termKey}
@@ -235,21 +252,63 @@ export function AcademicPerformanceCard({
                     onMouseLeave={() => setHoveredIdx(null)}
                     onClick={() => setHoveredIdx(i)}
                   >
-                    <circle cx={pt.x} cy={pt.y} r="14" fill="transparent" />
-                    {isSelected ? (
+                    <circle cx={pt.x} cy={pt.y} r="15" fill="transparent" />
+
+                    {/* Retake Warning Halo & Symbol Badge */}
+                    {hasRetake ? (
+                      <>
+                        <circle
+                          cx={pt.x}
+                          cy={pt.y}
+                          r={isSelected ? 11 : 9}
+                          fill="#f59e0b"
+                          fillOpacity="0.22"
+                          stroke="#fbbf24"
+                          strokeWidth="1"
+                          strokeOpacity="0.6"
+                        />
+                        <g transform={`translate(${pt.x}, ${pt.y - 18})`}>
+                          <rect
+                            x="-16"
+                            y="-9"
+                            width="32"
+                            height="15"
+                            rx="5"
+                            fill="#451a03"
+                            stroke="#f59e0b"
+                            strokeWidth="1"
+                          />
+                          <text
+                            x="0"
+                            y="1.5"
+                            textAnchor="middle"
+                            className="fill-amber-300 font-mono text-[9px] font-bold"
+                          >
+                            ⚠ {pt.retakes}R
+                          </text>
+                        </g>
+                      </>
+                    ) : isSelected ? (
                       <circle
                         cx={pt.x}
                         cy={pt.y}
-                        r="8"
+                        r="9"
                         fill="#10b981"
                         fillOpacity="0.25"
                       />
                     ) : null}
+
                     <circle
                       cx={pt.x}
                       cy={pt.y}
-                      r={isSelected ? 5 : 4}
-                      fill={isSelected ? "#34d399" : "#22d3ee"}
+                      r={isSelected ? 5.5 : 4.5}
+                      fill={
+                        hasRetake
+                          ? "#fbbf24"
+                          : isSelected
+                            ? "#34d399"
+                            : "#22d3ee"
+                      }
                       stroke="#060A12"
                       strokeWidth="2"
                     />
@@ -258,9 +317,11 @@ export function AcademicPerformanceCard({
                       y={chartHeight - 8}
                       textAnchor="middle"
                       className={`font-mono text-[11px] ${
-                        isSelected
-                          ? "fill-emerald-300 font-bold"
-                          : "fill-slate-400"
+                        hasRetake
+                          ? "fill-amber-300 font-bold"
+                          : isSelected
+                            ? "fill-emerald-300 font-bold"
+                            : "fill-slate-400"
                       }`}
                     >
                       {pt.termKey}

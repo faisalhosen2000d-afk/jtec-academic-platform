@@ -247,6 +247,7 @@ export default async function StudentDashboardPage() {
       termKey: t.level_term_key,
       gpa: Number(t.gpa),
       cgpa: t.cgpa !== null ? Number(t.cgpa) : null,
+      retakes: Number(t.term_retake_count) || 0,
     }));
 
     const lastPassedTerm =
