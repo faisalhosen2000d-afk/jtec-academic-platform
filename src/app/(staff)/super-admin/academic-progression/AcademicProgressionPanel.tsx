@@ -319,7 +319,7 @@ export default function AcademicProgressionPanel({
   return (
     <div className="space-y-6">
       {/* Step 01: Academic Assignment */}
-      <section className="rounded-2xl border border-violet-500/35 bg-[#0A1020] p-6 shadow-[0_0_35px_rgba(139,92,246,0.08)] transition-all duration-300 hover:border-violet-400/60">
+      <section className="rounded-2xl border border-violet-500/35 bg-[#0A1020] p-6 shadow-[0_0_35px_rgba(139,92,246,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-400/60 hover:bg-[#0D162B] hover:shadow-[0_14px_38px_rgba(139,92,246,0.16)]">
         <div className="mb-5">
           <span className="text-[10px] font-bold uppercase tracking-widest text-violet-400">
             Step 01
@@ -417,7 +417,7 @@ export default function AcademicProgressionPanel({
       {/* Step 02 & Step 03 Side-by-Side */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
         {/* Step 02: Student Preview */}
-        <section className="lg:col-span-7 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl">
+        <section className="lg:col-span-7 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-500/45 hover:bg-[#0D162B] hover:shadow-[0_14px_36px_rgba(139,92,246,0.14)]">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-800/80 pb-4">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-widest text-violet-400">
@@ -498,7 +498,7 @@ export default function AcademicProgressionPanel({
         </section>
 
         {/* Step 03: Review & Confirm */}
-        <section className="lg:col-span-5 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl">
+        <section className="lg:col-span-5 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-500/45 hover:bg-[#0D162B] hover:shadow-[0_14px_36px_rgba(139,92,246,0.14)]">
           <span className="text-[10px] font-bold uppercase tracking-widest text-violet-400">
             Step 03
           </span>
@@ -691,7 +691,7 @@ export default function AcademicProgressionPanel({
       )}
 
       {/* Step 04: Progression History */}
-      <section className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl">
+      <section className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-500/45 hover:bg-[#0D162B] hover:shadow-[0_14px_36px_rgba(139,92,246,0.14)]">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-800/80 pb-4">
           <div className="flex items-start gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-violet-500/30 bg-violet-500/10 text-violet-400">
