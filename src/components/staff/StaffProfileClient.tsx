@@ -191,7 +191,7 @@ export function StaffProfileClient({
           </div>
           <Link
             href={backHref}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-200 transition-all hover:border-amber-500/50 hover:text-amber-300"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-700 bg-gradient-to-b from-slate-800/90 to-slate-900 px-4 py-2 text-xs font-semibold text-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:-translate-y-0.5 hover:border-amber-500/50 hover:text-amber-300 hover:shadow-[0_0_20px_rgba(245,158,11,0.2)] active:translate-y-0 active:scale-95"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>{backLabel}</span>
