@@ -347,7 +347,7 @@ export default function MaterialsSearch({
   return (
     <div className="space-y-6">
       {/* Search & Filters Panel */}
-      <section className="space-y-4 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-5 shadow-xl transition-all duration-200 hover:border-emerald-500/35">
+      <section className="dash-stagger-2 space-y-4 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-5 shadow-xl transition-all duration-200 hover:border-emerald-500/35">
         <div className="grid gap-4 md:grid-cols-12">
           <div className="md:col-span-6">
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -477,13 +477,20 @@ export default function MaterialsSearch({
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredMaterials.map((material) => (
-            <MaterialCard
+          {filteredMaterials.map((material, index) => (
+            <div
               key={material.id}
-              material={material}
-              searchQuery={searchQuery}
-              initialBookmarked={bookmarkedSet.has(material.id)}
-            />
+              style={{
+                animation: "dashFadeUp 0.42s ease-out both",
+                animationDelay: `${Math.min(index, 11) * 50 + 140}ms`,
+              }}
+            >
+              <MaterialCard
+                material={material}
+                searchQuery={searchQuery}
+                initialBookmarked={bookmarkedSet.has(material.id)}
+              />
+            </div>
           ))}
         </div>
       )}
