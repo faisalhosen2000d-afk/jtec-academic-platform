@@ -133,7 +133,7 @@ export default async function AuditLogsPage() {
       <main className="relative z-10 mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         {/* 3 Live KPI Cards */}
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-cyan-500/30 bg-[#0A1020] p-5 shadow-lg">
+          <div className="rounded-2xl border border-cyan-500/30 bg-[#0A1020] p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400/60 hover:bg-[#0D162B] hover:shadow-[0_10px_30px_rgba(6,182,212,0.14)]">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Total Recorded Logs
             </p>
@@ -145,7 +145,7 @@ export default async function AuditLogsPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-amber-500/30 bg-[#0A1020] p-5 shadow-lg">
+          <div className="rounded-2xl border border-amber-500/30 bg-[#0A1020] p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-400/60 hover:bg-[#0D162B] hover:shadow-[0_10px_30px_rgba(245,158,11,0.14)]">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Primary Monitored Actions
             </p>
@@ -157,7 +157,7 @@ export default async function AuditLogsPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-emerald-500/30 bg-[#0A1020] p-5 shadow-lg">
+          <div className="rounded-2xl border border-emerald-500/30 bg-[#0A1020] p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-400/60 hover:bg-[#0D162B] hover:shadow-[0_10px_30px_rgba(16,185,129,0.14)]">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Log Retention Policy
             </p>

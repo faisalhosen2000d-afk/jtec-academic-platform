@@ -365,7 +365,7 @@ export default function AuditLogsView({
   );
 
   return (
-    <section className="overflow-visible rounded-2xl border border-slate-800/90 bg-[#0A1020] shadow-xl">
+    <section className="overflow-visible rounded-2xl border border-slate-800/90 bg-[#0A1020] shadow-xl transition-all duration-200 hover:border-cyan-500/40 hover:shadow-[0_14px_40px_rgba(6,182,212,0.10)]">
       {/* Search & Custom Dropdown Filters */}
       <div className="flex flex-col gap-3 border-b border-slate-800/80 p-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative max-w-md flex-1">
