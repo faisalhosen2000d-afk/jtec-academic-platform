@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
@@ -132,7 +132,7 @@ export default async function SuperAdminStudentVerificationPage() {
   return (
     <main className="min-h-screen bg-[#050811] text-slate-100 p-4 sm:p-6 lg:p-8">
       <div className="mx-auto w-full max-w-7xl space-y-6">
-        <div className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-6 shadow-xl sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl transition-all duration-200 hover:border-amber-500/40 hover:bg-[#0D162B] hover:shadow-[0_14px_36px_rgba(245,158,11,0.10)] sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[10px] font-bold uppercase tracking-wider text-amber-400">
@@ -149,10 +149,12 @@ export default async function SuperAdminStudentVerificationPage() {
             </p>
           </div>
 
-          <Link href="/super-admin/users/students">
-            <Button className="rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:border-amber-400 hover:text-white">
-              Back to Student Management
-            </Button>
+          <Link
+            href="/super-admin/users/students"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-700 bg-gradient-to-b from-slate-800/90 to-slate-900 px-4 py-2 text-xs font-semibold text-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:-translate-y-0.5 hover:border-amber-500/50 hover:text-amber-300 active:translate-y-0 active:scale-95"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to Student Management</span>
           </Link>
         </div>
 
