@@ -372,16 +372,16 @@ export default function UploaderContactProfile({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-3 text-left transition-opacity hover:opacity-85 focus:outline-none"
+        className="flex min-w-0 flex-1 items-center gap-2.5 text-left transition-opacity hover:opacity-85 focus:outline-none"
       >
         {profile.avatar_url ? (
           <img
             src={profile.avatar_url}
             alt={profile.full_name}
-            className="h-9 w-9 rounded-full object-cover ring-1 ring-slate-700"
+            className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-slate-700"
           />
         ) : (
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-sm font-semibold text-slate-200">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-sm font-semibold text-slate-200">
             {profile.full_name.charAt(0).toUpperCase()}
           </div>
         )}

@@ -260,7 +260,7 @@ export default function MaterialCard({
       {/* Footer: Uploader + Icon Stats + Open */}
       <div className="mt-4 space-y-3 border-t border-slate-800/80 pt-3.5">
         {material.uploader && (
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center justify-between gap-2">
             <UploaderContactProfile
               profile={material.uploader}
               materialId={material.id}
