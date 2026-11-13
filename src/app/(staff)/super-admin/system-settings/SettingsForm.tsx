@@ -73,12 +73,12 @@ function ToggleSwitch({
       aria-label={label}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-all duration-200 ${
-        checked ? activeBg : "bg-slate-700"
+        checked ? activeBg : "border-slate-600 bg-slate-800"
       }`}
     >
       <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
-          checked ? "translate-x-5.5" : "translate-x-0.5"
+        className={`inline-block h-4 w-4 rounded-full bg-white shadow-md transition-transform duration-200 ${
+          checked ? "translate-x-6" : "translate-x-1"
         }`}
       />
     </button>
