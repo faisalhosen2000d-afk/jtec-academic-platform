@@ -20,8 +20,9 @@ export default function MaterialRating({
   ratingCount,
 }: MaterialRatingProps) {
   const [selectedRating, setSelectedRating] = useState(initialRating);
+  const [hoveredStar, setHoveredStar] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; isError?: boolean } | null>(null);
 
   async function handleSave(stars: number) {
     setIsSaving(true);
@@ -34,9 +35,9 @@ export default function MaterialRating({
 
     if (result.success) {
       setSelectedRating(stars);
-      setMessage("Rating saved.");
+      setMessage({ text: "Rating saved." });
     } else {
-      setMessage(result.error);
+      setMessage({ text: result.error, isError: true });
     }
 
     setIsSaving(false);
@@ -50,59 +51,81 @@ export default function MaterialRating({
 
     if (result.success) {
       setSelectedRating(null);
-      setMessage("Rating removed.");
+      setMessage({ text: "Rating removed." });
     } else {
-      setMessage(result.error);
+      setMessage({ text: result.error, isError: true });
     }
 
     setIsSaving(false);
   }
 
+  const activeThreshold = hoveredStar ?? selectedRating ?? 0;
+
   return (
-    <div className="rounded-lg border border-border p-4">
+    <div className="rounded-xl border border-slate-800/90 bg-[#0E172A]/80 p-4 sm:p-5 transition-all duration-200 hover:border-amber-500/30">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-foreground">
-            Rating
+          <p className="text-sm font-semibold text-slate-100">
+            Material Rating
           </p>
 
-          <p className="mt-1 text-sm text-muted-foreground">
-            {averageRating.toFixed(2)} / 5 · {ratingCount}{" "}
-            {ratingCount === 1 ? "rating" : "ratings"}
+          <p className="mt-1 flex items-center gap-2 text-xs sm:text-sm text-slate-400">
+            <span className="font-semibold text-amber-300">
+              {averageRating.toFixed(2)} / 5
+            </span>
+            <span className="text-slate-600">&middot;</span>
+            <span>
+              {ratingCount} {ratingCount === 1 ? "rating" : "ratings"}
+            </span>
           </p>
         </div>
 
-        <div className="flex items-center gap-1" aria-label="Rate this material">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              type="button"
-              onClick={() => handleSave(star)}
-              disabled={isSaving}
-              aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
-              className={`text-2xl leading-none transition ${
-                selectedRating !== null && star <= selectedRating
-                  ? "text-yellow-500"
-                  : "text-muted-foreground/40 hover:text-yellow-400"
-              } disabled:cursor-not-allowed disabled:opacity-50`}
-            >
-              ★
-            </button>
-          ))}
+        <div
+          className="flex items-center gap-1.5"
+          aria-label="Rate this material"
+          onMouseLeave={() => setHoveredStar(null)}
+        >
+          {[1, 2, 3, 4, 5].map((star) => {
+            const isActive = star <= activeThreshold;
+            return (
+              <button
+                key={star}
+                type="button"
+                onClick={() => handleSave(star)}
+                onMouseEnter={() => setHoveredStar(star)}
+                disabled={isSaving}
+                aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                className={`rounded-lg p-1 transition-all duration-150 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  isActive
+                    ? "text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.45)]"
+                    : "text-slate-600 hover:text-amber-300/80"
+                }`}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="h-6 w-6"
+                  aria-hidden="true"
+                >
+                  <path d="M12 2.25l2.95 5.98 6.6.96-4.78 4.66 1.13 6.57L12 17.32l-5.9 3.1 1.13-6.57L2.45 9.19l6.6-.96L12 2.25z" />
+                </svg>
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {selectedRating !== null && (
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-800/80 pt-3">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-300">
             Your rating: {selectedRating}/5
-          </p>
+          </span>
 
           <button
             type="button"
             onClick={handleDelete}
             disabled={isSaving}
-            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+            className="text-xs font-medium text-slate-400 underline decoration-slate-600 underline-offset-4 transition-colors hover:text-rose-300 hover:decoration-rose-400 disabled:opacity-50"
           >
             Remove rating
           </button>
@@ -110,8 +133,13 @@ export default function MaterialRating({
       )}
 
       {message && (
-        <p className="mt-3 text-xs text-muted-foreground" role="status">
-          {message}
+        <p
+          className={`mt-3 text-xs font-medium ${
+            message.isError ? "text-rose-300" : "text-emerald-300"
+          }`}
+          role="status"
+        >
+          {message.text}
         </p>
       )}
     </div>
