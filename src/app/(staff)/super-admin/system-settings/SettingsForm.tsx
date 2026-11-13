@@ -1,8 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  AlertCircle,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  HardDrive,
+  Loader2,
+  Save,
+  ShieldAlert,
+  UserPlus,
+  Wrench,
+} from "lucide-react";
 import { savePlatformSettings } from "./actions";
-import { Button } from "@/components/ui/button";
+import { ModernDateTimePicker } from "@/components/ui/ModernDateTimePicker";
 
 type SettingsFormProps = {
   initialSettings: {
@@ -17,12 +29,19 @@ type SettingsFormProps = {
   };
 };
 
+const UPLOAD_OPTIONS = [
+  { value: 10, label: "10 MB per file (Compact)" },
+  { value: 25, label: "25 MB per file (Strict)" },
+  { value: 50, label: "50 MB per file (Balanced)" },
+  { value: 100, label: "100 MB per file (Recommended Standard)" },
+  { value: 200, label: "200 MB per file (Large Archives)" },
+];
+
 function toLocalInputString(isoStr: string | null | undefined): string {
   if (!isoStr) return "";
   try {
     const d = new Date(isoStr);
-    if (isNaN(d.getTime())) return "";
-    // Convert to Bangladesh Time (UTC+6) for datetime-local input display
+    if (Number.isNaN(d.getTime())) return "";
     const bdTime = new Date(d.getTime() + 6 * 60 * 60 * 1000);
     return bdTime.toISOString().slice(0, 16);
   } catch {
@@ -30,21 +49,92 @@ function toLocalInputString(isoStr: string | null | undefined): string {
   }
 }
 
+function ToggleSwitch({
+  checked,
+  onChange,
+  accent = "emerald",
+  label,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  accent?: "emerald" | "amber";
+  label: string;
+}) {
+  const activeBg =
+    accent === "amber"
+      ? "bg-amber-500 shadow-[0_0_16px_rgba(245,158,11,0.45)]"
+      : "bg-emerald-500 shadow-[0_0_16px_rgba(16,185,129,0.45)]";
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-all duration-200 ${
+        checked ? activeBg : "bg-slate-700"
+      }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+          checked ? "translate-x-5.5" : "translate-x-0.5"
+        }`}
+      />
+    </button>
+  );
+}
+
 export default function SettingsForm({ initialSettings }: SettingsFormProps) {
-  const [registrationOpen, setRegistrationOpen] = useState(initialSettings.registration_open);
-  const [maxUploadSizeMb, setMaxUploadSizeMb] = useState(initialSettings.max_upload_size_mb || 25);
-  const [maintenanceMode, setMaintenanceMode] = useState(initialSettings.maintenance_mode);
+  const [registrationOpen, setRegistrationOpen] = useState(
+    initialSettings.registration_open,
+  );
+  const [maxUploadSizeMb, setMaxUploadSizeMb] = useState(
+    initialSettings.max_upload_size_mb || 25,
+  );
+  const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
+  const uploadMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const [maintenanceMode, setMaintenanceMode] = useState(
+    initialSettings.maintenance_mode,
+  );
   const [maintenanceMessage, setMaintenanceMessage] = useState(
     initialSettings.maintenance_message ||
-      "The academic platform is currently undergoing scheduled maintenance. Please check back shortly."
+      "The academic platform is currently undergoing scheduled maintenance. Please check back shortly.",
   );
-  const [startTime, setStartTime] = useState(toLocalInputString(initialSettings.maintenance_start_time));
-  const [endTime, setEndTime] = useState(toLocalInputString(initialSettings.maintenance_end_time));
-  const [bypassIds, setBypassIds] = useState(initialSettings.maintenance_bypass_student_ids || "");
+  const [startTime, setStartTime] = useState(
+    toLocalInputString(initialSettings.maintenance_start_time),
+  );
+  const [endTime, setEndTime] = useState(
+    toLocalInputString(initialSettings.maintenance_end_time),
+  );
+  const [bypassIds, setBypassIds] = useState(
+    initialSettings.maintenance_bypass_student_ids || "",
+  );
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    function onOutside(e: MouseEvent) {
+      if (
+        uploadMenuRef.current &&
+        !uploadMenuRef.current.contains(e.target as Node)
+      ) {
+        setUploadMenuOpen(false);
+      }
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") setUploadMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onOutside);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,12 +142,11 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
     setError("");
     setSuccess("");
 
-    // Smart midnight check: if endTime is earlier than startTime on the same date, advance endTime by 1 day
     let finalEndTime = endTime || null;
     if (startTime && endTime) {
       const s = new Date(`${startTime}+06:00`);
       const e = new Date(`${endTime}+06:00`);
-      if (!isNaN(s.getTime()) && !isNaN(e.getTime()) && e < s) {
+      if (!Number.isNaN(s.getTime()) && !Number.isNaN(e.getTime()) && e < s) {
         const nextDay = new Date(e.getTime() + 24 * 60 * 60 * 1000);
         const bdNext = new Date(nextDay.getTime() + 6 * 60 * 60 * 1000);
         finalEndTime = bdNext.toISOString().slice(0, 16);
@@ -76,7 +165,9 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
     });
 
     if (result.success) {
-      setSuccess("System settings saved and applied immediately across the platform!");
+      setSuccess(
+        "System settings saved and applied immediately across the platform!",
+      );
       setTimeout(() => setSuccess(""), 5000);
     } else {
       setError(result.error);
@@ -85,210 +176,299 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
     setLoading(false);
   }
 
+  const selectedUploadOption =
+    UPLOAD_OPTIONS.find((o) => o.value === maxUploadSizeMb) ??
+    UPLOAD_OPTIONS[1];
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-emerald-500/30 bg-[#0A1020] p-5 shadow-lg">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Registration Gate
+          </p>
+          <p
+            className={`mt-2 font-serif text-2xl font-bold ${
+              registrationOpen ? "text-emerald-300" : "text-rose-300"
+            }`}
+          >
+            {registrationOpen ? "Open" : "Closed"}
+          </p>
         </div>
-      )}
 
-      {success && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">
-          {success}
+        <div className="rounded-2xl border border-cyan-500/30 bg-[#0A1020] p-5 shadow-lg">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Max Upload Limit
+          </p>
+          <p className="mt-2 font-serif text-2xl font-bold text-cyan-300">
+            {maxUploadSizeMb} MB
+          </p>
         </div>
-      )}
+
+        <div className="rounded-2xl border border-amber-500/30 bg-[#0A1020] p-5 shadow-lg">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Maintenance Mode
+          </p>
+          <p
+            className={`mt-2 font-serif text-2xl font-bold ${
+              maintenanceMode ? "text-amber-300" : "text-slate-300"
+            }`}
+          >
+            {maintenanceMode ? "Active" : "Normal"}
+          </p>
+        </div>
+      </section>
+
+      {error ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-rose-500/35 bg-rose-500/10 px-5 py-3.5 text-xs font-semibold text-rose-300">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      ) : null}
+
+      {success ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/35 bg-emerald-500/10 px-5 py-3.5 text-xs font-semibold text-emerald-300">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span>{success}</span>
+        </div>
+      ) : null}
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Student Registration Gate */}
-        <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold">Student Registration Gate</h2>
+        <div className="space-y-4 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-500/35 bg-emerald-500/15 text-emerald-300">
+                <UserPlus className="h-4 w-4" />
+              </div>
+              <h2 className="font-serif text-base font-bold text-white">
+                Student Registration Gate
+              </h2>
+            </div>
             <span
-              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+              className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
                 registrationOpen
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-red-100 text-red-700"
+                  ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                  : "border-rose-500/40 bg-rose-500/15 text-rose-300"
               }`}
             >
               {registrationOpen ? "Open" : "Closed"}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Allow new students to register using valid department registration codes. Turn this off when admissions close.
+
+          <p className="text-xs leading-relaxed text-slate-400">
+            Allow new students to register using valid department registration
+            codes. Turn this off when admissions close.
           </p>
-          <label className="flex items-center justify-between rounded-xl border p-4 cursor-pointer hover:bg-muted/40 transition">
-            <span className="text-sm font-semibold">Accept New Registrations</span>
-            <input
-              type="checkbox"
-              name="registration_open"
+
+          <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-[#060A12] px-4 py-3.5">
+            <span className="text-xs font-semibold text-slate-200">
+              Accept New Registrations
+            </span>
+            <ToggleSwitch
               checked={registrationOpen}
-              onChange={(e) => setRegistrationOpen(e.target.checked)}
-              className="h-5 w-5 accent-blue-600 rounded cursor-pointer"
+              onChange={setRegistrationOpen}
+              accent="emerald"
+              label="Accept New Registrations"
             />
-          </label>
+          </div>
         </div>
 
         {/* Maximum Upload Size */}
-        <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold">Maximum Upload Size</h2>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+        <div className="space-y-4 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-500/35 bg-cyan-500/15 text-cyan-300">
+                <HardDrive className="h-4 w-4" />
+              </div>
+              <h2 className="font-serif text-base font-bold text-white">
+                Maximum Upload Size
+              </h2>
+            </div>
+            <span className="rounded-full border border-cyan-500/40 bg-cyan-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-300">
               {maxUploadSizeMb} MB Limit
             </span>
           </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Directly sets the max file upload size for all students on the upload material page and API endpoints.
+
+          <p className="text-xs leading-relaxed text-slate-400">
+            Directly sets the max file upload size for all students on the
+            upload material page and API endpoints.
           </p>
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+
+          <div ref={uploadMenuRef} className="relative space-y-1.5">
+            <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               Select Maximum File Boundary
-            </label>
-            <select
-              name="max_upload_size_mb"
-              value={maxUploadSizeMb}
-              onChange={(e) => setMaxUploadSizeMb(Number(e.target.value))}
-              className="w-full h-11 px-3 rounded-xl border bg-background text-sm font-medium"
+            </span>
+            <button
+              type="button"
+              onClick={() => setUploadMenuOpen((o) => !o)}
+              className={`flex h-11 w-full cursor-pointer items-center justify-between rounded-xl border bg-[#060A12] px-3.5 text-xs font-semibold text-white transition-all ${
+                uploadMenuOpen
+                  ? "border-cyan-400/80 ring-2 ring-cyan-500/20"
+                  : "border-slate-700/80 hover:border-slate-600"
+              }`}
             >
-              <option value={10}>10 MB per file (Compact)</option>
-              <option value={25}>25 MB per file (Strict)</option>
-              <option value={50}>50 MB per file (Balanced)</option>
-              <option value={100}>100 MB per file (Recommended Standard)</option>
-              <option value={200}>200 MB per file (Large Archives)</option>
-            </select>
+              <span>{selectedUploadOption?.label}</span>
+              <ChevronDown
+                className={`h-4 w-4 text-slate-400 transition-transform duration-150 ${
+                  uploadMenuOpen ? "rotate-180 text-cyan-300" : ""
+                }`}
+              />
+            </button>
+
+            {uploadMenuOpen ? (
+              <div className="absolute left-0 top-full z-50 mt-2 w-full rounded-xl border border-cyan-500/35 bg-[#0A1020] p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.85)]">
+                {UPLOAD_OPTIONS.map((opt) => {
+                  const active = opt.value === maxUploadSizeMb;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setMaxUploadSizeMb(opt.value);
+                        setUploadMenuOpen(false);
+                      }}
+                      className={`flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors ${
+                        active
+                          ? "bg-cyan-500/20 font-semibold text-cyan-300"
+                          : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      {active ? (
+                        <Check className="h-3.5 w-3.5 text-cyan-300" />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
 
       {/* Scheduled System Maintenance Mode */}
-      <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold">Scheduled System Maintenance Mode</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Configure scheduled maintenance window with exact start time and estimated completion time.
-            </p>
+      <section className="space-y-5 rounded-2xl border border-amber-500/30 bg-[#0A1020] p-6 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/35 bg-amber-500/15 text-amber-300">
+              <Wrench className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="font-serif text-lg font-bold text-white">
+                Scheduled System Maintenance Mode
+              </h2>
+              <p className="text-xs text-slate-400">
+                Configure scheduled maintenance window with exact start time and
+                estimated completion time.
+              </p>
+            </div>
           </div>
-          <span
-            className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-              maintenanceMode
-                ? "bg-red-100 text-red-700"
-                : "bg-emerald-100 text-emerald-700"
-            }`}
-          >
-            {maintenanceMode ? "Active" : "Normal"}
-          </span>
+
+          <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-[#060A12] px-4 py-2.5">
+            <span className="text-xs font-semibold text-slate-200">
+              Turn On Maintenance
+            </span>
+            <ToggleSwitch
+              checked={maintenanceMode}
+              onChange={setMaintenanceMode}
+              accent="amber"
+              label="Turn On Maintenance Window"
+            />
+          </div>
         </div>
 
-        <label className="flex items-center justify-between rounded-xl border p-4 cursor-pointer hover:bg-muted/40 transition">
-          <div>
-            <div className="text-sm font-semibold">Turn On Maintenance Window</div>
-            <div className="text-xs text-muted-foreground">
-              Students see the notice below until maintenance is turned off or window ends. (Leave times blank for immediate indefinite maintenance).
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            name="maintenance_mode"
-            checked={maintenanceMode}
-            onChange={(e) => setMaintenanceMode(e.target.checked)}
-            className="h-5 w-5 accent-blue-600 rounded cursor-pointer"
-          />
-        </label>
-
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2">
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Maintenance Start Time (Optional)
-              </label>
-              {startTime && (
-                <button
-                  type="button"
-                  onClick={() => setStartTime("")}
-                  className="text-[11px] text-blue-600 hover:underline"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <input
-              type="datetime-local"
+            <label
+              htmlFor="maintenance_start_time"
+              className="block text-xs font-semibold text-slate-300"
+            >
+              Maintenance Start Time (Optional · BDT)
+            </label>
+            <ModernDateTimePicker
+              id="maintenance_start_time"
               name="maintenance_start_time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl border bg-background text-sm"
+              defaultValue={startTime}
+              onChange={setStartTime}
+              placeholder="No scheduled start"
             />
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Estimated Completion Time (End Time)
-              </label>
-              {endTime && (
-                <button
-                  type="button"
-                  onClick={() => setEndTime("")}
-                  className="text-[11px] text-blue-600 hover:underline"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <input
-              type="datetime-local"
+            <label
+              htmlFor="maintenance_end_time"
+              className="block text-xs font-semibold text-slate-300"
+            >
+              Estimated Completion Time (Optional · BDT)
+            </label>
+            <ModernDateTimePicker
+              id="maintenance_end_time"
               name="maintenance_end_time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl border bg-background text-sm"
+              defaultValue={endTime}
+              onChange={setEndTime}
+              placeholder="No scheduled end"
             />
           </div>
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <label
+            htmlFor="maintenance_message"
+            className="block text-xs font-semibold text-slate-300"
+          >
             Notice Shown to Students
           </label>
           <textarea
+            id="maintenance_message"
             name="maintenance_message"
             rows={3}
             value={maintenanceMessage}
             onChange={(e) => setMaintenanceMessage(e.target.value)}
-            className="w-full p-3 rounded-xl border bg-background text-sm"
+            placeholder="Enter custom message to show students during maintenance..."
+            className="w-full rounded-xl border border-slate-700/80 bg-[#060A12] p-3.5 text-xs text-white placeholder:text-slate-500 transition-all focus:border-amber-400/80 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
           />
         </div>
 
-        {/* Authorized Test Student IDs INSIDE the card and form */}
-        <div className="space-y-2 pt-4 border-t">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-              Authorized Test Student IDs (Maintenance Bypass)
-            </label>
-            <span className="text-[11px] text-muted-foreground">Comma-separated</span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Only these specific Student IDs will bypass the maintenance screen and access the student dashboard for live testing while all other students remain blocked.
-          </p>
+        <div className="space-y-1.5 border-t border-slate-800/80 pt-4">
+          <label
+            htmlFor="maintenance_bypass_student_ids"
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-300"
+          >
+            <ShieldAlert className="h-3.5 w-3.5 text-amber-400" />
+            <span>
+              Authorized Test Student IDs (Maintenance Bypass · Comma-separated)
+            </span>
+          </label>
           <input
-            type="text"
+            id="maintenance_bypass_student_ids"
             name="maintenance_bypass_student_ids"
+            type="text"
             value={bypassIds}
             onChange={(e) => setBypassIds(e.target.value)}
-            placeholder="e.g. 24060401021, 20210001999"
-            className="w-full h-11 px-3.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-600"
+            placeholder="e.g. 24060401021, 20210001999 (comma-separated)"
+            className="h-11 w-full rounded-xl border border-slate-700/80 bg-[#060A12] px-3.5 font-mono text-xs text-white placeholder:text-slate-500 transition-all focus:border-amber-400/80 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
           />
+          <p className="text-[11px] text-slate-400">
+            Only these specific Student IDs will bypass the maintenance screen so
+            you can verify student features safely during lockdown.
+          </p>
         </div>
-      </div>
+      </section>
 
       <div className="flex justify-end">
-        <Button
+        <button
           type="submit"
           disabled={loading}
-          className="h-11 px-6 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold"
+          className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-500 px-6 text-xs font-bold text-slate-950 shadow-[0_0_22px_rgba(6,182,212,0.3)] transition-all duration-150 hover:from-cyan-300 hover:to-cyan-400 hover:shadow-[0_0_28px_rgba(6,182,212,0.5)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? "Saving Changes..." : "Save System Settings"}
-        </Button>
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          <span>{loading ? "Saving Changes..." : "Save System Settings"}</span>
+        </button>
       </div>
     </form>
   );
