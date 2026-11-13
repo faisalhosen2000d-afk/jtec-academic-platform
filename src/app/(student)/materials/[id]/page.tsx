@@ -1,14 +1,9 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import MaterialFileActions from "./MaterialFileActions";
 import MaterialBookmarkButton from "./MaterialBookmarkButton";
 import MaterialRating from "@/components/materials/MaterialRating";
-
-export const metadata: Metadata = {
-  title: "Material Details | JTEC Academic Platform",
-};
 
 type Material = {
   id: string;

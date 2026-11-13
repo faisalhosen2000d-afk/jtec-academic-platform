@@ -228,6 +228,7 @@ export default function MaterialCard({
         {/* Title & Subject Name */}
         <Link
           href={`/materials/${material.id}`}
+          prefetch={true}
           className="mt-3 block transition-colors group-hover:text-emerald-300"
         >
           <h3 className="line-clamp-2 font-serif text-base font-bold leading-snug text-white transition-colors group-hover:text-emerald-200">
@@ -294,6 +295,7 @@ export default function MaterialCard({
 
           <Link
             href={`/materials/${material.id}`}
+          prefetch={true}
             className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/35 bg-emerald-500/15 px-3 py-1.5 text-[11px] font-bold text-emerald-300 transition-all hover:border-emerald-400 hover:bg-emerald-500 hover:text-slate-950 active:scale-95"
           >
             <span>Open</span>
