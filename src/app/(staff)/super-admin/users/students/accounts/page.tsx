@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, ShieldCheck, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import StudentAccountsTable from "./StudentAccountsTable";
 
@@ -48,95 +48,94 @@ export default async function StudentAccountsPage() {
     .order("created_at", { ascending: false });
 
   const students = (data ?? []) as StudentProfile[];
+  const verifiedCount = students.filter((s) => s.is_verified).length;
+  const uploadDisabledCount = students.filter((s) => s.upload_disabled).length;
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 rounded-xl border border-border bg-card p-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="mb-1 text-sm font-medium text-muted-foreground">
-              Super Admin
-            </p>
+    <div className="min-h-screen bg-[#060A12] text-slate-100">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/4 h-96 w-96 rounded-full bg-cyan-500/5 blur-3xl" />
+      </div>
 
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+      <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#060A12]/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/40 bg-cyan-500/15 px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest text-cyan-300 shadow-[0_0_18px_rgba(6,182,212,0.22)]">
+                <Users className="h-3 w-3" />
+                Student Accounts
+              </span>
+              <span className="text-xs text-slate-400">Super Admin</span>
+            </div>
+            <h1 className="mt-2 font-serif text-2xl font-bold tracking-tight text-white sm:text-3xl">
               Student Accounts
             </h1>
-
-            <p className="mt-2 text-sm text-muted-foreground">
-              View registered student accounts and their current account
-              status.
+            <p className="mt-1 text-xs text-slate-400 sm:text-sm">
+              View registered student accounts, verification status, and
+              upload controls.
             </p>
           </div>
 
-          <Link href="/super-admin/users/students">
-            <Button variant="outline">Back to Students</Button>
+          <Link
+            href="/super-admin/users/students"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-gradient-to-b from-slate-800/90 to-slate-900 px-4 py-2 text-xs font-semibold text-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:-translate-y-0.5 hover:border-cyan-500/50 hover:text-cyan-300 active:translate-y-0 active:scale-95"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to Students</span>
           </Link>
         </div>
+      </header>
 
-        {/* Summary */}
-        <section className="mb-6 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-border bg-card p-5">
-            <p className="text-sm text-muted-foreground">Total Students</p>
-            <p className="mt-1 text-2xl font-bold">{students.length}</p>
-          </div>
-
-          <div className="rounded-xl border border-border bg-card p-5">
-            <p className="text-sm text-muted-foreground">Verified</p>
-            <p className="mt-1 text-2xl font-bold">
-              {students.filter((student) => student.is_verified).length}
+      <main className="relative z-10 mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-cyan-500/30 bg-[#0A1020] p-5 shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Total Students
+            </p>
+            <p className="mt-2 font-serif text-3xl font-bold text-cyan-300">
+              {students.length}
             </p>
           </div>
-
-          <div className="rounded-xl border border-border bg-card p-5">
-            <p className="text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-emerald-500/30 bg-[#0A1020] p-5 shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Verified
+            </p>
+            <p className="mt-2 font-serif text-3xl font-bold text-emerald-300">
+              {verifiedCount}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-rose-500/30 bg-[#0A1020] p-5 shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Upload Disabled
             </p>
-            <p className="mt-1 text-2xl font-bold">
-              {students.filter((student) => student.upload_disabled).length}
+            <p className="mt-2 font-serif text-3xl font-bold text-rose-300">
+              {uploadDisabledCount}
             </p>
           </div>
         </section>
 
-        {/* Student List */}
-        <section className="rounded-xl border border-border bg-card shadow-sm">
-          <div className="border-b border-border p-5">
-            <h2 className="text-lg font-semibold">Registered Students</h2>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              Student accounts currently stored in the platform.
+        {error ? (
+          <div className="rounded-2xl border border-rose-500/35 bg-rose-500/10 p-6">
+            <p className="text-sm font-semibold text-rose-300">
+              Unable to load student accounts.
             </p>
+            <p className="mt-1 text-xs text-slate-400">{error.message}</p>
           </div>
+        ) : (
+          <StudentAccountsTable students={students} />
+        )}
 
-          {error ? (
-            <div className="p-5">
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-                <p className="text-sm font-medium text-destructive">
-                  Unable to load student accounts.
-                </p>
-
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Please try again after checking the database connection and
-                  permissions.
-                </p>
-              </div>
-            </div>
-          ) : students.length === 0 ? (
-            <div className="p-8 text-center">
-              <h3 className="text-base font-semibold">
-                No student accounts found
-              </h3>
-
-              <p className="mt-2 text-sm text-muted-foreground">
-                There are currently no student profiles available.
-              </p>
-            </div>
-          ) : (            <StudentAccountsTable students={students} />
-          )}
+        <section className="flex items-start gap-3 rounded-2xl border border-slate-800/80 bg-[#0A1020]/70 px-5 py-4 text-xs text-slate-400">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
+          <p className="leading-relaxed">
+            <span className="font-semibold text-slate-200">
+              Account Governance:
+            </span>{" "}
+            Student account deletions and bulk actions are enforced server-side
+            with Super Admin verification.
+          </p>
         </section>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
-
-
