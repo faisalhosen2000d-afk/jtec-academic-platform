@@ -26,7 +26,7 @@ export function StudentMobileNav() {
   return (
     <nav
       aria-label="Mobile Bottom Navigation"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-800/90 bg-[#060A12]/92 backdrop-blur-xl lg:hidden pb-[env(safe-area-inset-bottom)]"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-800/90 bg-[#060A12] lg:hidden pb-[env(safe-area-inset-bottom)]"
     >
       <div className="mx-auto grid h-16 max-w-lg grid-cols-5 items-center px-2">
         {mobileTabs.map((tab) => {
