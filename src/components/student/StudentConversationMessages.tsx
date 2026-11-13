@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { BookOpen } from "lucide-react";
 import { markMessageAsRead } from "@/server/actions/profile-messages";
 
 type ConversationMessage = {
@@ -62,7 +63,7 @@ export function StudentConversationMessages({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3.5">
       {messages.map((item) => {
         const isMine = item.sender_id === currentUserId;
         const isUnread = !isMine && !readMessageIds.has(item.id);
@@ -70,18 +71,16 @@ export function StudentConversationMessages({
         return (
           <div
             key={item.id}
-            className={`flex ${
-              isMine ? "justify-end" : "justify-start"
-            }`}
+            className={`flex ${isMine ? "justify-end" : "justify-start"}`}
           >
             <button
               type="button"
               onClick={() => handleMessageClick(item.id)}
               disabled={isPending && isUnread}
-              className={`max-w-[85%] rounded-2xl px-4 py-3 text-left ${
+              className={`max-w-[85%] rounded-2xl border px-4 py-3 text-left transition ${
                 isMine
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-foreground"
+                  ? "rounded-br-sm border-emerald-500/35 bg-emerald-500/15 text-emerald-50"
+                  : "rounded-bl-sm border-slate-800 bg-[#0E172A] text-slate-100"
               }`}
             >
               <p
@@ -94,7 +93,7 @@ export function StudentConversationMessages({
                   {isUnread ? (
                     <span
                       aria-label="Unread message"
-                      className="inline-block h-2 w-2 rounded-full bg-destructive"
+                      className="inline-block h-2 w-2 rounded-full bg-cyan-400"
                     />
                   ) : null}
                 </span>
@@ -104,22 +103,24 @@ export function StudentConversationMessages({
                 <Link
                   href={`/materials/${item.material_id}`}
                   onClick={(event) => event.stopPropagation()}
-                  className={`mt-2 block rounded-lg border px-3 py-2 text-xs hover:underline ${
+                  className={`mt-2.5 flex items-center gap-2 rounded-xl border px-3 py-2 text-xs transition hover:underline ${
                     isMine
-                      ? "border-primary-foreground/30 text-primary-foreground"
-                      : "border-border text-foreground"
+                      ? "border-emerald-400/35 bg-[#0A1020]/60 text-emerald-200"
+                      : "border-slate-700/80 bg-[#0A1020] text-cyan-300"
                   }`}
                 >
-                  <span className="font-medium">Material:</span>{" "}
-                  {materialTitleById.get(item.material_id) ?? "Referenced material"}
+                  <BookOpen className="h-3.5 w-3.5 shrink-0" />
+                  <span className="font-semibold">Material:</span>{" "}
+                  <span className="truncate">
+                    {materialTitleById.get(item.material_id) ?? "Referenced material"}
+                  </span>
                 </Link>
               ) : null}
 
-              <p suppressHydrationWarning
-                className={`mt-1 text-xs ${
-                  isMine
-                    ? "text-primary-foreground/70"
-                    : "text-muted-foreground"
+              <p
+                suppressHydrationWarning
+                className={`mt-1.5 text-[11px] ${
+                  isMine ? "text-emerald-300/70" : "text-slate-400"
                 }`}
               >
                 {new Date(item.created_at).toLocaleString()}
@@ -131,7 +132,3 @@ export function StudentConversationMessages({
     </div>
   );
 }
-
-
-
-

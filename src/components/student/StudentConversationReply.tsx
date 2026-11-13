@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2, Send } from "lucide-react";
 import { sendProfileMessage } from "@/server/actions/profile-messages";
 import ContactMethodQr from "./ContactMethodQr";
 
@@ -75,6 +76,7 @@ function getContactDestination(key: ContactKey, value: string) {
 
   return trimmedValue;
 }
+
 type StudentConversationReplyProps = {
   recipientId: string;
   sentMessageCount: number;
@@ -119,22 +121,22 @@ export function StudentConversationReply({
   }
 
   return (
-    <section className="rounded-xl border border-border bg-background p-6 shadow-sm">
-      <h2 className="text-base font-semibold text-foreground">
+    <section className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-5 sm:p-6 shadow-xl transition-all duration-200 hover:border-cyan-500/35">
+      <h2 className="font-serif text-base font-bold text-white">
         Reply
       </h2>
 
       {sentMessageCount >= 5 ? (
-        <div className="mt-3 rounded-lg border border-border bg-muted/50 p-4">
-          <p className="text-sm font-medium text-foreground">
+        <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/8 p-4">
+          <p className="text-sm font-semibold text-amber-200">
             You have reached your 5-message limit in this conversation.
           </p>
 
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-xs text-slate-300">
             You can continue communicating using the available contact methods below.
           </p>
 
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 space-y-2.5">
             {contactFields.map(({ key, label }) => {
               const value = contactProfile[key];
 
@@ -145,14 +147,14 @@ export function StudentConversationReply({
               return (
                 <div
                   key={key}
-                  className="rounded-lg border border-border bg-background p-3"
+                  className="rounded-xl border border-slate-800 bg-[#0E172A] p-3"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                         {label}
                       </p>
-                      <p className="mt-1 break-words text-sm text-foreground">
+                      <p className="mt-0.5 break-words text-xs sm:text-sm font-medium text-slate-100">
                         {value}
                       </p>
                     </div>
@@ -175,28 +177,44 @@ export function StudentConversationReply({
             onChange={(event) => setMessage(event.target.value)}
             placeholder="Write your reply..."
             maxLength={2000}
-            rows={4}
+            rows={3}
             disabled={sending}
-            className="mt-3 w-full rounded-lg border border-border bg-background p-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+            className="mt-3 w-full rounded-xl border border-slate-800 bg-[#0E172A] p-3 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-cyan-500/60 focus:ring-2 focus:ring-cyan-500/15 disabled:opacity-60"
           />
 
-          <div className="mt-2 text-xs text-muted-foreground">
-            {message.length}/2000 characters
-          </div>
+          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs text-slate-400">
+              {message.length}/2000 characters
+            </span>
 
-          <button
-            type="button"
-            disabled={sending || !message.trim()}
-            onClick={handleSubmit}
-            className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {sending ? "Sending..." : "Send Reply"}
-          </button>
+            <button
+              type="button"
+              disabled={sending || !message.trim()}
+              onClick={handleSubmit}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-5 py-2 text-xs font-bold text-slate-950 shadow-[0_0_20px_rgba(52,211,153,0.25)] transition hover:bg-emerald-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {sending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-3.5 w-3.5" />
+                  Send Reply
+                </>
+              )}
+            </button>
+          </div>
         </>
       )}
 
       {status && (
-        <p className="mt-3 text-sm text-muted-foreground">
+        <p
+          className={`mt-3 text-xs font-medium ${
+            status.includes("success") ? "text-emerald-400" : "text-rose-400"
+          }`}
+        >
           {status}
         </p>
       )}
