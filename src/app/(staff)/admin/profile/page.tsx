@@ -14,7 +14,7 @@ export default async function AdminProfilePage() {
 
   const { data: rawProfile } = await supabase
     .from("profiles")
-    .select("id, full_name, email, role, department_id, designation, phone, office_room, specialization, created_at")
+    .select("id, full_name, email, role, department_id, designation, phone, office_room, specialization, avatar_url, created_at")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -28,6 +28,7 @@ export default async function AdminProfilePage() {
     phone: string | null;
     office_room: string | null;
     specialization: string | null;
+    avatar_url: string | null;
     created_at: string;
   } | null;
 
@@ -57,6 +58,7 @@ export default async function AdminProfilePage() {
         phone: profile.phone,
         office_room: profile.office_room,
         specialization: profile.specialization,
+        avatar_url: profile.avatar_url,
         created_at: profile.created_at,
       }}
       backHref="/admin"

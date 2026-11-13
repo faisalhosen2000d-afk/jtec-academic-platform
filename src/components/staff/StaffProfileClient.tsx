@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { saveProfilePhoto } from "@/server/actions/profile-photo";
 import {
   updateStaffProfile,
   updateStaffPassword,
@@ -23,6 +25,8 @@ import {
   AlertCircle,
   Calendar,
   Save,
+  Camera,
+  Loader2,
 } from "lucide-react";
 
 export interface StaffProfileData {
@@ -35,6 +39,7 @@ export interface StaffProfileData {
   phone: string | null;
   office_room: string | null;
   specialization: string | null;
+  avatar_url?: string | null;
   created_at: string;
 }
 
@@ -60,6 +65,9 @@ export function StaffProfileClient({
   const [isPendingProfile, startProfileTransition] = useTransition();
   const [isPendingPassword, startPasswordTransition] = useTransition();
 
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile.avatar_url ?? null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoStatus, setPhotoStatus] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [fullName, setFullName] = useState(profile.full_name || "");
   const [designation, setDesignation] = useState(profile.designation || "");
   const [phone, setPhone] = useState(profile.phone || "");
@@ -100,6 +108,43 @@ export function StaffProfileClient({
     profile.role === "super_admin"
       ? "Global Institutional Access • All Departments, Academic Structure, Audit Logs & System Settings"
       : `Departmental Administration • ${profile.department_name || "All Assigned Scopes"} (Verification, Materials, Results & Notices)`;
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoStatus(null);
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setPhotoStatus({ type: "error", text: "Please select a JPG, PNG, or WebP image." });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoStatus({ type: "error", text: "Profile photo cannot exceed 5 MB." });
+      return;
+    }
+    setUploadingPhoto(true);
+    try {
+      const supabase = createClient();
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const filePath = `${profile.id}/avatar-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("profile-photos")
+        .upload(filePath, file, { contentType: file.type, upsert: false });
+      if (uploadError) throw new Error(uploadError.message);
+      const { data } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
+      const res = await saveProfilePhoto(data.publicUrl);
+      if (!res.success) throw new Error(res.error);
+      setAvatarUrl(data.publicUrl);
+      setPhotoStatus({ type: "success", text: "Profile photo updated!" });
+    } catch (err) {
+      setPhotoStatus({
+        type: "error",
+        text: err instanceof Error ? err.message : "Could not upload photo.",
+      });
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const handleProfileSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -161,9 +206,43 @@ export function StaffProfileClient({
             <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-[#0A1020] p-6 shadow-xl">
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/60 to-transparent" />
               <div className="flex flex-col items-center text-center">
-                <div className="flex h-20 w-20 items-center justify-center rounded-2xl border-2 border-amber-500/40 bg-gradient-to-br from-amber-500/20 to-slate-900 font-serif text-2xl font-bold text-amber-300 shadow-lg">
-                  {initials}
+                <div className="relative">
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={fullName || "Staff Avatar"}
+                      className="h-24 w-24 rounded-2xl border-2 border-amber-500/50 object-cover shadow-lg"
+                    />
+                  ) : (
+                    <div className="flex h-24 w-24 items-center justify-center rounded-2xl border-2 border-amber-500/40 bg-gradient-to-br from-amber-500/20 to-slate-900 font-serif text-2xl font-bold text-amber-300 shadow-lg">
+                      {initials}
+                    </div>
+                  )}
+                  <label
+                    htmlFor="staff-avatar-upload"
+                    title="Upload profile photo"
+                    className="absolute -bottom-2 -right-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-amber-400/60 bg-amber-500 text-slate-950 shadow-[0_0_14px_rgba(245,158,11,0.45)] transition-all hover:bg-amber-400 active:scale-95"
+                  >
+                    {uploadingPhoto ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
+                    <input
+                      id="staff-avatar-upload"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      disabled={uploadingPhoto}
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
+                {photoStatus ? (
+                  <p className={`mt-3 text-[11px] font-semibold ${photoStatus.type === "success" ? "text-emerald-300" : "text-rose-300"}`}>
+                    {photoStatus.text}
+                  </p>
+                ) : null}
                 <h2 className="mt-4 font-serif text-xl font-bold text-white">
                   {fullName || "Administrator"}
                 </h2>

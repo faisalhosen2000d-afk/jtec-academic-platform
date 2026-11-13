@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -48,6 +48,10 @@ export async function saveProfilePhoto(
 
   revalidatePath("/profile");
   revalidatePath("/materials");
+  revalidatePath("/admin/profile");
+  revalidatePath("/super-admin/profile");
+  revalidatePath("/admin");
+  revalidatePath("/super-admin");
 
   return { success: true };
 }
