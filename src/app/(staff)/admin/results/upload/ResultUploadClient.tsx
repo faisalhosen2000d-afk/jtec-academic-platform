@@ -378,7 +378,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
       {/* Target Level & Batch Selector */}
-      <div className="lg:col-span-5 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-5">
+      <div className="lg:col-span-5 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/45 hover:bg-[#0D162B] hover:shadow-[0_14px_36px_rgba(16,185,129,0.12)]">
         <h2 className="text-base font-bold flex items-center gap-2">
           <FileText className="w-5 h-5 text-emerald-400" />
           1. Select Target Department, Batch & Term
@@ -421,7 +421,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
       </div>
 
       {/* Excel / CSV Upload Zone & Paste Area */}
-      <div className="lg:col-span-7 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-5">
+      <div className="lg:col-span-7 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/45 hover:bg-[#0D162B] hover:shadow-[0_14px_36px_rgba(16,185,129,0.12)]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-bold flex items-center gap-2">
@@ -502,7 +502,7 @@ export default function ResultUploadClient({ departments, batches, levels, terms
       </div>
       {/* Parsed Preview Table */}
       {parsedResults.length > 0 && (
-        <div className="lg:col-span-5 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-5">
+        <div className="lg:col-span-5 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl space-y-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/45 hover:bg-[#0D162B] hover:shadow-[0_14px_36px_rgba(16,185,129,0.12)]">
           <h3 className="text-sm font-bold flex items-center justify-between">
             <span>Parsed Entries Preview ({parsedResults.length} Students)</span>
             <span className="text-xs font-normal text-slate-400">Ready to commit to database</span>
