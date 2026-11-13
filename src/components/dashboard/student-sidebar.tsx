@@ -31,13 +31,52 @@ const navigationItems = [
   { label: "Profile", href: "/profile", icon: User },
 ];
 
+type PillPos = { top: number; height: number };
+
+let persistedPill: PillPos | null = null;
+let pendingGlide: {
+  from: PillPos;
+  to: PillPos;
+  startTime: number;
+  duration: number;
+} | null = null;
+
+function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
 export function StudentSidebar() {
   const pathname = usePathname();
   const [optimisticHref, setOptimisticHref] = useState<string | null>(null);
   const hasUnreadNotifications = useUnreadNotifications(pathname);
   const hasUnreadMessages = useUnreadMessages(pathname);
   const itemRefs = useRef<Array<HTMLAnchorElement | null>>([]);
-  const [pillStyle, setPillStyle] = useState<{ top: number; height: number } | null>(null);
+
+  const [glideDuration, setGlideDuration] = useState<number>(() => {
+    if (!pendingGlide) return 300;
+    const elapsed = performance.now() - pendingGlide.startTime;
+    const remaining = pendingGlide.duration - elapsed;
+    return Math.max(120, Math.round(remaining));
+  });
+
+  const [pillStyle, setPillStyle] = useState<PillPos | null>(() => {
+    if (pendingGlide) {
+      const progress = Math.min(
+        1,
+        Math.max(0, (performance.now() - pendingGlide.startTime) / pendingGlide.duration),
+      );
+      const eased = easeOutCubic(progress);
+      return {
+        top:
+          pendingGlide.from.top +
+          (pendingGlide.to.top - pendingGlide.from.top) * eased,
+        height:
+          pendingGlide.from.height +
+          (pendingGlide.to.height - pendingGlide.from.height) * eased,
+      };
+    }
+    return persistedPill;
+  });
 
   useEffect(() => {
     setOptimisticHref(null);
@@ -53,9 +92,23 @@ export function StudentSidebar() {
 
   useEffect(() => {
     const el = activeIndex >= 0 ? itemRefs.current[activeIndex] : null;
-    if (el) {
-      setPillStyle({ top: el.offsetTop, height: el.offsetHeight });
+    if (!el) return;
+
+    const next: PillPos = { top: el.offsetTop, height: el.offsetHeight };
+
+    if (!persistedPill && !pendingGlide) {
+      persistedPill = next;
+      setPillStyle(next);
+      return;
     }
+
+    const frame = requestAnimationFrame(() => {
+      persistedPill = next;
+      pendingGlide = null;
+      setPillStyle(next);
+    });
+
+    return () => cancelAnimationFrame(frame);
   }, [activeIndex]);
 
   return (
@@ -88,15 +141,16 @@ export function StudentSidebar() {
         </p>
 
         <div className="relative space-y-1">
-          {/* Smooth Sliding Glowing Pill */}
+          {/* Smooth Cross-Route Sliding Glowing Pill */}
           {pillStyle ? (
             <div
               aria-hidden="true"
               style={{
                 transform: `translateY(${pillStyle.top}px)`,
                 height: `${pillStyle.height}px`,
+                transitionDuration: `${glideDuration}ms`,
               }}
-              className="pointer-events-none absolute inset-x-0 top-0 rounded-xl border border-emerald-400/40 bg-gradient-to-r from-emerald-500/20 via-cyan-500/15 to-transparent shadow-[0_0_20px_rgba(16,185,129,0.16)] transition-all duration-300 ease-out"
+              className="pointer-events-none absolute inset-x-0 top-0 rounded-xl border border-emerald-400/40 bg-gradient-to-r from-emerald-500/20 via-cyan-500/15 to-transparent shadow-[0_0_20px_rgba(16,185,129,0.16)] transition-[transform,height] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform"
             />
           ) : null}
 
@@ -116,6 +170,19 @@ export function StudentSidebar() {
                 prefetch={true}
                 onClick={() => {
                   if (pathname !== item.href) {
+                    const targetEl = itemRefs.current[idx];
+                    if (pillStyle && targetEl) {
+                      pendingGlide = {
+                        from: pillStyle,
+                        to: {
+                          top: targetEl.offsetTop,
+                          height: targetEl.offsetHeight,
+                        },
+                        startTime: performance.now(),
+                        duration: 300,
+                      };
+                      setGlideDuration(300);
+                    }
                     setOptimisticHref(item.href);
                   }
                 }}
@@ -172,7 +239,7 @@ export function StudentSidebar() {
             JTEC Academic Platform
           </p>
           <p className="mt-0.5 text-[11px] text-slate-400">
-            Student Portal · Verified Access
+            Student Portal &middot; Verified Access
           </p>
         </div>
       </div>
