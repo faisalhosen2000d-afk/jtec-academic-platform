@@ -24,8 +24,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
+    <html lang="en" className="bg-[#060A12]" suppressHydrationWarning>
+      <body className="min-h-screen bg-[#060A12] text-slate-100 antialiased">
         <TopProgressBar />
         {children}
       </body>

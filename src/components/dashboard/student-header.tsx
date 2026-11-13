@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { User, LogOut, ExternalLink, Bell, ChevronDown } from "lucide-react";
 import { signOut } from "@/server/actions/auth";
 import { useUnreadNotifications } from "@/lib/use-unread-notifications";
@@ -34,6 +34,8 @@ let cachedStudentProfile: StudentProfilePreview | null = null;
 
 export function StudentHeader() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
   const hasUnreadNotifications = useUnreadNotifications(pathname);
   const [profile, setProfile] = useState<StudentProfilePreview | null>(
     cachedStudentProfile,
@@ -152,9 +154,12 @@ export function StudentHeader() {
   }, [pathname]);
 
   const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
     cachedStudentProfile = null;
     await signOut();
-    window.location.href = "/login";
+    router.replace("/login");
+    router.refresh();
   };
 
   const title =
@@ -287,10 +292,11 @@ export function StudentHeader() {
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 px-4 py-2.5 text-xs font-semibold text-rose-300 transition hover:border-rose-400 hover:bg-rose-500/25 active:scale-95"
+                  disabled={signingOut}
+                  className="flex w-full disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer items-center justify-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 px-4 py-2.5 text-xs font-semibold text-rose-300 transition hover:border-rose-400 hover:bg-rose-500/25 active:scale-95"
                 >
                   <LogOut className="h-4 w-4" />
-                  <span>Logout</span>
+                  <span>{signingOut ? "Signing out..." : "Logout"}</span>
                 </button>
               </div>
             </div>
