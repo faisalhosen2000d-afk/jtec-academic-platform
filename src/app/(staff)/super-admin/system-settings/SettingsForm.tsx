@@ -235,7 +235,7 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Student Registration Gate */}
-        <div className="space-y-4 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl">
+        <div className="space-y-4 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/45 hover:bg-[#0D162B] hover:shadow-[0_14px_36px_rgba(16,185,129,0.12)]">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-500/35 bg-emerald-500/15 text-emerald-300">
@@ -275,7 +275,7 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
         </div>
 
         {/* Maximum Upload Size */}
-        <div className="space-y-4 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl">
+        <div className="space-y-4 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-500/45 hover:bg-[#0D162B] hover:shadow-[0_14px_36px_rgba(6,182,212,0.12)]">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-500/35 bg-cyan-500/15 text-cyan-300">
