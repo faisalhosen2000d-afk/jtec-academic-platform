@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { User, LogOut, ExternalLink, Bell } from "lucide-react";
+import { User, LogOut, ExternalLink, Bell, ChevronDown } from "lucide-react";
 import { signOut } from "@/server/actions/auth";
 import { useUnreadNotifications } from "@/lib/use-unread-notifications";
 import { createClient } from "@/lib/supabase/client";
@@ -15,6 +15,7 @@ const pageTitles: Record<string, string> = {
   "/upload": "Upload",
   "/results": "Results",
   "/ranking": "Ranking",
+  "/cgpa-calculator": "CGPA Calculator",
   "/messages": "Conversations",
   "/notifications": "Notifications",
   "/profile": "Profile",
@@ -86,14 +87,16 @@ export function StudentHeader() {
 
       const { data: profileRow } = await supabase
         .from("profiles")
-        .select(`
+        .select(
+          `
           full_name,
           student_id,
           avatar_url,
           email,
           department_id,
           batch_id
-        `)
+        `,
+        )
         .eq("id", user.id)
         .maybeSingle();
 
@@ -158,18 +161,17 @@ export function StudentHeader() {
     pageTitles[pathname] ??
     Object.entries(pageTitles).find(
       ([path]) =>
-        path !== "/dashboard" &&
-        pathname.startsWith(`${path}/`),
+        path !== "/dashboard" && pathname.startsWith(`${path}/`),
     )?.[1] ??
     "Student Portal";
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur lg:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-800/80 bg-[#060A12]/85 px-4 backdrop-blur-xl lg:px-6">
       <div className="flex items-center gap-3">
         <div className="lg:hidden">
           <Link
             href="/dashboard"
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground shadow-sm"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-400/50 bg-emerald-500/15 font-serif text-sm font-bold text-emerald-300 shadow-sm"
             aria-label="JTEC Academic Platform"
           >
             J
@@ -177,11 +179,10 @@ export function StudentHeader() {
         </div>
 
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-foreground">
+          <h1 className="font-serif text-lg font-bold tracking-tight text-white">
             {title}
           </h1>
-
-          <p className="hidden text-xs text-muted-foreground sm:block">
+          <p className="hidden text-[11px] text-slate-400 sm:block">
             JTEC Academic Platform
           </p>
         </div>
@@ -191,29 +192,29 @@ export function StudentHeader() {
         {/* Notifications Icon */}
         <Link
           href="/notifications"
-          className="relative flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-[#0A1020] text-slate-300 transition-all duration-150 hover:-translate-y-0.5 hover:border-cyan-500/50 hover:text-cyan-300 active:scale-95"
           aria-label="Notifications"
         >
-          <Bell className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
+          <Bell className="h-4.5 w-4.5" strokeWidth={1.9} aria-hidden="true" />
           {hasUnreadNotifications && (
             <span
-              className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background"
+              className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.85)]"
               aria-label="Unread notifications"
             />
           )}
         </Link>
 
-        {/* Profile Avatar with Dropdown */}
+        {/* Profile Pill with Dropdown */}
         <div ref={dropdownRef} className="relative">
           <button
             type="button"
             onClick={() => setDropdownOpen((prev) => !prev)}
-            className="flex items-center gap-2 rounded-lg p-1 transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="flex h-10 cursor-pointer items-center gap-2.5 rounded-xl border border-slate-800 bg-[#0A1020] pl-1.5 pr-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-emerald-500/50 hover:bg-[#0D162B] focus:outline-none active:scale-95"
             aria-expanded={dropdownOpen}
             aria-haspopup="true"
             aria-label="Open user profile menu"
           >
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary shadow-xs">
+            <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-lg border border-emerald-400/50 bg-emerald-500/15 text-xs font-bold text-emerald-300">
               {profile?.avatarUrl ? (
                 <img
                   src={profile.avatarUrl}
@@ -226,22 +227,24 @@ export function StudentHeader() {
             </div>
 
             <div className="hidden text-left sm:block">
-              <p className="max-w-[120px] truncate text-xs font-semibold text-foreground">
+              <p className="max-w-[130px] truncate text-xs font-semibold text-white">
                 {profile?.fullName || "Student"}
               </p>
-              <p className="text-[10px] text-muted-foreground">My Account</p>
             </div>
+            <ChevronDown
+              className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-150 ${
+                dropdownOpen ? "rotate-180 text-emerald-300" : ""
+              }`}
+            />
           </button>
 
-          {/* Large Profile Dropdown Card */}
           {dropdownOpen && (
             <div
-              className="absolute right-0 top-12 z-50 w-72 origin-top-right rounded-2xl border border-border bg-background p-5 shadow-2xl transition-all animate-in fade-in zoom-in-95"
+              className="absolute right-0 top-12 z-50 w-72 origin-top-right rounded-2xl border border-emerald-500/35 bg-[#0A1020] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.85)]"
               role="menu"
             >
               <div className="flex flex-col items-center text-center">
-                {/* Large Profile Picture */}
-                <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-primary/20 bg-primary/10 text-2xl font-bold text-primary shadow-md">
+                <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border-2 border-emerald-400/50 bg-emerald-500/15 font-serif text-2xl font-bold text-emerald-300 shadow-lg">
                   {profile?.avatarUrl ? (
                     <img
                       src={profile.avatarUrl}
@@ -253,40 +256,38 @@ export function StudentHeader() {
                   )}
                 </div>
 
-                {/* Profile Details */}
-                <h3 className="mt-3 text-base font-bold text-foreground">
+                <h3 className="mt-3 font-serif text-base font-bold text-white">
                   {profile?.fullName || "Student"}
                 </h3>
 
-                <p className="mt-0.5 font-mono text-xs font-medium text-primary">
+                <p className="mt-1 rounded-md border border-slate-700 bg-slate-900 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-cyan-300">
                   ID: {profile?.studentId || "N/A"}
                 </p>
 
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {profile?.departmentName} • {profile?.batchName}
+                <p className="mt-1.5 text-xs text-slate-300">
+                  {profile?.departmentName} · {profile?.batchName}
                 </p>
 
-                <p className="mt-0.5 max-w-[240px] truncate text-xs text-muted-foreground">
+                <p className="mt-0.5 max-w-[240px] truncate text-[11px] text-slate-400">
                   {profile?.email}
                 </p>
               </div>
 
-              {/* Action Buttons */}
-              <div className="mt-5 space-y-2 border-t border-border pt-4">
+              <div className="mt-5 space-y-2 border-t border-slate-800 pt-4">
                 <Link
                   href="/profile"
                   onClick={() => setDropdownOpen(false)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 px-4 py-2.5 text-xs font-bold text-slate-950 shadow-[0_0_16px_rgba(16,185,129,0.28)] transition hover:from-emerald-300 hover:to-emerald-400 active:scale-95"
                 >
                   <User className="h-4 w-4" />
                   <span>Go to Full Profile</span>
-                  <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+                  <ExternalLink className="h-3.5 w-3.5 opacity-75" />
                 </Link>
 
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-medium text-destructive transition hover:bg-destructive/10"
+                  className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 px-4 py-2.5 text-xs font-semibold text-rose-300 transition hover:border-rose-400 hover:bg-rose-500/25 active:scale-95"
                 >
                   <LogOut className="h-4 w-4" />
                   <span>Logout</span>
@@ -295,8 +296,6 @@ export function StudentHeader() {
             </div>
           )}
         </div>
-
-
       </div>
     </header>
   );
