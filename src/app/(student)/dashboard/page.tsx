@@ -17,6 +17,11 @@ import {
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
 import NoticeList from "@/components/dashboard/NoticeList";
+import { CollapsibleSectionCard } from "@/components/dashboard/CollapsibleSectionCard";
+import {
+  AcademicPerformanceCard,
+  type TermTrendPoint,
+} from "@/components/dashboard/AcademicPerformanceCard";
 import {
   getStudentBookmarksCount,
   getStudentVisibleMaterialsCount,
@@ -146,6 +151,9 @@ export default async function StudentDashboardPage() {
   let cardScoreText = isApprovedStudent ? "No Results" : "Pending Verification";
   let cardRankText = isApprovedStudent ? "Unranked" : "—";
   let totalPendingRetakes = 0;
+  let currentNumericScore: number | null = null;
+  let scoreLabel = "CGPA";
+  let trendPoints: TermTrendPoint[] = [];
   let lastTerm: {
     level_term_key: string;
     gpa: number;
@@ -235,6 +243,12 @@ export default async function StudentDashboardPage() {
     }
 
     const passedUserTerms = userTerms.filter((t) => t.status !== "air_dropped");
+    trendPoints = passedUserTerms.map((t) => ({
+      termKey: t.level_term_key,
+      gpa: Number(t.gpa),
+      cgpa: t.cgpa !== null ? Number(t.cgpa) : null,
+    }));
+
     const lastPassedTerm =
       passedUserTerms.length > 0
         ? passedUserTerms[passedUserTerms.length - 1]
@@ -243,13 +257,21 @@ export default async function StudentDashboardPage() {
       lastPassedTerm ??
       (userTerms.length > 0 ? (userTerms[userTerms.length - 1] ?? null) : null);
 
-    cardScoreText = lastPassedTerm
-      ? lastPassedTerm.level_term_key === "1-1"
-        ? `${Number(lastPassedTerm.gpa).toFixed(2)} GPA`
-        : `${Number(lastPassedTerm.cgpa ?? lastPassedTerm.gpa).toFixed(2)} CGPA`
-      : firstDropTerm
-        ? "Year Dropped"
-        : "No Results";
+    if (lastPassedTerm) {
+      if (lastPassedTerm.level_term_key === "1-1") {
+        currentNumericScore = Number(lastPassedTerm.gpa);
+        scoreLabel = "GPA";
+        cardScoreText = `${currentNumericScore.toFixed(2)} GPA`;
+      } else {
+        currentNumericScore = Number(
+          lastPassedTerm.cgpa ?? lastPassedTerm.gpa,
+        );
+        scoreLabel = "CGPA";
+        cardScoreText = `${currentNumericScore.toFixed(2)} CGPA`;
+      }
+    } else {
+      cardScoreText = firstDropTerm ? "Year Dropped" : "No Results";
+    }
 
     totalPendingRetakes = firstDropTerm
       ? 5
@@ -404,18 +426,15 @@ export default async function StudentDashboardPage() {
                 )}
               </section>
 
-              {/* Academic Information */}
-              <section className="dash-stagger-2 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl transition-all duration-200 hover:border-cyan-500/35">
-                <div>
-                  <h3 className="font-serif text-lg font-bold text-white">
-                    Academic Information
-                  </h3>
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    Your current academic assignment and enrollment details.
-                  </p>
-                </div>
-
-                <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {/* Collapsible Academic Information */}
+              <CollapsibleSectionCard
+                storageKey="academic_info"
+                title="Academic Information"
+                subtitle="Your current academic assignment and enrollment details."
+                className="dash-stagger-2"
+                borderHoverCls="hover:border-cyan-500/35"
+              >
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="rounded-xl border border-cyan-500/25 bg-[#060A12] p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400/55 hover:bg-[#0D162B]">
                     <div className="flex items-center gap-2 text-xs text-cyan-400">
                       <Building2 className="h-3.5 w-3.5" />
@@ -456,7 +475,7 @@ export default async function StudentDashboardPage() {
                     </p>
                   </div>
                 </div>
-              </section>
+              </CollapsibleSectionCard>
 
               {/* 4 KPI Stat Cards */}
               <section className="dash-stagger-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -535,79 +554,82 @@ export default async function StudentDashboardPage() {
                 </Link>
               </section>
 
-              {/* Official Notices */}
-              <section className="dash-stagger-4 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl transition-all duration-200 hover:border-cyan-500/35">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-500/35 bg-cyan-500/15 text-cyan-300">
-                      <Bell className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-serif text-lg font-bold text-white">
-                        Official Notices
-                      </h3>
-                      <p className="mt-0.5 text-xs text-slate-400">
-                        Recent academic notices relevant to you.
-                      </p>
-                    </div>
+              {/* Animated Academic Performance Trend + CGPA Gauge */}
+              <AcademicPerformanceCard
+                terms={trendPoints}
+                currentScore={currentNumericScore}
+                scoreLabel={scoreLabel}
+                isApproved={isApprovedStudent}
+              />
+
+              {/* Collapsible Official Notices */}
+              <CollapsibleSectionCard
+                storageKey="official_notices"
+                title="Official Notices"
+                subtitle="Recent academic notices relevant to you."
+                className="dash-stagger-4"
+                borderHoverCls="hover:border-cyan-500/35"
+                icon={
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-500/35 bg-cyan-500/15 text-cyan-300">
+                    <Bell className="h-5 w-5" />
                   </div>
+                }
+                headerRight={
                   <Link
                     href="/notifications"
-                    className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-xl border border-slate-700 bg-gradient-to-b from-slate-800/90 to-slate-900 px-4 py-2 text-xs font-semibold text-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:-translate-y-0.5 hover:border-cyan-500/50 hover:text-cyan-300 active:scale-95"
+                    className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 bg-gradient-to-b from-slate-800/90 to-slate-900 px-3.5 text-xs font-semibold text-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:border-cyan-500/50 hover:text-cyan-300 active:scale-95"
                   >
                     View Notifications
                   </Link>
-                </div>
-
-                <div className="mt-5">
-                  {notices && notices.length > 0 ? (
-                    <NoticeList categories={noticeCategories ?? []}>
-                      <div className="divide-y divide-slate-800/80">
-                        {notices.map((notice) => (
-                          <Link
-                            key={notice.id}
-                            href={`/notices/${notice.id}`}
-                            data-notice-search={`${notice.title} ${notice.content}`}
-                            data-notice-category={notice.category_id ?? ""}
-                            className="block rounded-xl p-4 transition-all duration-150 hover:bg-[#0D162B]/90"
-                          >
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <h4 className="text-sm font-semibold text-white">
-                                    {notice.title}
-                                  </h4>
-                                  {notice.is_pinned ? (
-                                    <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">
-                                      Pinned
-                                    </span>
-                                  ) : null}
-                                </div>
-                                <p className="mt-1 text-xs text-slate-400">
-                                  {new Intl.DateTimeFormat("en-US", {
-                                    timeZone: "Asia/Dhaka",
-                                    dateStyle: "medium",
-                                    timeStyle: "short",
-                                  }).format(new Date(notice.created_at))}
-                                </p>
+                }
+              >
+                {notices && notices.length > 0 ? (
+                  <NoticeList categories={noticeCategories ?? []}>
+                    <div className="divide-y divide-slate-800/80">
+                      {notices.map((notice) => (
+                        <Link
+                          key={notice.id}
+                          href={`/notices/${notice.id}`}
+                          data-notice-search={`${notice.title} ${notice.content}`}
+                          data-notice-category={notice.category_id ?? ""}
+                          className="block rounded-xl p-4 transition-all duration-150 hover:bg-[#0D162B]/90"
+                        >
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="text-sm font-semibold text-white">
+                                  {notice.title}
+                                </h4>
+                                {notice.is_pinned ? (
+                                  <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                                    Pinned
+                                  </span>
+                                ) : null}
                               </div>
+                              <p className="mt-1 text-xs text-slate-400">
+                                {new Intl.DateTimeFormat("en-US", {
+                                  timeZone: "Asia/Dhaka",
+                                  dateStyle: "medium",
+                                  timeStyle: "short",
+                                }).format(new Date(notice.created_at))}
+                              </p>
                             </div>
-                          </Link>
-                        ))}
-                      </div>
-                    </NoticeList>
-                  ) : (
-                    <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center">
-                      <p className="font-serif text-sm font-bold text-white">
-                        No notices yet
-                      </p>
-                      <p className="mt-1 text-xs text-slate-400">
-                        New academic notices relevant to you will appear here.
-                      </p>
+                          </div>
+                        </Link>
+                      ))}
                     </div>
-                  )}
-                </div>
-              </section>
+                  </NoticeList>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center">
+                    <p className="font-serif text-sm font-bold text-white">
+                      No notices yet
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      New academic notices relevant to you will appear here.
+                    </p>
+                  </div>
+                )}
+              </CollapsibleSectionCard>
             </div>
           </main>
         </div>
