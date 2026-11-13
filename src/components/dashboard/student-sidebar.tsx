@@ -120,10 +120,12 @@ export function StudentSidebar() {
                   }
                 }}
                 className={[
-                  "group relative z-10 flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-colors duration-200",
+                  "group relative z-10 flex items-center gap-3 rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition-colors duration-200",
                   isActive
-                    ? "text-emerald-300"
-                    : "text-slate-400 hover:bg-slate-900/60 hover:text-slate-100",
+                    ? "border-transparent text-emerald-300"
+                    : isNotifications && hasUnreadNotifications
+                      ? "border-amber-400/25 bg-amber-500/8 text-amber-200 hover:bg-amber-500/15"
+                      : "border-transparent text-slate-400 hover:bg-slate-900/60 hover:text-slate-100",
                 ].join(" ")}
               >
                 <Icon
@@ -131,7 +133,9 @@ export function StudentSidebar() {
                     "h-4 w-4 shrink-0 transition-transform duration-200 group-hover:scale-110",
                     isActive
                       ? "text-emerald-300"
-                      : "text-slate-400 group-hover:text-cyan-300",
+                      : isNotifications && hasUnreadNotifications
+                        ? "text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.75)]"
+                        : "text-slate-400 group-hover:text-cyan-300",
                   ].join(" ")}
                   strokeWidth={isActive ? 2.2 : 1.8}
                   aria-hidden="true"
@@ -141,16 +145,20 @@ export function StudentSidebar() {
 
                 {isNotifications && hasUnreadNotifications && (
                   <span
-                    className="h-2 w-2 shrink-0 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]"
+                    className="shrink-0 rounded-full border border-amber-400/50 bg-amber-400/15 px-2 py-0.5 text-[10px] font-bold text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.3)]"
                     aria-label="Unread notifications"
-                  />
+                  >
+                    New
+                  </span>
                 )}
 
                 {isConversations && hasUnreadMessages && (
                   <span
-                    className="h-2 w-2 shrink-0 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"
+                    className="shrink-0 rounded-full border border-cyan-400/50 bg-cyan-400/15 px-2 py-0.5 text-[10px] font-bold text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.28)]"
                     aria-label="Unread messages"
-                  />
+                  >
+                    New
+                  </span>
                 )}
               </Link>
             );
