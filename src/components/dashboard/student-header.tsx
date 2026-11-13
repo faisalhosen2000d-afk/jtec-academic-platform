@@ -194,16 +194,30 @@ export function StudentHeader() {
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Notifications Icon */}
+        {/* Golden Notifications Bell Icon with Radiant Unread Glow */}
         <Link
           href="/notifications"
-          className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-[#0A1020] text-slate-300 transition-all duration-150 hover:-translate-y-0.5 hover:border-cyan-500/50 hover:text-cyan-300 active:scale-95"
+          className={`relative flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 hover:-translate-y-0.5 active:scale-95 ${
+            hasUnreadNotifications
+              ? "border-amber-400/80 bg-amber-500/20 text-amber-300 shadow-[0_0_24px_rgba(251,191,36,0.55)] ring-2 ring-amber-400/35 hover:bg-amber-500/25"
+              : "border-amber-500/30 bg-[#0A1020] text-amber-300/85 hover:border-amber-400/65 hover:bg-amber-500/10 hover:text-amber-200"
+          }`}
           aria-label="Notifications"
         >
-          <Bell className="h-4.5 w-4.5" strokeWidth={1.9} aria-hidden="true" />
           {hasUnreadNotifications && (
             <span
-              className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.85)]"
+              className="pointer-events-none absolute -inset-1 rounded-xl bg-amber-400/20 blur-md animate-pulse"
+              aria-hidden="true"
+            />
+          )}
+          <Bell
+            className={`relative h-4.5 w-4.5 ${hasUnreadNotifications ? "text-amber-300" : ""}`}
+            strokeWidth={2}
+            aria-hidden="true"
+          />
+          {hasUnreadNotifications && (
+            <span
+              className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_10px_rgba(252,211,77,0.95)]"
               aria-label="Unread notifications"
             />
           )}
@@ -243,11 +257,15 @@ export function StudentHeader() {
             />
           </button>
 
-          {dropdownOpen && (
-            <div
-              className="absolute right-0 top-12 z-50 w-72 origin-top-right rounded-2xl border border-emerald-500/35 bg-[#0A1020] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.85)]"
-              role="menu"
-            >
+          <div
+            aria-hidden={!dropdownOpen}
+            className={`absolute right-0 top-12 z-50 w-72 origin-top-right rounded-2xl border border-emerald-500/35 bg-[#0A1020] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.85)] transition-all duration-200 ease-out ${
+              dropdownOpen
+                ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
+                : "pointer-events-none -translate-y-2 scale-95 opacity-0"
+            }`}
+            role="menu"
+          >
               <div className="flex flex-col items-center text-center">
                 <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border-2 border-emerald-400/50 bg-emerald-500/15 font-serif text-2xl font-bold text-emerald-300 shadow-lg">
                   {profile?.avatarUrl ? (
@@ -300,7 +318,6 @@ export function StudentHeader() {
                 </button>
               </div>
             </div>
-          )}
         </div>
       </div>
     </header>
