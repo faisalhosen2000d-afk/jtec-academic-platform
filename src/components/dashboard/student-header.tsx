@@ -1,11 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { User, LogOut, ExternalLink, Bell, ChevronDown } from "lucide-react";
+import {
+  User,
+  LogOut,
+  ExternalLink,
+  Bell,
+  ChevronDown,
+  Menu,
+  X,
+  LayoutDashboard,
+  BookOpen,
+  Bookmark,
+  Upload,
+  GraduationCap,
+  Trophy,
+  Calculator,
+  MessageSquare,
+} from "lucide-react";
 import { signOut } from "@/server/actions/auth";
 import { useUnreadNotifications } from "@/lib/use-unread-notifications";
+import { useUnreadMessages } from "@/lib/use-unread-messages";
 import { createClient } from "@/lib/supabase/client";
 
 const pageTitles: Record<string, string> = {
@@ -20,6 +38,19 @@ const pageTitles: Record<string, string> = {
   "/notifications": "Notifications",
   "/profile": "Profile",
 };
+
+const mobileNavItems = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Materials", href: "/materials", icon: BookOpen },
+  { label: "Bookmarks", href: "/bookmarks", icon: Bookmark },
+  { label: "Upload", href: "/upload", icon: Upload },
+  { label: "Results", href: "/results", icon: GraduationCap },
+  { label: "Ranking", href: "/ranking", icon: Trophy },
+  { label: "CGPA Calculator", href: "/cgpa-calculator", icon: Calculator },
+  { label: "Conversations", href: "/messages", icon: MessageSquare },
+  { label: "Notifications", href: "/notifications", icon: Bell },
+  { label: "Profile", href: "/profile", icon: User },
+];
 
 type StudentProfilePreview = {
   fullName: string;
@@ -37,14 +68,22 @@ export function StudentHeader() {
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
   const hasUnreadNotifications = useUnreadNotifications(pathname);
+  const hasUnreadMessages = useUnreadMessages(pathname);
   const [profile, setProfile] = useState<StudentProfilePreview | null>(
     cachedStudentProfile,
   );
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     setDropdownOpen(false);
+    setDrawerOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -60,6 +99,7 @@ export function StudentHeader() {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setDropdownOpen(false);
+        setDrawerOpen(false);
       }
     };
 
@@ -71,6 +111,17 @@ export function StudentHeader() {
       document.removeEventListener("keydown", handleEscape);
     };
   }, []);
+
+  useEffect(() => {
+    if (drawerOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [drawerOpen]);
 
   useEffect(() => {
     let isMounted = true;
@@ -171,20 +222,19 @@ export function StudentHeader() {
     "Student Portal";
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-800/80 bg-[#060A12]/85 px-4 backdrop-blur-xl lg:px-6">
-      <div className="flex items-center gap-3">
-        <div className="lg:hidden">
-          <Link
-            href="/dashboard"
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-400/50 bg-emerald-500/15 font-serif text-sm font-bold text-emerald-300 shadow-sm"
-            aria-label="JTEC Academic Platform"
-          >
-            J
-          </Link>
-        </div>
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-800/80 bg-[#060A12]/85 px-3.5 sm:px-4 backdrop-blur-xl lg:px-6">
+      <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-800 bg-[#0A1020] text-slate-200 transition hover:border-emerald-500/40 hover:text-emerald-300 active:scale-95 lg:hidden"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
 
-        <div>
-          <h1 className="font-serif text-lg font-bold tracking-tight text-white">
+        <div className="min-w-0">
+          <h1 className="truncate font-serif text-base sm:text-lg font-bold tracking-tight text-white">
             {title}
           </h1>
           <p className="hidden text-[11px] text-slate-400 sm:block">
@@ -193,10 +243,11 @@ export function StudentHeader() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-2.5 sm:gap-3">
         {/* Golden Notifications Bell Icon with Radiant Unread Glow */}
         <Link
           href="/notifications"
+          prefetch={true}
           className={`relative flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 hover:-translate-y-0.5 active:scale-95 ${
             hasUnreadNotifications
               ? "border-amber-400/80 bg-amber-500/20 text-amber-300 shadow-[0_0_24px_rgba(251,191,36,0.55)] ring-2 ring-amber-400/35 hover:bg-amber-500/25"
@@ -228,7 +279,7 @@ export function StudentHeader() {
           <button
             type="button"
             onClick={() => setDropdownOpen((prev) => !prev)}
-            className="flex h-10 cursor-pointer items-center gap-2.5 rounded-xl border border-slate-800 bg-[#0A1020] pl-1.5 pr-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-emerald-500/50 hover:bg-[#0D162B] focus:outline-none active:scale-95"
+            className="flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-800 bg-[#0A1020] pl-1.5 pr-2.5 sm:pr-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-emerald-500/50 hover:bg-[#0D162B] focus:outline-none active:scale-95"
             aria-expanded={dropdownOpen}
             aria-haspopup="true"
             aria-label="Open user profile menu"
@@ -266,60 +317,183 @@ export function StudentHeader() {
             }`}
             role="menu"
           >
-              <div className="flex flex-col items-center text-center">
-                <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border-2 border-emerald-400/50 bg-emerald-500/15 font-serif text-2xl font-bold text-emerald-300 shadow-lg">
-                  {profile?.avatarUrl ? (
-                    <img
-                      src={profile.avatarUrl}
-                      alt={profile.fullName}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    profile?.fullName?.[0]?.toUpperCase() || "S"
-                  )}
-                </div>
-
-                <h3 className="mt-3 font-serif text-base font-bold text-white">
-                  {profile?.fullName || "Student"}
-                </h3>
-
-                <p className="mt-1 rounded-md border border-slate-700 bg-slate-900 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-cyan-300">
-                  ID: {profile?.studentId || "N/A"}
-                </p>
-
-                <p className="mt-1.5 text-xs text-slate-300">
-                  {profile?.departmentName} · {profile?.batchName}
-                </p>
-
-                <p className="mt-0.5 max-w-[240px] truncate text-[11px] text-slate-400">
-                  {profile?.email}
-                </p>
+            <div className="flex flex-col items-center text-center">
+              <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border-2 border-emerald-400/50 bg-emerald-500/15 font-serif text-2xl font-bold text-emerald-300 shadow-lg">
+                {profile?.avatarUrl ? (
+                  <img
+                    src={profile.avatarUrl}
+                    alt={profile.fullName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  profile?.fullName?.[0]?.toUpperCase() || "S"
+                )}
               </div>
 
-              <div className="mt-5 space-y-2 border-t border-slate-800 pt-4">
+              <h3 className="mt-3 font-serif text-base font-bold text-white">
+                {profile?.fullName || "Student"}
+              </h3>
+
+              <p className="mt-1 rounded-md border border-slate-700 bg-slate-900 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-cyan-300">
+                ID: {profile?.studentId || "N/A"}
+              </p>
+
+              <p className="mt-1.5 text-xs text-slate-300">
+                {profile?.departmentName} &middot; {profile?.batchName}
+              </p>
+
+              <p className="mt-0.5 max-w-[240px] truncate text-[11px] text-slate-400">
+                {profile?.email}
+              </p>
+            </div>
+
+            <div className="mt-5 space-y-2 border-t border-slate-800 pt-4">
+              <Link
+                href="/profile"
+                prefetch={true}
+                onClick={() => setDropdownOpen(false)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 px-4 py-2.5 text-xs font-bold text-slate-950 shadow-[0_0_16px_rgba(16,185,129,0.28)] transition hover:from-emerald-300 hover:to-emerald-400 active:scale-95"
+              >
+                <User className="h-4 w-4" />
+                <span>Go to Full Profile</span>
+                <ExternalLink className="h-3.5 w-3.5 opacity-75" />
+              </Link>
+
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={signingOut}
+                className="flex w-full disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer items-center justify-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 px-4 py-2.5 text-xs font-semibold text-rose-300 transition hover:border-rose-400 hover:bg-rose-500/25 active:scale-95"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>{signingOut ? "Signing out..." : "Logout"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Slide-Over Navigation Drawer */}
+      {mounted &&
+        createPortal(
+          <div
+            className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-250 ${
+              drawerOpen
+                ? "pointer-events-auto opacity-100"
+                : "pointer-events-none opacity-0"
+            }`}
+            aria-hidden={!drawerOpen}
+          >
+            <div
+              onClick={() => setDrawerOpen(false)}
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            />
+
+            <aside
+              className={`relative flex h-[100dvh] w-72 max-w-[82vw] flex-col border-r border-slate-800/90 bg-[#060A12] text-slate-200 shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                drawerOpen ? "translate-x-0" : "-translate-x-full"
+              }`}
+            >
+              <div className="flex h-16 items-center justify-between border-b border-slate-800/80 px-4">
                 <Link
-                  href="/profile"
-                  onClick={() => setDropdownOpen(false)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 px-4 py-2.5 text-xs font-bold text-slate-950 shadow-[0_0_16px_rgba(16,185,129,0.28)] transition hover:from-emerald-300 hover:to-emerald-400 active:scale-95"
+                  href="/dashboard"
+                  prefetch={true}
+                  onClick={() => setDrawerOpen(false)}
+                  className="flex items-center gap-3"
                 >
-                  <User className="h-4 w-4" />
-                  <span>Go to Full Profile</span>
-                  <ExternalLink className="h-3.5 w-3.5 opacity-75" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-400/50 bg-gradient-to-br from-emerald-400/25 to-cyan-500/20 font-serif text-sm font-bold text-emerald-300 shadow-[0_0_18px_rgba(16,185,129,0.25)]">
+                    J
+                  </div>
+                  <div>
+                    <p className="font-serif text-sm font-bold tracking-tight text-white">
+                      JTEC Academic
+                    </p>
+                    <p className="text-[11px] font-medium text-emerald-400/80">
+                      Student Portal
+                    </p>
+                  </div>
                 </Link>
 
                 <button
                   type="button"
-                  onClick={handleSignOut}
-                  disabled={signingOut}
-                  className="flex w-full disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer items-center justify-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 px-4 py-2.5 text-xs font-semibold text-rose-300 transition hover:border-rose-400 hover:bg-rose-500/25 active:scale-95"
+                  onClick={() => setDrawerOpen(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-800 bg-[#0A1020] text-slate-400 transition hover:border-slate-700 hover:text-white active:scale-95"
+                  aria-label="Close navigation menu"
                 >
-                  <LogOut className="h-4 w-4" />
-                  <span>{signingOut ? "Signing out..." : "Logout"}</span>
+                  <X className="h-4 w-4" />
                 </button>
               </div>
-            </div>
-        </div>
-      </div>
+
+              <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+                <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                  Navigation
+                </p>
+
+                {mobileNavItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive =
+                    pathname === item.href ||
+                    (item.href !== "/dashboard" &&
+                      pathname.startsWith(`${item.href}/`));
+                  const isNotifications = item.href === "/notifications";
+                  const isConversations = item.href === "/messages";
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      prefetch={true}
+                      onClick={() => setDrawerOpen(false)}
+                      className={`flex items-center gap-3 rounded-xl border px-3.5 py-3 text-xs font-semibold transition-all active:scale-[0.98] ${
+                        isActive
+                          ? "border-emerald-400/40 bg-gradient-to-r from-emerald-500/20 via-cyan-500/15 to-transparent text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.16)]"
+                          : isNotifications && hasUnreadNotifications
+                            ? "border-amber-400/25 bg-amber-500/8 text-amber-200"
+                            : "border-transparent text-slate-300 hover:bg-slate-900/60 hover:text-white"
+                      }`}
+                    >
+                      <Icon
+                        className={`h-4 w-4 shrink-0 ${
+                          isActive
+                            ? "text-emerald-300"
+                            : isNotifications && hasUnreadNotifications
+                              ? "text-amber-300"
+                              : "text-slate-400"
+                        }`}
+                        strokeWidth={isActive ? 2.2 : 1.8}
+                      />
+                      <span className="flex-1">{item.label}</span>
+
+                      {isNotifications && hasUnreadNotifications && (
+                        <span className="rounded-full border border-amber-400/50 bg-amber-400/15 px-2 py-0.5 text-[10px] font-bold text-amber-200">
+                          New
+                        </span>
+                      )}
+
+                      {isConversations && hasUnreadMessages && (
+                        <span className="rounded-full border border-cyan-400/50 bg-cyan-400/15 px-2 py-0.5 text-[10px] font-bold text-cyan-200">
+                          New
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              <div className="border-t border-slate-800/80 p-3">
+                <div className="rounded-xl border border-slate-800/80 bg-[#0A1020] p-3">
+                  <p className="text-xs font-semibold text-white">
+                    JTEC Academic Platform
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">
+                    Student Portal &middot; Verified Access
+                  </p>
+                </div>
+              </div>
+            </aside>
+          </div>,
+          document.body,
+        )}
     </header>
   );
 }
