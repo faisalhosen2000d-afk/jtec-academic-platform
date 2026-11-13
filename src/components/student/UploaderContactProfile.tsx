@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Send, Mail, Phone } from "lucide-react";
 import { sendProfileMessage } from "@/server/actions/profile-messages";
 import ContactMethodQr from "./ContactMethodQr";
@@ -217,6 +218,155 @@ export default function UploaderContactProfile({
 
   const deptBadge = getDepartmentBadge(departmentName || profile.department_name);
 
+  const modalContent = open ? (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+      onClick={() => setOpen(false)}
+    >
+      <div
+        className="max-h-[85vh] w-full max-w-[430px] overflow-y-auto rounded-2xl border border-emerald-500/25 bg-[#0A1020] p-5 text-slate-100 shadow-[0_24px_64px_rgba(0,0,0,0.75)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header Profile Card with Department Badge */}
+        <div className="flex items-center justify-between border-b border-slate-800/90 pb-4">
+          <div className="flex min-w-0 items-center gap-3">
+            {profile.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={profile.full_name}
+                className="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-emerald-500/35"
+              />
+            ) : (
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-gradient-to-br from-emerald-500/25 to-cyan-500/25 text-sm font-bold text-emerald-300">
+                {profile.full_name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="truncate font-serif text-base font-bold leading-tight text-white">
+                  {profile.full_name}
+                </h3>
+                {deptBadge}
+              </div>
+              <p className="mt-0.5 text-[11px] font-medium text-slate-400">
+                Contributor Contact
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="shrink-0 rounded-xl border border-slate-800 bg-[#0E172A] p-1.5 text-slate-400 transition-colors hover:border-slate-700 hover:text-white"
+            title="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Contact Methods List */}
+        <div className="mt-4 space-y-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Contact &amp; Social
+          </p>
+
+          {contactFields.map(({ key, label }) => {
+            const value = profile[key];
+            if (!value) return null;
+
+            const destination = getContactDestination(key, value);
+            const isLink =
+              destination.startsWith("http") ||
+              destination.startsWith("mailto:") ||
+              destination.startsWith("tel:");
+
+            return (
+              <div
+                key={key}
+                className="flex items-center justify-between gap-2.5 rounded-xl border border-slate-800/90 bg-[#0E172A] px-3 py-2.5 transition-colors hover:border-slate-700"
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-700/70 bg-[#0A1020]">
+                    {getContactIcon(key)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-[10px] font-semibold uppercase leading-none text-slate-400">
+                      {label}
+                    </span>
+                    {isLink ? (
+                      <a
+                        href={destination}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 block truncate text-xs font-medium text-slate-100 hover:text-emerald-300 hover:underline"
+                        title={value}
+                      >
+                        {value}
+                      </a>
+                    ) : (
+                      <span
+                        className="mt-1 block truncate text-xs font-medium text-slate-100"
+                        title={value}
+                      >
+                        {value}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="shrink-0">
+                  <ContactMethodQr
+                    label={label}
+                    value={value}
+                    destination={destination}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Direct Message */}
+        <div className="mt-4 border-t border-slate-800/90 pt-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Direct Message
+          </p>
+
+          <textarea
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            placeholder="Write a message to this student..."
+            maxLength={2000}
+            rows={2}
+            className="mt-2 w-full rounded-xl border border-slate-800 bg-[#0E172A] p-3 text-xs text-slate-100 placeholder:text-slate-500 transition outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20"
+          />
+
+          <button
+            type="button"
+            disabled={sending || !message.trim()}
+            onClick={handleSubmit}
+            className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-400 py-2.5 text-xs font-bold text-slate-950 shadow-[0_0_20px_rgba(52,211,153,0.25)] transition hover:bg-emerald-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <Send className="h-3.5 w-3.5" />
+            {sending ? "Sending..." : "Send Message"}
+          </button>
+
+          {status && (
+            <p
+              className={`mt-2 text-center text-xs font-medium ${
+                status.includes("success")
+                  ? "text-emerald-400"
+                  : "text-rose-400"
+              }`}
+            >
+              {status}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <>
       <button
@@ -228,7 +378,7 @@ export default function UploaderContactProfile({
           <img
             src={profile.avatar_url}
             alt={profile.full_name}
-            className="h-9 w-9 rounded-full object-cover"
+            className="h-9 w-9 rounded-full object-cover ring-1 ring-slate-700"
           />
         ) : (
           <div className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-sm font-semibold text-slate-200">
@@ -244,154 +394,9 @@ export default function UploaderContactProfile({
         </div>
       </button>
 
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-150"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="max-h-[82vh] w-full max-w-[420px] overflow-y-auto rounded-2xl border border-slate-800 bg-[#0A1020] text-slate-100 p-5 shadow-2xl animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header Profile Card with Department Badge */}
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3.5">
-              <div className="flex items-center gap-3 min-w-0">
-                {profile.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt={profile.full_name}
-                    className="h-10 w-10 rounded-full object-cover ring-2 ring-blue-500/20 shadow-xs shrink-0"
-                  />
-                ) : (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-sm font-bold text-white shadow-xs">
-                    {profile.full_name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
-                      {profile.full_name}
-                    </h3>
-                    {deptBadge}
-                  </div>
-                  <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Contributor Contact
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 shrink-0"
-                title="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Contact Methods List with Official Branded Icons */}
-            <div className="mt-3.5 space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                Contact & Social
-              </p>
-
-              {contactFields.map(({ key, label }) => {
-                const value = profile[key];
-                if (!value) return null;
-
-                const destination = getContactDestination(key, value);
-                const isLink =
-                  destination.startsWith("http") ||
-                  destination.startsWith("mailto:") ||
-                  destination.startsWith("tel:");
-
-                return (
-                  <div
-                    key={key}
-                    className="flex items-center justify-between gap-2.5 rounded-xl border border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-800/40 px-3 py-2 transition-colors hover:border-zinc-200 dark:hover:border-zinc-700"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-zinc-800 shadow-xs border border-zinc-100 dark:border-zinc-700/60">
-                        {getContactIcon(key)}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <span className="block text-[10px] font-semibold uppercase leading-none text-zinc-400 dark:text-zinc-500">
-                          {label}
-                        </span>
-                        {isLink ? (
-                          <a
-                            href={destination}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-0.5 block truncate text-xs font-medium text-zinc-800 dark:text-zinc-200 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
-                            title={value}
-                          >
-                            {value}
-                          </a>
-                        ) : (
-                          <span
-                            className="mt-0.5 block truncate text-xs font-medium text-zinc-800 dark:text-zinc-200"
-                            title={value}
-                          >
-                            {value}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="shrink-0">
-                      <ContactMethodQr
-                        label={label}
-                        value={value}
-                        destination={destination}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Direct Message */}
-            <div className="mt-4 border-t border-zinc-100 dark:border-zinc-800 pt-3.5">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                Direct Message
-              </p>
-
-              <textarea
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                placeholder="Write a message to this student..."
-                maxLength={2000}
-                rows={2}
-                className="mt-2 w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/40 p-2.5 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 transition outline-none focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-blue-500/20"
-              />
-
-              <button
-                type="button"
-                disabled={sending || !message.trim()}
-                onClick={handleSubmit}
-                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 py-2 text-xs font-semibold text-white shadow-xs transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Send className="h-3 w-3" />
-                {sending ? "Sending..." : "Send Message"}
-              </button>
-
-              {status && (
-                <p
-                  className={`mt-2 text-center text-xs font-medium ${
-                    status.includes("success")
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-rose-600 dark:text-rose-400"
-                  }`}
-                >
-                  {status}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {typeof document !== "undefined" && modalContent
+        ? createPortal(modalContent, document.body)
+        : null}
     </>
   );
 }
