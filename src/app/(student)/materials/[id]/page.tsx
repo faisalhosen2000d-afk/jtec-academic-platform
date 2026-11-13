@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { StudentSidebar } from "@/components/dashboard/student-sidebar";
-import { StudentHeader } from "@/components/dashboard/student-header";
 import MaterialFileActions from "./MaterialFileActions";
 import MaterialBookmarkButton from "./MaterialBookmarkButton";
 import MaterialRating from "@/components/materials/MaterialRating";
@@ -150,7 +148,7 @@ export default async function MaterialDetailsPage({
   const shortType = formatFileType(materialData.file_type).slice(0, 4);
 
   return (
-    <div className="min-h-screen bg-[#060A12] text-slate-100">
+    <div className="min-h-full bg-[#060A12] text-slate-100">
       <style>{`
         @keyframes dashFadeUp {
           from { opacity: 0; transform: translateY(10px); }
@@ -164,11 +162,9 @@ export default async function MaterialDetailsPage({
         }
       `}</style>
 
-      <div className="flex min-h-screen">
-        <StudentSidebar />
+      <div className="flex min-h-full">
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <StudentHeader />
 
           <main className="flex-1 p-4 sm:p-6">
             <div className="mx-auto w-full max-w-4xl space-y-5">

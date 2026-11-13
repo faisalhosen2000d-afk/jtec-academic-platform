@@ -1,8 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { BadgeCheck, Mail, ShieldCheck, User } from "lucide-react";
-import { StudentSidebar } from "@/components/dashboard/student-sidebar";
-import { StudentHeader } from "@/components/dashboard/student-header";
 import StudentContactSettings from "@/components/student/StudentContactSettings";
 import StudentProfilePhoto from "@/components/student/StudentProfilePhoto";
 import StudentFullNameEditor from "@/components/student/StudentFullNameEditor";
@@ -56,7 +54,7 @@ export default async function StudentProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#060A12] text-slate-100">
+    <div className="min-h-full bg-[#060A12] text-slate-100">
       <style>{`
         @keyframes dashFadeUp {
           from { opacity: 0; transform: translateY(10px); }
@@ -67,11 +65,9 @@ export default async function StudentProfilePage() {
         .dash-stagger-3 { animation: dashFadeUp 0.45s ease-out 0.16s both; }
         .dash-stagger-4 { animation: dashFadeUp 0.45s ease-out 0.24s both; }
       `}</style>
-      <div className="flex min-h-screen">
-        <StudentSidebar />
+      <div className="flex min-h-full">
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <StudentHeader />
 
           <main className="flex-1 p-5 sm:p-6">
             <div className="mx-auto max-w-3xl space-y-5">

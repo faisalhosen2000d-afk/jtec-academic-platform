@@ -1,8 +1,6 @@
 import { redirect } from "next/navigation";
 import { Bell } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { StudentSidebar } from "@/components/dashboard/student-sidebar";
-import { StudentHeader } from "@/components/dashboard/student-header";
 import StudentNotificationsList from "./StudentNotificationsList";
 
 export default async function StudentNotificationsPage() {
@@ -27,7 +25,7 @@ export default async function StudentNotificationsPage() {
   const unreadCount = (notifications ?? []).filter((n) => !n.is_read).length;
 
   return (
-    <div className="min-h-screen bg-[#060A12] text-slate-100">
+    <div className="min-h-full bg-[#060A12] text-slate-100">
       <style>{`
         @keyframes dashFadeUp {
           from { opacity: 0; transform: translateY(10px); }
@@ -36,11 +34,9 @@ export default async function StudentNotificationsPage() {
         .dash-stagger-1 { animation: dashFadeUp 0.45s ease-out both; }
         .dash-stagger-2 { animation: dashFadeUp 0.45s ease-out 0.08s both; }
       `}</style>
-      <div className="flex min-h-screen">
-        <StudentSidebar />
+      <div className="flex min-h-full">
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <StudentHeader />
 
           <main className="flex-1 p-5 sm:p-6">
             <div className="mx-auto w-full max-w-4xl space-y-5">

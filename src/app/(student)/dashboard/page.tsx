@@ -14,8 +14,6 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-import { StudentSidebar } from "@/components/dashboard/student-sidebar";
-import { StudentHeader } from "@/components/dashboard/student-header";
 import NoticeList from "@/components/dashboard/NoticeList";
 import { CollapsibleSectionCard } from "@/components/dashboard/CollapsibleSectionCard";
 import {
@@ -396,7 +394,7 @@ export default async function StudentDashboardPage() {
   const greeting = getBDTimeGreeting();
 
   return (
-    <div className="min-h-screen bg-[#060A12] text-slate-100">
+    <div className="min-h-full bg-[#060A12] text-slate-100">
       <style>{`
         @keyframes dashFadeUp {
           from {
@@ -414,11 +412,9 @@ export default async function StudentDashboardPage() {
         .dash-stagger-4 { animation: dashFadeUp 0.45s ease-out 0.24s both; }
       `}</style>
 
-      <div className="flex min-h-screen">
-        <StudentSidebar />
+      <div className="flex min-h-full">
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <StudentHeader />
 
           <main className="relative flex-1 p-5 sm:p-6 lg:p-8">
             <div className="pointer-events-none fixed inset-0 overflow-hidden">

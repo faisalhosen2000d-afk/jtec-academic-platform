@@ -12,8 +12,6 @@ import {
   UploadCloud,
 } from "lucide-react";
 import UploadForm from "./UploadForm";
-import { StudentSidebar } from "@/components/dashboard/student-sidebar";
-import { StudentHeader } from "@/components/dashboard/student-header";
 
 export default async function UploadPage() {
   const supabase = await createClient();
@@ -108,7 +106,7 @@ export default async function UploadPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#060A12] text-slate-100">
+    <div className="min-h-full bg-[#060A12] text-slate-100">
       <style>{`
         @keyframes dashFadeUp {
           from { opacity: 0; transform: translateY(10px); }
@@ -118,11 +116,9 @@ export default async function UploadPage() {
         .dash-stagger-2 { animation: dashFadeUp 0.45s ease-out 0.08s both; }
         .dash-stagger-3 { animation: dashFadeUp 0.45s ease-out 0.16s both; }
       `}</style>
-      <div className="flex min-h-screen">
-        <StudentSidebar />
+      <div className="flex min-h-full">
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <StudentHeader />
 
           <main className="flex-1 p-6">
             <div className="mx-auto w-full max-w-3xl space-y-5">

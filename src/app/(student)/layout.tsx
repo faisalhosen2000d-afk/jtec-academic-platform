@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { StudentMaintenanceView } from "@/components/StudentMaintenanceView";
 import { getActivePlatformSettings, isMaintenanceCurrentlyActive, isStudentAuthorizedBypass } from "@/lib/platform-settings";
 import { StudentAccessGateWrapper } from "@/components/student/StudentAccessGateWrapper";
+import { StudentSidebar } from "@/components/dashboard/student-sidebar";
+import { StudentHeader } from "@/components/dashboard/student-header";
 import { Clock, AlertCircle, ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -114,12 +116,25 @@ export default async function StudentLayout({ children }: { children: ReactNode 
         </div>
       )}
 
-      <StudentAccessGateWrapper userId={user.id}
+      <StudentAccessGateWrapper
+        userId={user.id}
         isApproved={isApproved}
         verificationStatus={profile?.verification_status}
         rejectionReason={profile?.verification_rejection_reason}
       >
-        {children}
+        <div className="min-h-screen bg-[#060A12] text-slate-100">
+          <div className="flex min-h-screen">
+            <StudentSidebar />
+
+            <div className="flex min-w-0 flex-1 flex-col">
+              <StudentHeader />
+
+              <div className="flex flex-1 flex-col">
+                {children}
+              </div>
+            </div>
+          </div>
+        </div>
       </StudentAccessGateWrapper>
     </>
   );
