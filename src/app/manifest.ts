@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "JTEC Academic",
     description:
       "The academic platform for Jhenaidah Textile Engineering College — materials, notices, results, and rankings in one place.",
-    start_url: "/dashboard",
+    start_url: "/",
     display: "standalone",
     background_color: "#060A12",
     theme_color: "#060A12",
