@@ -10,8 +10,8 @@ export const metadata: Metadata = {
   description:
     "The academic platform for Jhenaidah Textile Engineering College — materials, notices, results, and rankings in one place.",
   icons: {
-    icon: "/jtec-logo.png",
-    apple: "/jtec-logo.png",
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
   },
   appleWebApp: {
     capable: true,
