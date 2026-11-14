@@ -24,7 +24,7 @@ export default function ContactMethodQr({
       onClick={() => setOpen(false)}
     >
       <div
-        className="w-full max-w-sm rounded-2xl border border-emerald-500/25 bg-[#0A1020] p-6 text-slate-100 shadow-[0_24px_64px_rgba(0,0,0,0.8)]"
+        className="max-h-[88dvh] w-full max-w-sm overflow-y-auto rounded-2xl border border-emerald-500/25 bg-[#0A1020] p-4 sm:p-6 text-slate-100 shadow-[0_24px_64px_rgba(0,0,0,0.8)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-800/90 pb-4">

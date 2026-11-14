@@ -200,7 +200,7 @@ export default function MaterialCard({
   const badge = getFileTypeBadge(material.file_type, material.title);
 
   return (
-    <article className="group flex flex-col justify-between rounded-2xl border border-slate-800/90 bg-[#0A1020] p-5 shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/45 hover:bg-[#0D162B] hover:shadow-[0_14px_34px_rgba(16,185,129,0.12)]">
+    <article className="group flex flex-col justify-between rounded-2xl border border-slate-800/90 bg-[#0A1020] p-4 sm:p-5 shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/45 hover:bg-[#0D162B] hover:shadow-[0_14px_34px_rgba(16,185,129,0.12)]">
       <div>
         {/* Top Row: File Badge + Subject Pill + Bookmark */}
         <div className="flex items-start justify-between gap-2">

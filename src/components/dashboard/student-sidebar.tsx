@@ -112,7 +112,7 @@ export function StudentSidebar() {
   }, [activeIndex]);
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-slate-800/80 bg-[#060A12] text-slate-200 lg:flex lg:min-h-screen lg:flex-col">
+    <aside data-student-sidebar="true" className="hidden w-64 shrink-0 border-r border-slate-800/80 bg-[#060A12] text-slate-200 lg:flex lg:min-h-screen lg:flex-col">
       <div className="flex h-16 items-center border-b border-slate-800/80 px-6">
         <Link
           href="/dashboard"

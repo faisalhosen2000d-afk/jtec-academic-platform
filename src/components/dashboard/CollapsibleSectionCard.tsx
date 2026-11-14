@@ -55,13 +55,13 @@ export function CollapsibleSectionCard({
 
   return (
     <section
-      className={`rounded-2xl border border-slate-800/90 bg-[#0A1020] p-6 shadow-xl transition-all duration-200 ${borderHoverCls} ${className}`}
+      className={`rounded-2xl border border-slate-800/90 bg-[#0A1020] p-4 sm:p-6 shadow-xl transition-all duration-200 ${borderHoverCls} ${className}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {icon}
           <div>
-            <h3 className="font-serif text-lg font-bold text-white">{title}</h3>
+            <h3 className="font-serif text-base sm:text-lg font-bold text-white">{title}</h3>
             {subtitle && !collapsed ? (
               <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>
             ) : null}
