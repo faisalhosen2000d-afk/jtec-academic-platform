@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
@@ -166,6 +167,7 @@ export async function POST(request: Request) {
     const fileName = String(body.file_name ?? "").trim();
     const fileType = String(body.file_type ?? "").trim() || "application/octet-stream";
     const fileSize = Number(body.file_size ?? 0);
+    const fileHash = String(body.file_hash ?? "").trim().toLowerCase();
 
     if (!subjectId) {
       return jsonError("Please select a subject.");
@@ -222,6 +224,28 @@ export async function POST(request: Request) {
       return jsonError("Invalid storage file path.");
     }
 
+    if (fileHash && !/^[a-f0-9]{64}$/.test(fileHash)) {
+      return jsonError("Invalid file fingerprint.");
+    }
+
+    if (fileHash) {
+      const serviceSupabase = createServiceRoleClient();
+      const { data: existingDuplicate } = await serviceSupabase
+        .from("materials")
+        .select("id, title, status")
+        .eq("file_hash", fileHash)
+        .in("status", ["approved", "pending"])
+        .limit(1)
+        .maybeSingle();
+
+      if (existingDuplicate) {
+        return NextResponse.json(
+          { error: `This exact file has already been uploaded ("${existingDuplicate.title}"). Duplicate files are not allowed.` },
+          { status: 409 }
+        );
+      }
+    }
+
     if (action === "prepare") {
       return NextResponse.json({
         success: true,
@@ -247,6 +271,7 @@ export async function POST(request: Request) {
         file_path: filePath,
         file_type: fileType,
         file_size_bytes: fileSize,
+        file_hash: fileHash || null,
         status: "pending",
       })
       .select("id, title, status, file_path, created_at")

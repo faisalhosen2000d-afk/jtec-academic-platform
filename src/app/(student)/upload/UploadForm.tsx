@@ -188,6 +188,9 @@ export default function UploadForm({
     try {
       setSubmitting(true);
 
+      const hashBuffer = await window.crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+      const fileHash = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+
       const metadata = {
         subject_id: selectedSubjectId,
         title: title.trim(),
@@ -196,6 +199,7 @@ export default function UploadForm({
         file_name: file.name,
         file_type: file.type || "application/octet-stream",
         file_size: file.size,
+        file_hash: fileHash,
       };
 
       const prepareResponse = await fetch("/api/materials/upload", {
