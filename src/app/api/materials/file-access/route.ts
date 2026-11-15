@@ -210,10 +210,7 @@ export async function POST(request: Request) {
      *
      * Bucket remains private.
      */
-    const { data: signedUrlData, error: signedUrlError } =
-      await serviceSupabase.storage
-        .from("academic-materials")
-        .createSignedUrl(material.file_path, 300, { download: body.action === "download" });
+    const normalizedPath = material.file_path.replace(/^\/+/, "").replace(/^academic-materials\//, ""); const { data: signedUrlData, error: signedUrlError } = await serviceSupabase.storage.from("academic-materials").createSignedUrl(normalizedPath, 300, { download: body.action === "download" });
 
     if (signedUrlError || !signedUrlData?.signedUrl) {
       console.error(
@@ -224,7 +221,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Unable to create secure access to the material file.",
+          error: signedUrlError?.message ? `Unable to access file: ${signedUrlError.message}` : "Unable to create secure access to the material file.",
         },
         { status: 500 }
       );
