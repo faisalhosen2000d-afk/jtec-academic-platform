@@ -96,7 +96,7 @@ export async function POST(request: Request) {
     const parts: GeminiPart[] = [];
 
     const ft = (material.file_type || "").toLowerCase();
-    const hasCachedContext = Boolean(material.ai_summary_en || material.ai_summary_bn); const canAttachInline = !(mode === "ask" && hasCachedContext) &&
+    const canAttachInline =
       material.file_path &&
       material.file_size_bytes <= 10 * 1024 * 1024 &&
       (ft.includes("pdf") || ft.includes("image") || ft.includes("text/plain"));
