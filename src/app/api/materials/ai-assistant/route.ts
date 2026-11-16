@@ -109,7 +109,7 @@ export async function POST(request: Request) {
 
     if (mode === "summary_en") {
       parts.push({
-        text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nProvide a clear, well-structured study summary in English with concise bullet points covering key concepts, definitions, and formulas from this material. Keep it scannable and under 280 words.`,
+        text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nProvide a clear, well-structured study summary in English with concise bullet points covering key concepts, definitions, and formulas from this material. Keep it scannable and under 280 words. Write formulas in plain readable math notation (use ×, ÷, ≈, μ, /, %) and NEVER use LaTeX syntax like $, $, \frac, or \text.`,
       });
       const content = await callGemini(parts);
       await serviceSupabase.from("materials").update({ ai_summary_en: content } as never).eq("id", material.id);
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
 
     if (mode === "summary_bn") {
       parts.push({
-        text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nএই ম্যাটেরিয়ালটির মূল বিষয়বস্তু, সংজ্ঞা ও গুরুত্বপূর্ণ সূত্রগুলো সহজ ও প্রাঞ্জল বাংলায় (প্রয়োজনীয় ইংরেজি টেকনিক্যাল টার্ম পাশে রেখে) বুলেট পয়েন্টে সংক্ষেপে বুঝিয়ে দিন। ২৫০ শব্দের মধ্যে রাখুন।`,
+        text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nএই ম্যাটেরিয়ালটির মূল বিষয়বস্তু, সংজ্ঞা ও গুরুত্বপূর্ণ সূত্রগুলো সহজ ও প্রাঞ্জল বাংলায় (প্রয়োজনীয় ইংরেজি টেকনিক্যাল টার্ম পাশে রেখে) বুলেট পয়েন্টে সংক্ষেপে বুঝিয়ে দিন। ২৫০ শব্দের মধ্যে রাখুন। সূত্রগুলো সাধারণ পড়া যায় এমনভাবে লিখুন (যেমন ×, ÷, ≈, μ, / ব্যবহার করুন), কখনোই LaTeX ($, $, \frac, \text) ব্যবহার করবেন না।`,
       });
       const content = await callGemini(parts);
       await serviceSupabase.from("materials").update({ ai_summary_bn: content } as never).eq("id", material.id);

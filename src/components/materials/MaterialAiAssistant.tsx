@@ -15,6 +15,97 @@ type MaterialAiAssistantProps = {
   initialQuestions: PracticeQuestion[] | null;
 };
 
+function cleanMathAndLatex(text: string): string {
+  return text
+    .replace(/\$\$([\s\S]*?)\$\$/g, "$1")
+    .replace(/\$([^$]+)\$/g, "$1")
+    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, "($1) / ($2)")
+    .replace(/\\text\{([^}]+)\}/g, "$1")
+    .replace(/\\approx/g, "≈")
+    .replace(/\\times/g, "×")
+    .replace(/\\cdot/g, "·")
+    .replace(/\\mu/g, "μ")
+    .replace(/\\pm/g, "±")
+    .replace(/\\leq/g, "≤")
+    .replace(/\\geq/g, "≥")
+    .replace(/\\div/g, "÷")
+    .replace(/\\\{/g, "{")
+    .replace(/\\\}/g, "}")
+    .replace(/\\%/g, "%")
+    .replace(/\{--\}/g, "–")
+    .replace(/\\([a-zA-Z]+)/g, "$1");
+}
+
+function renderInlineFormatting(line: string) {
+  const cleaned = cleanMathAndLatex(line);
+  const parts = cleaned.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return (
+        <strong key={i} className="font-semibold text-white">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
+      return (
+        <em key={i} className="italic text-cyan-200/90">
+          {part.slice(1, -1)}
+        </em>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
+function FormattedAiContent({ content }: { content: string }) {
+  const lines = content.split(/\r?\n/);
+
+  return (
+    <div className="space-y-2 text-xs sm:text-sm leading-relaxed text-slate-200">
+      {lines.map((rawLine, idx) => {
+        const line = rawLine.trim();
+        if (!line) return <div key={idx} className="h-1" />;
+
+        if (/^---+$/.test(line)) {
+          return <hr key={idx} className="my-2 border-slate-800/90" />;
+        }
+
+        if (line.startsWith("#### ")) {
+          return (
+            <h5 key={idx} className="pt-2 text-xs sm:text-sm font-bold text-cyan-300">
+              {renderInlineFormatting(line.slice(5))}
+            </h5>
+          );
+        }
+
+        if (line.startsWith("### ") || line.startsWith("## ")) {
+          const text = line.replace(/^#{2,3}\s+/, "");
+          return (
+            <h4 key={idx} className="pt-2 text-sm sm:text-base font-bold text-emerald-300">
+              {renderInlineFormatting(text)}
+            </h4>
+          );
+        }
+
+        const bulletMatch = rawLine.match(/^(\s*)(\*|-|\d+\.)\s+(.*)$/);
+        if (bulletMatch) {
+          const indent = (bulletMatch[1] ?? "").length >= 2;
+          const marker = bulletMatch[2] === "*" || bulletMatch[2] === "-" ? "•" : bulletMatch[2];
+          return (
+            <div key={idx} className={`flex items-start gap-2 ${indent ? "pl-4" : ""}`}>
+              <span className="mt-0.5 shrink-0 font-bold text-cyan-400">{marker}</span>
+              <span className="flex-1">{renderInlineFormatting(bulletMatch[3] ?? "")}</span>
+            </div>
+          );
+        }
+
+        return <p key={idx}>{renderInlineFormatting(line)}</p>;
+      })}
+    </div>
+  );
+}
+
 export default function MaterialAiAssistant({
   materialId,
   initialSummaryEn,
@@ -157,14 +248,14 @@ export default function MaterialAiAssistant({
       )}
 
       {!loadingTab && activeTab === "summary_en" && summaryEn && (
-        <div className="mt-4 rounded-xl border border-slate-800/90 bg-[#0A1020] p-4 text-xs sm:text-sm leading-relaxed text-slate-200 whitespace-pre-wrap">
-          {summaryEn}
+        <div className="mt-4 rounded-xl border border-slate-800/90 bg-[#0A1020] p-4">
+          <FormattedAiContent content={summaryEn} />
         </div>
       )}
 
       {!loadingTab && activeTab === "summary_bn" && summaryBn && (
-        <div className="mt-4 rounded-xl border border-slate-800/90 bg-[#0A1020] p-4 text-xs sm:text-sm leading-relaxed text-slate-200 whitespace-pre-wrap">
-          {summaryBn}
+        <div className="mt-4 rounded-xl border border-slate-800/90 bg-[#0A1020] p-4">
+          <FormattedAiContent content={summaryBn} />
         </div>
       )}
 
@@ -174,7 +265,7 @@ export default function MaterialAiAssistant({
             <div key={idx} className="rounded-xl border border-slate-800/90 bg-[#0A1020] p-3.5">
               <p className="text-xs sm:text-sm font-medium text-slate-100">
                 <span className="mr-1.5 font-bold text-violet-300">Q{idx + 1}.</span>
-                {item.q}
+                {cleanMathAndLatex(item.q)}
               </p>
               <button
                 type="button"
@@ -185,9 +276,9 @@ export default function MaterialAiAssistant({
                 {openHints[idx] ? "Hide Answer Hint" : "Show Answer Hint"}
               </button>
               {openHints[idx] && (
-                <p className="mt-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5 text-xs text-slate-300">
-                  {item.hint}
-                </p>
+                <div className="mt-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5 text-xs text-slate-300">
+                  <FormattedAiContent content={item.hint} />
+                </div>
               )}
             </div>
           ))}
@@ -214,9 +305,9 @@ export default function MaterialAiAssistant({
       </form>
 
       {qaResult && (
-        <div className="mt-3 rounded-xl border border-violet-500/25 bg-[#0A1020] p-3.5 text-xs sm:text-sm">
-          <p className="font-semibold text-violet-300">Q: {qaResult.q}</p>
-          <p className="mt-1.5 whitespace-pre-wrap leading-relaxed text-slate-200">{qaResult.a}</p>
+        <div className="mt-3 rounded-xl border border-violet-500/25 bg-[#0A1020] p-3.5">
+          <p className="mb-2 text-xs sm:text-sm font-semibold text-violet-300">Q: {qaResult.q}</p>
+          <FormattedAiContent content={qaResult.a} />
         </div>
       )}
 
