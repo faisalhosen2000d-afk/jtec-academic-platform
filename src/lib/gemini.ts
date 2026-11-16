@@ -32,7 +32,6 @@ export async function callGemini(parts: GeminiPart[], options?: { jsonMode?: boo
             contents: [{ parts }],
             generationConfig: {
               temperature: 0.35,
-              thinkingConfig: { thinkingBudget: 0 },
               ...(options?.jsonMode ? { responseMimeType: "application/json" } : {}),
             },
           }),
@@ -52,34 +51,7 @@ export async function callGemini(parts: GeminiPart[], options?: { jsonMode?: boo
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        const msg = data?.error?.message || `Gemini API error (${response.status})`;
-        if (msg.toLowerCase().includes("thinking")) {
-          const retryRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-            {
-              method: "POST",
-              headers: {
-                "x-goog-api-key": apiKey,
-                "Content-Type": "application/json",
-              },
-              signal: AbortSignal.timeout(15000),
-              body: JSON.stringify({
-                contents: [{ parts }],
-                generationConfig: {
-                  temperature: 0.35,
-                  ...(options?.jsonMode ? { responseMimeType: "application/json" } : {}),
-                },
-              }),
-            }
-          );
-          const retryData = await retryRes.json().catch(() => null);
-          const retryText = retryData?.candidates?.[0]?.content?.parts
-            ?.map((p: { text?: string }) => p.text ?? "")
-            .join("")
-            .trim();
-          if (retryRes.ok && retryText) return retryText;
-        }
-        lastError = msg;
+        lastError = data?.error?.message || `Gemini API error (${response.status})`;
         continue;
       }
 

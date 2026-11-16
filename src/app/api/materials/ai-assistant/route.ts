@@ -96,7 +96,7 @@ export async function POST(request: Request) {
     const parts: GeminiPart[] = [];
 
     const ft = (material.file_type || "").toLowerCase();
-    const canAttachInline =
+    const hasCachedContext = Boolean(material.ai_summary_en || material.ai_summary_bn); const canAttachInline = !(mode === "ask" && hasCachedContext) &&
       material.file_path &&
       material.file_size_bytes <= 10 * 1024 * 1024 &&
       (ft.includes("pdf") || ft.includes("image") || ft.includes("text/plain"));
@@ -155,7 +155,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, cached: false, questions });
     }
 
-    const extraSummary = material.ai_summary_en ? `\nCached Summary:\n${material.ai_summary_en}` : "";
+    const extraSummary = [material.ai_summary_en ? `\nSummary (EN):\n${material.ai_summary_en}` : "", material.ai_summary_bn ? `\nSummary (BN):\n${material.ai_summary_bn}` : ""].filter(Boolean).join("");
     parts.push({
       text: `You are a helpful academic tutor for JTEC textile engineering students.\n${contextHeader}${extraSummary}\n\nStudent Question: ${question}\n\nAnswer clearly and concisely in the same language as the student's question (Bangla or English). Write formulas plainly (e.g., A_T, x^2, /) and NEVER use LaTeX like $, $$, \\frac, or \\text.`,
     });
