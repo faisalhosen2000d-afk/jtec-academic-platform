@@ -19,7 +19,7 @@ function cleanMathAndLatex(text: string): string {
   let out = text
     .replace(/\$\$([\s\S]*?)\$\$/g, "$1")
     .replace(/\$([^$]+)\$/g, "$1")
-    .replace(/\\%/g, "%")
+    .replace(/\\%/g, "%").replace(/\\text\{--\}/g, "\u2013").replace(/\\text/g, "")
     .replace(/\{--\}/g, "\u2013")
     .replace(/(\d)\s*--\s*(\d)/g, "$1\u2013$2")
     .replace(/\\text\{([^{}]*)\}/g, "$1")
