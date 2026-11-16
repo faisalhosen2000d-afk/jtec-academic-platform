@@ -1,11 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { Sparkles, BookOpen, Languages, HelpCircle, Send, ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Sparkles, BookOpen, Languages, HelpCircle, Send, ChevronDown, Trash2 } from "lucide-react";
 
 type PracticeQuestion = {
   q: string;
   hint: string;
+};
+
+type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  isStreaming?: boolean;
 };
 
 type MaterialAiAssistantProps = {
@@ -15,15 +22,21 @@ type MaterialAiAssistantProps = {
   initialQuestions: PracticeQuestion[] | null;
 };
 
+const QUICK_PROMPTS = [
+  "Explain simply",
+  "Important formulas?",
+  "Key exam tips?",
+];
+
 function cleanMathAndLatex(text: string): string {
   let out = text
     .replace(/\$\$([\s\S]*?)\$\$/g, "$1")
     .replace(/\$([^$]+)\$/g, "$1")
-    .replace(/\\%/g, "%").replace(/\\text\{--\}/g, "\u2013").replace(/\\text/g, "")
+    .replace(/\\%/g, "%")
+    .replace(/\\text\{--\}/g, "\u2013")
+    .replace(/\\text/g, "")
     .replace(/\{--\}/g, "\u2013")
     .replace(/(\d)\s*--\s*(\d)/g, "$1\u2013$2")
-    .replace(/\\text\{([^{}]*)\}/g, "$1")
-    .replace(/\\text\{([^{}]*)\}/g, "$1")
     .replace(/\\approx/g, "\u2248")
     .replace(/\\times/g, "\u00D7")
     .replace(/\\cdot/g, "\u00B7")
@@ -39,6 +52,7 @@ function cleanMathAndLatex(text: string): string {
   out = out
     .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, "($1) / ($2)")
     .replace(/(?:^|[^a-zA-Z])frac\{([^}]+)\}\{([^}]+)\}/g, " ($1) / ($2)")
+    .replace(/\{([^{}]+)\}/g, "$1")
     .replace(/\\([a-zA-Z]+)/g, "$1");
 
   return out;
@@ -166,8 +180,39 @@ export default function MaterialAiAssistant({
 
   const [questionInput, setQuestionInput] = useState("");
   const [asking, setAsking] = useState(false);
-  const [qaResult, setQaResult] = useState<{ q: string; a: string } | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const streamTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (streamTimerRef.current) clearInterval(streamTimerRef.current);
+    };
+  }, []);
+
+  function streamAssistantReply(msgId: string, fullText: string) {
+    if (streamTimerRef.current) clearInterval(streamTimerRef.current);
+    const words = fullText.split(/(\s+)/);
+    let cursor = 0;
+    const step = words.length > 120 ? 5 : 3;
+
+    streamTimerRef.current = setInterval(() => {
+      cursor = Math.min(words.length, cursor + step);
+      const partial = words.slice(0, cursor).join("");
+      const done = cursor >= words.length;
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === msgId ? { ...m, content: partial, isStreaming: !done } : m
+        )
+      );
+
+      if (done && streamTimerRef.current) {
+        clearInterval(streamTimerRef.current);
+        streamTimerRef.current = null;
+      }
+    }, 22);
+  }
 
   async function handleSelectTab(mode: "summary_en" | "summary_bn" | "questions") {
     setError(null);
@@ -198,13 +243,23 @@ export default function MaterialAiAssistant({
     }
   }
 
-  async function handleAsk(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = questionInput.trim();
+  async function submitQuestion(rawQuestion: string) {
+    const trimmed = rawQuestion.trim();
     if (!trimmed || asking) return;
 
     setError(null);
     setAsking(true);
+    setQuestionInput("");
+
+    const userMsgId = `u-${Date.now()}`;
+    const aiMsgId = `a-${Date.now()}`;
+
+    setMessages((prev) => [
+      ...prev,
+      { id: userMsgId, role: "user", content: trimmed },
+      { id: aiMsgId, role: "assistant", content: "", isStreaming: true },
+    ]);
+
     try {
       const res = await fetch("/api/materials/ai-assistant", {
         method: "POST",
@@ -215,20 +270,27 @@ export default function MaterialAiAssistant({
       if (!res.ok || !data.success) {
         throw new Error(data?.error || "Could not get an answer.");
       }
-      setQaResult({ q: trimmed, a: data.answer });
-      setQuestionInput("");
+      streamAssistantReply(aiMsgId, String(data.answer || ""));
     } catch (err) {
+      setMessages((prev) => prev.filter((m) => m.id !== aiMsgId));
       setError(err instanceof Error ? err.message : "AI request failed.");
     } finally {
       setAsking(false);
     }
   }
 
+  function handleAsk(e: React.FormEvent) {
+    e.preventDefault();
+    void submitQuestion(questionInput);
+  }
+
   return (
-    <div className="rounded-2xl border border-violet-500/25 bg-[#0E172A]/80 p-4 sm:p-5 transition-all duration-200 hover:border-violet-400/40">
+    <div className="relative overflow-hidden rounded-2xl border border-violet-500/25 bg-[#0E172A]/85 p-4 sm:p-5 transition-all duration-200 hover:border-violet-400/40">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-400/50 to-transparent" />
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-violet-400/35 bg-violet-500/15 text-violet-300">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-violet-400/35 bg-gradient-to-br from-violet-500/25 to-cyan-500/20 text-violet-200 shadow-[0_0_16px_rgba(139,92,246,0.25)]">
             <Sparkles className="h-4 w-4" />
           </div>
           <div>
@@ -236,6 +298,17 @@ export default function MaterialAiAssistant({
             <p className="text-[11px] text-slate-400">Main topics, short definitions &amp; exam prep</p>
           </div>
         </div>
+
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setMessages([])}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-[#0A1020] px-2.5 py-1 text-[11px] font-medium text-slate-400 transition hover:border-rose-500/30 hover:text-rose-300"
+          >
+            <Trash2 className="h-3 w-3" />
+            Clear chat
+          </button>
+        )}
       </div>
 
       <div className="mt-3.5 flex flex-wrap gap-2">
@@ -245,7 +318,7 @@ export default function MaterialAiAssistant({
           disabled={loadingTab !== null}
           className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all active:scale-95 ${
             activeTab === "summary_en"
-              ? "border-cyan-400/60 bg-cyan-500/15 text-cyan-200"
+              ? "border-cyan-400/60 bg-cyan-500/15 text-cyan-200 shadow-[0_0_14px_rgba(34,211,238,0.15)]"
               : "border-slate-700/80 bg-[#0A1020] text-slate-300 hover:border-cyan-500/40 hover:text-cyan-200"
           }`}
         >
@@ -259,7 +332,7 @@ export default function MaterialAiAssistant({
           disabled={loadingTab !== null}
           className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all active:scale-95 ${
             activeTab === "summary_bn"
-              ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
+              ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200 shadow-[0_0_14px_rgba(16,185,129,0.15)]"
               : "border-slate-700/80 bg-[#0A1020] text-slate-300 hover:border-emerald-500/40 hover:text-emerald-200"
           }`}
         >
@@ -273,7 +346,7 @@ export default function MaterialAiAssistant({
           disabled={loadingTab !== null}
           className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all active:scale-95 ${
             activeTab === "questions"
-              ? "border-violet-400/60 bg-violet-500/15 text-violet-200"
+              ? "border-violet-400/60 bg-violet-500/15 text-violet-200 shadow-[0_0_14px_rgba(139,92,246,0.15)]"
               : "border-slate-700/80 bg-[#0A1020] text-slate-300 hover:border-violet-500/40 hover:text-violet-200"
           }`}
         >
@@ -283,10 +356,14 @@ export default function MaterialAiAssistant({
       </div>
 
       {loadingTab && (
-        <div className="mt-4 space-y-2 rounded-xl border border-slate-800 bg-[#0A1020] p-4">
-          <p className="text-xs font-medium text-violet-300 animate-pulse">AI is reading this material...</p>
-          <div className="h-3 w-3/4 rounded bg-slate-800 animate-pulse" />
-          <div className="h-3 w-5/6 rounded bg-slate-800 animate-pulse" />
+        <div className="mt-4 space-y-2.5 rounded-xl border border-violet-500/20 bg-[#0A1020] p-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-3.5 w-3.5 animate-spin text-violet-300" />
+            <p className="text-xs font-medium text-violet-300">Analyzing material...</p>
+          </div>
+          <div className="h-2.5 w-3/4 rounded-full bg-slate-800/90 animate-pulse" />
+          <div className="h-2.5 w-5/6 rounded-full bg-slate-800/80 animate-pulse" />
+          <div className="h-2.5 w-2/3 rounded-full bg-slate-800/70 animate-pulse" />
         </div>
       )}
 
@@ -328,31 +405,78 @@ export default function MaterialAiAssistant({
         </div>
       )}
 
-      <form onSubmit={handleAsk} className="mt-4 flex flex-col gap-2 sm:flex-row">
+      {messages.length > 0 && (
+        <div className="mt-4 space-y-3 border-t border-slate-800/80 pt-4">
+          {messages.map((msg) =>
+            msg.role === "user" ? (
+              <div key={msg.id} className="flex justify-end">
+                <div className="max-w-[85%] rounded-2xl rounded-tr-sm border border-violet-500/30 bg-violet-500/15 px-3.5 py-2 text-xs sm:text-sm text-slate-100">
+                  {msg.content}
+                </div>
+              </div>
+            ) : (
+              <div key={msg.id} className="flex items-start gap-2.5">
+                <div
+                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-violet-400/35 bg-gradient-to-br from-violet-500/20 to-cyan-500/20 text-violet-300 ${
+                    msg.isStreaming && !msg.content ? "animate-pulse" : ""
+                  }`}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                </div>
+                <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm border border-slate-800/90 bg-[#0A1020] p-3.5">
+                  {!msg.content ? (
+                    <div className="flex items-center gap-1.5 py-1">
+                      <span className="h-2 w-2 rounded-full bg-violet-400 animate-bounce [animation-delay:-0.3s]" />
+                      <span className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce [animation-delay:-0.15s]" />
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-bounce" />
+                    </div>
+                  ) : (
+                    <>
+                      <FormattedAiContent content={msg.content} />
+                      {msg.isStreaming && (
+                        <span className="ml-1 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-violet-400 align-middle" />
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )
+          )}
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        {QUICK_PROMPTS.map((prompt) => (
+          <button
+            key={prompt}
+            type="button"
+            disabled={asking}
+            onClick={() => void submitQuestion(prompt)}
+            className="rounded-full border border-slate-800 bg-[#0A1020] px-2.5 py-1 text-[11px] font-medium text-slate-400 transition hover:border-violet-500/40 hover:text-violet-200 disabled:opacity-50"
+          >
+            + {prompt}
+          </button>
+        ))}
+      </div>
+
+      <form onSubmit={handleAsk} className="mt-2.5 flex flex-col gap-2 sm:flex-row">
         <input
           type="text"
           value={questionInput}
           onChange={(e) => setQuestionInput(e.target.value)}
           placeholder="Ask AI anything about this material (Bangla or English)..."
           maxLength={600}
-          className="flex-1 rounded-xl border border-slate-800 bg-[#0A1020] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:border-violet-400/60"
+          className="flex-1 rounded-xl border border-slate-800 bg-[#0A1020] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-violet-400/60"
         />
         <button
           type="submit"
           disabled={asking || !questionInput.trim()}
-          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-500 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 px-4 py-2.5 text-xs font-semibold text-white shadow-[0_0_16px_rgba(139,92,246,0.3)] transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Send className="h-3.5 w-3.5" />
-          {asking ? "Thinking..." : "Ask AI"}
+          {asking ? "Sending..." : "Ask AI"}
         </button>
       </form>
-
-      {qaResult && (
-        <div className="mt-3 rounded-xl border border-violet-500/25 bg-[#0A1020] p-3.5">
-          <p className="mb-2 text-xs sm:text-sm font-semibold text-violet-300">Q: {qaResult.q}</p>
-          <FormattedAiContent content={qaResult.a} />
-        </div>
-      )}
 
       {error && (
         <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300" role="alert">
