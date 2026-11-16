@@ -46,10 +46,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Only verified students can use the AI Study Assistant." }, { status: 403 });
     }
 
-    type MaterialAiRow = { id: string; title: string; description: string | null; topic: string | null; file_path: string; file_type: string; file_size_bytes: number; ai_summary_en: string | null; ai_summary_bn: string | null; ai_questions: { q: string; hint: string }[] | null; subject: { subject_code: string; subject_name: string } | { subject_code: string; subject_name: string }[] | null }; const { data: rawMat, error: matErr } = await serviceSupabase.from("materials").select(`
-        id, title, description, topic, file_path, file_type, file_size_bytes,
-        ai_summary_en, ai_summary_bn, ai_questions
-      ` as never).eq("id", materialId).eq("status", "approved").maybeSingle(); const material = rawMat as unknown as MaterialAiRow | null;
+    type MaterialAiRow = {
+      id: string;
+      title: string;
+      description: string | null;
+      topic: string | null;
+      file_path: string;
+      file_type: string;
+      file_size_bytes: number;
+      ai_summary_en: string | null;
+      ai_summary_bn: string | null;
+      ai_questions: { q: string; hint: string }[] | null;
+    };
+
+    const { data: rawMat, error: matErr } = await serviceSupabase
+      .from("materials")
+      .select("id, title, description, topic, file_path, file_type, file_size_bytes, ai_summary_en, ai_summary_bn, ai_questions" as never)
+      .eq("id", materialId)
+      .eq("status", "approved")
+      .maybeSingle();
+
+    const material = rawMat as unknown as MaterialAiRow | null;
 
     if (matErr) {
       return NextResponse.json({ success: false, error: `DB error: ${matErr.message}` }, { status: 500 });
@@ -68,7 +85,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, cached: true, questions: material.ai_questions });
     }
 
-        const contextHeader = [
+    const contextHeader = [
       `Title: ${material.title}`,
       material.topic ? `Topic: ${material.topic}` : "",
       material.description ? `Description: ${material.description}` : "",
@@ -109,7 +126,7 @@ export async function POST(request: Request) {
 
     if (mode === "summary_en") {
       parts.push({
-        text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nProvide a clear, well-structured study summary in English with concise bullet points covering key concepts, definitions, and formulas from this material. Keep it scannable and under 280 words. Write formulas in plain readable math notation (use ×, ÷, ≈, μ, /, %) and NEVER use LaTeX syntax like $, $, \frac, or \text.`,
+        text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nList ONLY the main topics covered in this material so a student immediately knows what is inside, and under each topic write a concise 1-2 line definition or core formula. Keep it clean and under 240 words. Write formulas in plain readable math (e.g., A_T, x^2, ×, ÷, ≈, μ, /) and NEVER use LaTeX syntax like $, $$, \\frac, \\text, or --.`,
       });
       const content = await callGemini(parts);
       await serviceSupabase.from("materials").update({ ai_summary_en: content } as never).eq("id", material.id);
@@ -118,7 +135,7 @@ export async function POST(request: Request) {
 
     if (mode === "summary_bn") {
       parts.push({
-        text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nএই ম্যাটেরিয়ালটির মূল বিষয়বস্তু, সংজ্ঞা ও গুরুত্বপূর্ণ সূত্রগুলো সহজ ও প্রাঞ্জল বাংলায় (প্রয়োজনীয় ইংরেজি টেকনিক্যাল টার্ম পাশে রেখে) বুলেট পয়েন্টে সংক্ষেপে বুঝিয়ে দিন। ২৫০ শব্দের মধ্যে রাখুন। সূত্রগুলো সাধারণ পড়া যায় এমনভাবে লিখুন (যেমন ×, ÷, ≈, μ, / ব্যবহার করুন), কখনোই LaTeX ($, $, \frac, \text) ব্যবহার করবেন না।`,
+        text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nList ONLY the main topics covered in this material in simple, clear Bangla (keep technical terms in English in parentheses), and under each topic write a concise 1-2 line definition or core formula in simple Bangla. Keep it under 220 words. Write formulas plainly (e.g., A_T, x^2, ×, ÷, ≈, μ, /) and NEVER use LaTeX like $, $$, \\frac, \\text, or --.`,
       });
       const content = await callGemini(parts);
       await serviceSupabase.from("materials").update({ ai_summary_bn: content } as never).eq("id", material.id);
@@ -140,7 +157,7 @@ export async function POST(request: Request) {
 
     const extraSummary = material.ai_summary_en ? `\nCached Summary:\n${material.ai_summary_en}` : "";
     parts.push({
-      text: `You are a helpful academic tutor for JTEC textile engineering students.\n${contextHeader}${extraSummary}\n\nStudent Question: ${question}\n\nAnswer clearly and concisely in the same language as the student's question (Bangla or English).`,
+      text: `You are a helpful academic tutor for JTEC textile engineering students.\n${contextHeader}${extraSummary}\n\nStudent Question: ${question}\n\nAnswer clearly and concisely in the same language as the student's question (Bangla or English). Write formulas plainly (e.g., A_T, x^2, /) and NEVER use LaTeX like $, $$, \\frac, or \\text.`,
     });
     const answer = await callGemini(parts);
     return NextResponse.json({ success: true, answer });

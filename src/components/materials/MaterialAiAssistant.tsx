@@ -16,24 +16,67 @@ type MaterialAiAssistantProps = {
 };
 
 function cleanMathAndLatex(text: string): string {
-  return text
+  let out = text
     .replace(/\$\$([\s\S]*?)\$\$/g, "$1")
     .replace(/\$([^$]+)\$/g, "$1")
-    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, "($1) / ($2)")
-    .replace(/\\text\{([^}]+)\}/g, "$1")
-    .replace(/\\approx/g, "≈")
-    .replace(/\\times/g, "×")
-    .replace(/\\cdot/g, "·")
-    .replace(/\\mu/g, "μ")
-    .replace(/\\pm/g, "±")
-    .replace(/\\leq/g, "≤")
-    .replace(/\\geq/g, "≥")
-    .replace(/\\div/g, "÷")
-    .replace(/\\\{/g, "{")
-    .replace(/\\\}/g, "}")
     .replace(/\\%/g, "%")
-    .replace(/\{--\}/g, "–")
+    .replace(/\{--\}/g, "\u2013")
+    .replace(/(\d)\s*--\s*(\d)/g, "$1\u2013$2")
+    .replace(/\\text\{([^{}]*)\}/g, "$1")
+    .replace(/\\text\{([^{}]*)\}/g, "$1")
+    .replace(/\\approx/g, "\u2248")
+    .replace(/\\times/g, "\u00D7")
+    .replace(/\\cdot/g, "\u00B7")
+    .replace(/\\mu/g, "\u03BC")
+    .replace(/\\pm/g, "\u00B1")
+    .replace(/\\leq/g, "\u2264")
+    .replace(/\\geq/g, "\u2265")
+    .replace(/\\div/g, "\u00F7")
+    .replace(/\\ /g, " ")
+    .replace(/\\\{/g, "{")
+    .replace(/\\\}/g, "}");
+
+  out = out
+    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, "($1) / ($2)")
+    .replace(/(?:^|[^a-zA-Z])frac\{([^}]+)\}\{([^}]+)\}/g, " ($1) / ($2)")
     .replace(/\\([a-zA-Z]+)/g, "$1");
+
+  return out;
+}
+
+function renderTextWithSubSup(segment: string, keyPrefix: string) {
+  const tokens = segment.split(/(_\{[^}]+\}|_[A-Za-z0-9]+|\^\{[^}]+\}|\^[A-Za-z0-9+-]+)/g);
+  return tokens.map((tok, idx) => {
+    if (tok.startsWith("_{") && tok.endsWith("}")) {
+      return (
+        <sub key={`${keyPrefix}-${idx}`} className="text-[0.72em] text-cyan-200/90">
+          {tok.slice(2, -1)}
+        </sub>
+      );
+    }
+    if (tok.startsWith("_") && tok.length > 1) {
+      return (
+        <sub key={`${keyPrefix}-${idx}`} className="text-[0.72em] text-cyan-200/90">
+          {tok.slice(1)}
+        </sub>
+      );
+    }
+    if (tok.startsWith("^{") && tok.endsWith("}")) {
+      return (
+        <sup key={`${keyPrefix}-${idx}`} className="text-[0.72em] text-cyan-200/90">
+          {tok.slice(2, -1)}
+        </sup>
+      );
+    }
+    if (tok.startsWith("^") && tok.length > 1) {
+      return (
+        <sup key={`${keyPrefix}-${idx}`} className="text-[0.72em] text-cyan-200/90">
+          {tok.slice(1)}
+        </sup>
+      );
+    }
+    return <span key={`${keyPrefix}-${idx}`}>{tok}</span>;
+  });
 }
 
 function renderInlineFormatting(line: string) {
@@ -43,18 +86,18 @@ function renderInlineFormatting(line: string) {
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
       return (
         <strong key={i} className="font-semibold text-white">
-          {part.slice(2, -2)}
+          {renderTextWithSubSup(part.slice(2, -2), `b-${i}`)}
         </strong>
       );
     }
     if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
       return (
         <em key={i} className="italic text-cyan-200/90">
-          {part.slice(1, -1)}
+          {renderTextWithSubSup(part.slice(1, -1), `i-${i}`)}
         </em>
       );
     }
-    return <span key={i}>{part}</span>;
+    return <span key={i}>{renderTextWithSubSup(part, `t-${i}`)}</span>;
   });
 }
 
@@ -91,7 +134,7 @@ function FormattedAiContent({ content }: { content: string }) {
         const bulletMatch = rawLine.match(/^(\s*)(\*|-|\d+\.)\s+(.*)$/);
         if (bulletMatch) {
           const indent = (bulletMatch[1] ?? "").length >= 2;
-          const marker = bulletMatch[2] === "*" || bulletMatch[2] === "-" ? "•" : bulletMatch[2];
+          const marker = bulletMatch[2] === "*" || bulletMatch[2] === "-" ? "\u2022" : bulletMatch[2];
           return (
             <div key={idx} className={`flex items-start gap-2 ${indent ? "pl-4" : ""}`}>
               <span className="mt-0.5 shrink-0 font-bold text-cyan-400">{marker}</span>
@@ -190,7 +233,7 @@ export default function MaterialAiAssistant({
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-100">AI Study Assistant</p>
-            <p className="text-[11px] text-slate-400">Instant summary, Bangla explanation &amp; exam prep</p>
+            <p className="text-[11px] text-slate-400">Main topics, short definitions &amp; exam prep</p>
           </div>
         </div>
       </div>
@@ -221,7 +264,7 @@ export default function MaterialAiAssistant({
           }`}
         >
           <Languages className="h-3.5 w-3.5" />
-          সহজ বাংলায়
+          {"\u09B8\u09B9\u099C \u09AC\u09BE\u0982\u09B2\u09BE\u09DF"}
         </button>
 
         <button
@@ -265,7 +308,7 @@ export default function MaterialAiAssistant({
             <div key={idx} className="rounded-xl border border-slate-800/90 bg-[#0A1020] p-3.5">
               <p className="text-xs sm:text-sm font-medium text-slate-100">
                 <span className="mr-1.5 font-bold text-violet-300">Q{idx + 1}.</span>
-                {cleanMathAndLatex(item.q)}
+                {renderInlineFormatting(item.q)}
               </p>
               <button
                 type="button"
