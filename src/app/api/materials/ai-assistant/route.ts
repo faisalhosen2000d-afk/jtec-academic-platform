@@ -52,7 +52,10 @@ export async function POST(request: Request) {
         subject:subjects ( subject_code, subject_name )
       ` as never).eq("id", materialId).eq("status", "approved").maybeSingle(); const material = rawMat as unknown as MaterialAiRow | null;
 
-    if (matErr || !material) {
+    if (matErr) {
+      return NextResponse.json({ success: false, error: `DB error: ${matErr.message}` }, { status: 500 });
+    }
+    if (!material) {
       return NextResponse.json({ success: false, error: "Material not found." }, { status: 404 });
     }
 
