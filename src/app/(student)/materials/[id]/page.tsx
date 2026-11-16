@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import MaterialFileActions from "./MaterialFileActions";
 import MaterialBookmarkButton from "./MaterialBookmarkButton";
 import MaterialRating from "@/components/materials/MaterialRating";
+import MaterialAiAssistant from "@/components/materials/MaterialAiAssistant";
 
 type Material = {
   id: string;
@@ -15,6 +16,9 @@ type Material = {
   views_count: number;
   downloads_count: number;
   created_at: string;
+  ai_summary_en: string | null;
+  ai_summary_bn: string | null;
+  ai_questions: { q: string; hint: string }[] | null;
   subject: {
     subject_code: string;
     subject_name: string;
@@ -66,9 +70,7 @@ export default async function MaterialDetailsPage({
     redirect("/login");
   }
 
-  const { data: material, error } = await supabase
-    .from("materials")
-    .select(`
+  const { data: rawMaterial, error } = await (supabase as any).from("materials").select(`
       id,
       title,
       description,
@@ -78,14 +80,14 @@ export default async function MaterialDetailsPage({
       views_count,
       downloads_count,
       created_at,
+      ai_summary_en,
+      ai_summary_bn,
+      ai_questions,
       subject:subjects (
         subject_code,
         subject_name
       )
-    `)
-    .eq("id", id)
-    .eq("status", "approved")
-    .maybeSingle();
+    `).eq("id", id).eq("status", "approved").maybeSingle(); const material = rawMaterial as (Omit<Material, "subject"> & { subject: Material["subject"] | Material["subject"][] }) | null;
 
   if (error) {
     console.error("Material details loading error:", error);
@@ -320,6 +322,16 @@ export default async function MaterialDetailsPage({
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* AI Study Assistant */}
+              <div className="dash-stagger-3">
+                <MaterialAiAssistant
+                  materialId={materialData.id}
+                  initialSummaryEn={materialData.ai_summary_en ?? null}
+                  initialSummaryBn={materialData.ai_summary_bn ?? null}
+                  initialQuestions={Array.isArray(materialData.ai_questions) ? materialData.ai_questions : null}
+                />
               </div>
 
               {/* Rating */}
