@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, BookOpen, Languages, HelpCircle, Send, ChevronDown, Trash2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Sparkles, BookOpen, Languages, HelpCircle, Send, ChevronDown, Trash2, MessageSquare, X } from "lucide-react";
 
 type PracticeQuestion = {
   q: string;
@@ -27,6 +28,8 @@ const QUICK_PROMPTS = [
   "Important formulas?",
   "Key exam tips?",
 ];
+
+const MAX_SAVED_MESSAGES = 30;
 
 function cleanMathAndLatex(text: string): string {
   let out = text
@@ -178,17 +181,75 @@ export default function MaterialAiAssistant({
   const [openHints, setOpenHints] = useState<Record<number, boolean>>({});
   const [loadingTab, setLoadingTab] = useState<"summary_en" | "summary_bn" | "questions" | null>(null);
 
+  const [chatOpen, setChatOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [questionInput, setQuestionInput] = useState("");
   const [asking, setAsking] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const streamTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  const storageKey = `jtec_ai_chat_${materialId}`;
 
   useEffect(() => {
+    setMounted(true);
+    try {
+      const saved = window.localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setMessages(
+            parsed
+              .filter((m) => m && typeof m.content === "string" && (m.role === "user" || m.role === "assistant"))
+              .slice(-MAX_SAVED_MESSAGES)
+              .map((m) => ({ ...m, isStreaming: false }))
+          );
+        }
+      }
+    } catch {
+      // Ignore storage read errors
+    }
     return () => {
       if (streamTimerRef.current) clearInterval(streamTimerRef.current);
     };
-  }, []);
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      const toSave = messages
+        .filter((m) => m.content.trim().length > 0 && !m.isStreaming)
+        .slice(-MAX_SAVED_MESSAGES)
+        .map(({ id, role, content }) => ({ id, role, content }));
+      if (toSave.length > 0) {
+        window.localStorage.setItem(storageKey, JSON.stringify(toSave));
+      } else {
+        window.localStorage.removeItem(storageKey);
+      }
+    } catch {
+      // Ignore storage write errors
+    }
+  }, [messages, mounted, storageKey]);
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setChatOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [chatOpen]);
+
+  useEffect(() => {
+    if (chatOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, chatOpen]);
 
   function streamAssistantReply(msgId: string, fullText: string) {
     if (streamTimerRef.current) clearInterval(streamTimerRef.current);
@@ -284,11 +345,169 @@ export default function MaterialAiAssistant({
     void submitQuestion(questionInput);
   }
 
+  function handleClearChat() {
+    setMessages([]);
+    setError(null);
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  const chatModal =
+    mounted && chatOpen
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-2.5 sm:p-4 backdrop-blur-sm animate-[dashFadeUp_0.2s_ease-out]"
+            onClick={() => setChatOpen(false)}
+          >
+            <div
+              className="flex h-[86dvh] max-h-[680px] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-violet-500/35 bg-[#0A1020] shadow-[0_24px_70px_rgba(0,0,0,0.85)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between border-b border-slate-800/90 bg-[#060A12] px-4 py-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-violet-400/40 bg-gradient-to-br from-violet-500/25 to-cyan-500/20 text-violet-200">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">AI Study Chat</h3>
+                    <p className="text-[11px] text-slate-400">
+                      Ask questions in Bangla or English &middot; Saved locally
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {messages.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearChat}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-[#0E172A] px-2.5 py-1.5 text-[11px] font-medium text-slate-400 transition hover:border-rose-500/35 hover:text-rose-300"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Clear
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setChatOpen(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-800 bg-[#0E172A] text-slate-400 transition hover:border-slate-700 hover:text-white"
+                    aria-label="Close AI chat"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Chat Thread */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+                {messages.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center text-center px-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-400/35 bg-violet-500/15 text-violet-300">
+                      <Sparkles className="h-6 w-6" />
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-slate-100">
+                      Ask anything about this material
+                    </p>
+                    <p className="mt-1 max-w-sm text-xs text-slate-400">
+                      Your conversation is saved automatically in your browser so you can review it anytime without slowing down the page.
+                    </p>
+                  </div>
+                ) : (
+                  messages.map((msg) =>
+                    msg.role === "user" ? (
+                      <div key={msg.id} className="flex justify-end">
+                        <div className="max-w-[85%] rounded-2xl rounded-tr-sm border border-violet-500/30 bg-violet-500/15 px-3.5 py-2.5 text-xs sm:text-sm text-slate-100">
+                          {msg.content}
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={msg.id} className="flex items-start gap-2.5">
+                        <div
+                          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-violet-400/35 bg-gradient-to-br from-violet-500/20 to-cyan-500/20 text-violet-300 ${
+                            msg.isStreaming && !msg.content ? "animate-pulse" : ""
+                          }`}
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm border border-slate-800/90 bg-[#0E172A] p-3.5">
+                          {!msg.content ? (
+                            <div className="flex items-center gap-1.5 py-1">
+                              <span className="h-2 w-2 rounded-full bg-violet-400 animate-bounce [animation-delay:-0.3s]" />
+                              <span className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce [animation-delay:-0.15s]" />
+                              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-bounce" />
+                            </div>
+                          ) : (
+                            <>
+                              <FormattedAiContent content={msg.content} />
+                              {msg.isStreaming && (
+                                <span className="ml-1 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-violet-400 align-middle" />
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  )
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Modal Footer: Quick Chips + Input */}
+              <div className="border-t border-slate-800/90 bg-[#060A12] p-3.5 sm:p-4">
+                {error && (
+                  <p className="mb-2.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300" role="alert">
+                    {error}
+                  </p>
+                )}
+
+                <div className="mb-2.5 flex flex-wrap gap-1.5">
+                  {QUICK_PROMPTS.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      disabled={asking}
+                      onClick={() => void submitQuestion(prompt)}
+                      className="rounded-full border border-slate-800 bg-[#0A1020] px-2.5 py-1 text-[11px] font-medium text-slate-400 transition hover:border-violet-500/40 hover:text-violet-200 disabled:opacity-50"
+                    >
+                      + {prompt}
+                    </button>
+                  ))}
+                </div>
+
+                <form onSubmit={handleAsk} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={questionInput}
+                    onChange={(e) => setQuestionInput(e.target.value)}
+                    placeholder="Ask AI anything (Bangla or English)..."
+                    maxLength={600}
+                    className="flex-1 rounded-xl border border-slate-800 bg-[#0A1020] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-violet-400/60"
+                  />
+                  <button
+                    type="submit"
+                    disabled={asking || !questionInput.trim()}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 px-4 py-2.5 text-xs font-semibold text-white shadow-[0_0_16px_rgba(139,92,246,0.3)] transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">{asking ? "Sending..." : "Send"}</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
     <div className="relative overflow-hidden rounded-2xl border border-violet-500/25 bg-[#0E172A]/85 p-4 sm:p-5 transition-all duration-200 hover:border-violet-400/40">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-400/50 to-transparent" />
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-violet-400/35 bg-gradient-to-br from-violet-500/25 to-cyan-500/20 text-violet-200 shadow-[0_0_16px_rgba(139,92,246,0.25)]">
             <Sparkles className="h-4 w-4" />
@@ -299,16 +518,19 @@ export default function MaterialAiAssistant({
           </div>
         </div>
 
-        {messages.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setMessages([])}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-[#0A1020] px-2.5 py-1 text-[11px] font-medium text-slate-400 transition hover:border-rose-500/30 hover:text-rose-300"
-          >
-            <Trash2 className="h-3 w-3" />
-            Clear chat
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setChatOpen(true)}
+          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 px-3.5 py-2 text-xs font-semibold text-white shadow-[0_0_18px_rgba(139,92,246,0.35)] transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+          <span>Chat with AI</span>
+          {messages.length > 0 && (
+            <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">
+              {messages.length}
+            </span>
+          )}
+        </button>
       </div>
 
       <div className="mt-3.5 flex flex-wrap gap-2">
@@ -405,84 +627,13 @@ export default function MaterialAiAssistant({
         </div>
       )}
 
-      {messages.length > 0 && (
-        <div className="mt-4 space-y-3 border-t border-slate-800/80 pt-4">
-          {messages.map((msg) =>
-            msg.role === "user" ? (
-              <div key={msg.id} className="flex justify-end">
-                <div className="max-w-[85%] rounded-2xl rounded-tr-sm border border-violet-500/30 bg-violet-500/15 px-3.5 py-2 text-xs sm:text-sm text-slate-100">
-                  {msg.content}
-                </div>
-              </div>
-            ) : (
-              <div key={msg.id} className="flex items-start gap-2.5">
-                <div
-                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-violet-400/35 bg-gradient-to-br from-violet-500/20 to-cyan-500/20 text-violet-300 ${
-                    msg.isStreaming && !msg.content ? "animate-pulse" : ""
-                  }`}
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                </div>
-                <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm border border-slate-800/90 bg-[#0A1020] p-3.5">
-                  {!msg.content ? (
-                    <div className="flex items-center gap-1.5 py-1">
-                      <span className="h-2 w-2 rounded-full bg-violet-400 animate-bounce [animation-delay:-0.3s]" />
-                      <span className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce [animation-delay:-0.15s]" />
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-bounce" />
-                    </div>
-                  ) : (
-                    <>
-                      <FormattedAiContent content={msg.content} />
-                      {msg.isStreaming && (
-                        <span className="ml-1 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-violet-400 align-middle" />
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            )
-          )}
-        </div>
-      )}
-
-      <div className="mt-4 flex flex-wrap gap-1.5">
-        {QUICK_PROMPTS.map((prompt) => (
-          <button
-            key={prompt}
-            type="button"
-            disabled={asking}
-            onClick={() => void submitQuestion(prompt)}
-            className="rounded-full border border-slate-800 bg-[#0A1020] px-2.5 py-1 text-[11px] font-medium text-slate-400 transition hover:border-violet-500/40 hover:text-violet-200 disabled:opacity-50"
-          >
-            + {prompt}
-          </button>
-        ))}
-      </div>
-
-      <form onSubmit={handleAsk} className="mt-2.5 flex flex-col gap-2 sm:flex-row">
-        <input
-          type="text"
-          value={questionInput}
-          onChange={(e) => setQuestionInput(e.target.value)}
-          placeholder="Ask AI anything about this material (Bangla or English)..."
-          maxLength={600}
-          className="flex-1 rounded-xl border border-slate-800 bg-[#0A1020] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-violet-400/60"
-        />
-        <button
-          type="submit"
-          disabled={asking || !questionInput.trim()}
-          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 px-4 py-2.5 text-xs font-semibold text-white shadow-[0_0_16px_rgba(139,92,246,0.3)] transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Send className="h-3.5 w-3.5" />
-          {asking ? "Sending..." : "Ask AI"}
-        </button>
-      </form>
-
-      {error && (
+      {!chatOpen && error && (
         <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300" role="alert">
           {error}
         </p>
       )}
+
+      {chatModal}
     </div>
   );
 }
