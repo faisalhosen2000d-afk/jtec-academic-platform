@@ -2,7 +2,7 @@ export type GeminiPart =
   | { text: string }
   | { inlineData: { mimeType: string; data: string } };
 
-const MODEL_CANDIDATES = ["gemini-3.8-flash", "gemini-flash-latest"] as const;
+const MODEL_CANDIDATES = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-2.5-flash-lite"] as const;
 
 export async function callGemini(parts: GeminiPart[], options?: { jsonMode?: boolean }): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
