@@ -48,8 +48,7 @@ export async function POST(request: Request) {
 
     type MaterialAiRow = { id: string; title: string; description: string | null; topic: string | null; file_path: string; file_type: string; file_size_bytes: number; ai_summary_en: string | null; ai_summary_bn: string | null; ai_questions: { q: string; hint: string }[] | null; subject: { subject_code: string; subject_name: string } | { subject_code: string; subject_name: string }[] | null }; const { data: rawMat, error: matErr } = await serviceSupabase.from("materials").select(`
         id, title, description, topic, file_path, file_type, file_size_bytes,
-        ai_summary_en, ai_summary_bn, ai_questions,
-        subject:subjects ( subject_code, subject_name )
+        ai_summary_en, ai_summary_bn, ai_questions
       ` as never).eq("id", materialId).eq("status", "approved").maybeSingle(); const material = rawMat as unknown as MaterialAiRow | null;
 
     if (matErr) {
@@ -69,10 +68,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, cached: true, questions: material.ai_questions });
     }
 
-    const subjectObj = Array.isArray(material.subject) ? material.subject[0] : material.subject;
-    const contextHeader = [
+        const contextHeader = [
       `Title: ${material.title}`,
-      subjectObj ? `Subject: ${subjectObj.subject_code} - ${subjectObj.subject_name}` : "",
       material.topic ? `Topic: ${material.topic}` : "",
       material.description ? `Description: ${material.description}` : "",
     ]
