@@ -70,7 +70,7 @@ export default async function MaterialDetailsPage({
     redirect("/login");
   }
 
-  const { data: rawMaterial, error } = await (supabase as any).from("materials").select(`
+  const { data: rawMaterial, error } = await supabase.from("materials").select(`
       id,
       title,
       description,
@@ -87,7 +87,7 @@ export default async function MaterialDetailsPage({
         subject_code,
         subject_name
       )
-    `).eq("id", id).eq("status", "approved").maybeSingle(); const material = rawMaterial as (Omit<Material, "subject"> & { subject: Material["subject"] | Material["subject"][] }) | null;
+    ` as never).eq("id", id).eq("status", "approved").maybeSingle(); const material = rawMaterial as unknown as (Omit<Material, "subject"> & { subject: Material["subject"] | Material["subject"][] }) | null;
 
   if (error) {
     console.error("Material details loading error:", error);

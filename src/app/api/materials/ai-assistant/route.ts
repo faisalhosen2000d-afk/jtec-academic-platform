@@ -46,15 +46,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Only verified students can use the AI Study Assistant." }, { status: 403 });
     }
 
-    const { data: material, error: matErr } = await (serviceSupabase as any).from("materials")
-      .select(`
+    type MaterialAiRow = { id: string; title: string; description: string | null; topic: string | null; file_path: string; file_type: string; file_size_bytes: number; ai_summary_en: string | null; ai_summary_bn: string | null; ai_questions: { q: string; hint: string }[] | null; subject: { subject_code: string; subject_name: string } | { subject_code: string; subject_name: string }[] | null }; const { data: rawMat, error: matErr } = await serviceSupabase.from("materials").select(`
         id, title, description, topic, file_path, file_type, file_size_bytes,
         ai_summary_en, ai_summary_bn, ai_questions,
         subject:subjects ( subject_code, subject_name )
-      `)
-      .eq("id", materialId)
-      .eq("status", "approved")
-      .maybeSingle();
+      ` as never).eq("id", materialId).eq("status", "approved").maybeSingle(); const material = rawMat as unknown as MaterialAiRow | null;
 
     if (matErr || !material) {
       return NextResponse.json({ success: false, error: "Material not found." }, { status: 404 });
@@ -116,7 +112,7 @@ export async function POST(request: Request) {
         text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nProvide a clear, well-structured study summary in English with concise bullet points covering key concepts, definitions, and formulas from this material. Keep it scannable and under 280 words.`,
       });
       const content = await callGemini(parts);
-      await (serviceSupabase as any).from("materials").update({ ai_summary_en: content }).eq("id", material.id);
+      await serviceSupabase.from("materials").update({ ai_summary_en: content } as never).eq("id", material.id);
       return NextResponse.json({ success: true, cached: false, content });
     }
 
@@ -125,7 +121,7 @@ export async function POST(request: Request) {
         text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nএই ম্যাটেরিয়ালটির মূল বিষয়বস্তু, সংজ্ঞা ও গুরুত্বপূর্ণ সূত্রগুলো সহজ ও প্রাঞ্জল বাংলায় (প্রয়োজনীয় ইংরেজি টেকনিক্যাল টার্ম পাশে রেখে) বুলেট পয়েন্টে সংক্ষেপে বুঝিয়ে দিন। ২৫০ শব্দের মধ্যে রাখুন।`,
       });
       const content = await callGemini(parts);
-      await (serviceSupabase as any).from("materials").update({ ai_summary_bn: content }).eq("id", material.id);
+      await serviceSupabase.from("materials").update({ ai_summary_bn: content } as never).eq("id", material.id);
       return NextResponse.json({ success: true, cached: false, content });
     }
 
@@ -137,7 +133,7 @@ export async function POST(request: Request) {
       const parsed = JSON.parse(raw);
       const questions = Array.isArray(parsed) ? parsed.slice(0, 5) : [];
       if (questions.length > 0) {
-        await (serviceSupabase as any).from("materials").update({ ai_questions: questions }).eq("id", material.id);
+        await serviceSupabase.from("materials").update({ ai_questions: questions } as never).eq("id", material.id);
       }
       return NextResponse.json({ success: true, cached: false, questions });
     }
