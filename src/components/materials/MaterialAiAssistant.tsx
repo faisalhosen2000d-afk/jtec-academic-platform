@@ -172,9 +172,7 @@ export default function MaterialAiAssistant({
   initialSummaryBn,
   initialQuestions,
 }: MaterialAiAssistantProps) {
-  const [activeTab, setActiveTab] = useState<"summary_en" | "summary_bn" | "questions" | null>(
-    initialSummaryEn ? "summary_en" : initialSummaryBn ? "summary_bn" : null
-  );
+  const [activeTab, setActiveTab] = useState<"summary_en" | "summary_bn" | "questions" | null>(null);
   const [summaryEn, setSummaryEn] = useState<string | null>(initialSummaryEn);
   const [summaryBn, setSummaryBn] = useState<string | null>(initialSummaryBn);
   const [questions, setQuestions] = useState<PracticeQuestion[] | null>(initialQuestions);
@@ -276,6 +274,10 @@ export default function MaterialAiAssistant({
   }
 
   async function handleSelectTab(mode: "summary_en" | "summary_bn" | "questions") {
+    if (activeTab === mode) {
+      setActiveTab(null);
+      return;
+    }
     setError(null);
     setActiveTab(mode);
 
@@ -590,19 +592,15 @@ export default function MaterialAiAssistant({
       )}
 
       {!loadingTab && activeTab === "summary_en" && summaryEn && (
-        <div className="mt-4 rounded-xl border border-slate-800/90 bg-[#0A1020] p-4">
-          <FormattedAiContent content={summaryEn} />
-        </div>
+        <div className="mt-4 rounded-xl border border-slate-800/90 bg-[#0A1020] p-3.5 sm:p-4"><div className="mb-2 flex items-center justify-between border-b border-slate-800/80 pb-2"><span className="text-[11px] font-semibold uppercase tracking-wider text-cyan-300">Key Summary (EN)</span><button type="button" onClick={() => setActiveTab(null)} className="text-[11px] font-medium text-slate-400 hover:text-white">Minimize ▲</button></div><div className="max-h-72 overflow-y-auto pr-1"><FormattedAiContent content={summaryEn} /></div></div>
       )}
 
       {!loadingTab && activeTab === "summary_bn" && summaryBn && (
-        <div className="mt-4 rounded-xl border border-slate-800/90 bg-[#0A1020] p-4">
-          <FormattedAiContent content={summaryBn} />
-        </div>
+        <div className="mt-4 rounded-xl border border-slate-800/90 bg-[#0A1020] p-3.5 sm:p-4"><div className="mb-2 flex items-center justify-between border-b border-slate-800/80 pb-2"><span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-300">Bangla Summary</span><button type="button" onClick={() => setActiveTab(null)} className="text-[11px] font-medium text-slate-400 hover:text-white">Minimize ▲</button></div><div className="max-h-72 overflow-y-auto pr-1"><FormattedAiContent content={summaryBn} /></div></div>
       )}
 
       {!loadingTab && activeTab === "questions" && questions && questions.length > 0 && (
-        <div className="mt-4 space-y-2.5">
+        <div className="mt-4 rounded-xl border border-slate-800/90 bg-[#0A1020] p-3.5"><div className="mb-2.5 flex items-center justify-between border-b border-slate-800/80 pb-2"><span className="text-[11px] font-semibold uppercase tracking-wider text-violet-300">5 Exam Questions</span><button type="button" onClick={() => setActiveTab(null)} className="text-[11px] font-medium text-slate-400 hover:text-white">Minimize ▲</button></div><div className="max-h-72 space-y-2.5 overflow-y-auto pr-1">
           {questions.map((item, idx) => (
             <div key={idx} className="rounded-xl border border-slate-800/90 bg-[#0A1020] p-3.5">
               <p className="text-xs sm:text-sm font-medium text-slate-100">
@@ -623,8 +621,9 @@ export default function MaterialAiAssistant({
                 </div>
               )}
             </div>
-          ))}
+          )) }
         </div>
+      </div>
       )}
 
       {!chatOpen && error && (
