@@ -66,6 +66,7 @@ export default function UploadForm({
 
   const [submitting, setSubmitting] = useState(false);
   const [autoFilling, setAutoFilling] = useState(false);
+  const [aiSourceNote, setAiSourceNote] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -152,6 +153,7 @@ export default function UploadForm({
     if (!file || autoFilling) return;
     setError("");
     setMessage("");
+    setAiSourceNote(null);
     setAutoFilling(true);
     try {
       const fd = new FormData();
@@ -168,6 +170,7 @@ export default function UploadForm({
       if (data.title) setTitle(data.title);
       if (data.topic) setTopic(data.topic);
       if (data.description) setDescription(data.description);
+      setAiSourceNote(data.readFullFile ? "Filled from PDF content" : "Suggested from filename & subject (>3.8MB)");
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI Auto-Fill failed.");
     } finally {
@@ -489,24 +492,59 @@ export default function UploadForm({
         )}
       </div>
 
-      {/* AI Auto-Fill Bar */}
+      {/* AI Auto-Fill Bar with Galaxy AI Shimmer */}
       {file && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3.5 py-2.5">
-          <div className="flex items-center gap-2 text-xs text-violet-200">
-            <Sparkles className="h-4 w-4 text-violet-300" />
-            <span>Let AI read your file and fill Title, Topic &amp; Description</span>
+        <div
+          className={`relative overflow-hidden rounded-xl border px-3.5 py-2.5 transition-all duration-300 ${
+            autoFilling
+              ? "border-violet-400/70 bg-gradient-to-r from-violet-500/20 via-cyan-500/15 to-fuchsia-500/20 shadow-[0_0_28px_rgba(139,92,246,0.35)]"
+              : "border-violet-500/30 bg-violet-500/10"
+          }`}
+        >
+          {autoFilling && (
+            <div className="pointer-events-none absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+          )}
+          <div className="relative flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs text-violet-200">
+              <span className="relative flex h-6 w-6 items-center justify-center rounded-lg bg-violet-500/20">
+                <Sparkles className={`h-4 w-4 text-violet-300 ${autoFilling ? "animate-spin" : ""}`} />
+                {autoFilling && (
+                  <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-cyan-300 animate-ping" />
+                )}
+              </span>
+              <div>
+                <span className="font-medium">
+                  {autoFilling ? "Galaxy AI is analyzing your material..." : "Let AI read your file and fill Title, Topic & Description"}
+                </span>
+                {aiSourceNote && !autoFilling && (
+                  <span className="ml-2 inline-block rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+                    {aiSourceNote}
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleAiAutoFill}
+              disabled={autoFilling || submitting}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all active:scale-95 disabled:cursor-wait ${
+                autoFilling
+                  ? "bg-gradient-to-r from-fuchsia-500 via-violet-500 to-cyan-500 animate-pulse shadow-[0_0_16px_rgba(34,211,238,0.45)]"
+                  : "bg-gradient-to-r from-violet-500 to-indigo-500 hover:brightness-110"
+              }`}
+            >
+              <Sparkles className={`h-3.5 w-3.5 ${autoFilling ? "animate-bounce" : ""}`} />
+              {autoFilling ? "Analyzing..." : "AI Auto-Fill"}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleAiAutoFill}
-            disabled={autoFilling || submitting}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-500 to-indigo-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:brightness-110 active:scale-95 disabled:opacity-50"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            {autoFilling ? "Reading file..." : "AI Auto-Fill"}
-          </button>
         </div>
       )}
+
+      <style>{`
+        @keyframes shimmer {
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
 
       {/* Compact 2-Col Title & Topic */}
       <div className="grid gap-3.5 sm:grid-cols-2">
