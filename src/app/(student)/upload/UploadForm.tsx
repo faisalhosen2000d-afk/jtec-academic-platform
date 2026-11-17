@@ -9,6 +9,7 @@ import {
   FileText,
   Loader2,
   Search,
+  Sparkles,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -64,6 +65,7 @@ export default function UploadForm({
   const [isDragging, setIsDragging] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
+  const [autoFilling, setAutoFilling] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -145,6 +147,33 @@ export default function UploadForm({
   const selectedSubject = subjects.find(
     (subject) => subject.id === selectedSubjectId,
   );
+
+  const handleAiAutoFill = async () => {
+    if (!file || autoFilling) return;
+    setError("");
+    setMessage("");
+    setAutoFilling(true);
+    try {
+      const fd = new FormData();
+      fd.append("fileName", file.name);
+      if (selectedSubject) {
+        fd.append("subjectLabel", ` ${selectedSubject.subject_code} - ${selectedSubject.subject_name} `);
+      }
+      if (file.size <= 3.8 * 1024 * 1024) {
+        fd.append("file", file);
+      }
+      const res = await fetch("/api/materials/ai-autofill", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data?.error || "AI Auto-Fill failed.");
+      if (data.title) setTitle(data.title);
+      if (data.topic) setTopic(data.topic);
+      if (data.description) setDescription(data.description);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI Auto-Fill failed.");
+    } finally {
+      setAutoFilling(false);
+    }
+  };
 
   const handleTermChange = (termId: string) => {
     setSelectedTermFilter(termId);
@@ -459,6 +488,25 @@ export default function UploadForm({
           </div>
         )}
       </div>
+
+      {/* AI Auto-Fill Bar */}
+      {file && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3.5 py-2.5">
+          <div className="flex items-center gap-2 text-xs text-violet-200">
+            <Sparkles className="h-4 w-4 text-violet-300" />
+            <span>Let AI read your file and fill Title, Topic &amp; Description</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleAiAutoFill}
+            disabled={autoFilling || submitting}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-500 to-indigo-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:brightness-110 active:scale-95 disabled:opacity-50"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            {autoFilling ? "Reading file..." : "AI Auto-Fill"}
+          </button>
+        </div>
+      )}
 
       {/* Compact 2-Col Title & Topic */}
       <div className="grid gap-3.5 sm:grid-cols-2">
