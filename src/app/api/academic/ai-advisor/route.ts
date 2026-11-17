@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as {
-      mode?: "analyze" | "target_plan" | "chat" | "transcribe";
+      mode?: "analyze" | "target_plan" | "chat" | "transcribe" | "tts";
       targetCgpa?: number;
       question?: string;
       history?: ChatMsg[];
@@ -36,9 +36,63 @@ export async function POST(request: Request) {
       audioBase64?: string;
       mimeType?: string;
       voiceLang?: "auto" | "bn" | "en";
+      text?: string;
     };
 
     const mode = body.mode || "analyze";
+
+    if (mode === "tts") {
+      const rawText = String(body.text || "")
+        .replace(/\*\*/g, "")
+        .replace(/^[\s•*-]+/gm, "")
+        .replace(/[`#_~]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 1200);
+
+      if (!rawText) {
+        return NextResponse.json({ success: false, error: "Nothing to read." }, { status: 400 });
+      }
+
+      const tl = /[\u0980-\u09FF]/.test(rawText) ? "bn" : "en";
+      const words = rawText.split(" ");
+      const chunks: string[] = [];
+      let current = "";
+      for (const w of words) {
+        if ((current + " " + w).trim().length > 170) {
+          if (current.trim()) chunks.push(current.trim());
+          current = w;
+        } else {
+          current = (current + " " + w).trim();
+        }
+      }
+      if (current.trim()) chunks.push(current.trim());
+
+      const buffers: Buffer[] = [];
+      for (const chunk of chunks) {
+        const ttsRes = await fetch(
+          `https://translate.google.com/translate_tts?ie=UTF-8&tl=${tl}&client=tw-ob&q=${encodeURIComponent(chunk)}`,
+          {
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            },
+            signal: AbortSignal.timeout(8000),
+          }
+        );
+        if (!ttsRes.ok) {
+          return NextResponse.json({ success: false, error: "Voice audio service unavailable." }, { status: 502 });
+        }
+        buffers.push(Buffer.from(await ttsRes.arrayBuffer()));
+      }
+
+      const combined = Buffer.concat(buffers);
+      return NextResponse.json({
+        success: true,
+        audioBase64: combined.toString("base64"),
+        mimeType: "audio/mpeg",
+      });
+    }
 
     if (mode === "transcribe") {
       const audioBase64 = String(body.audioBase64 || "").trim();

@@ -109,6 +109,8 @@ export function AcademicAiAdvisor({
   const [transcribing, setTranscribing] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  const [ttsLoadingIdx, setTtsLoadingIdx] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -128,6 +130,7 @@ export function AcademicAiAdvisor({
       if (timerRef.current) window.clearInterval(timerRef.current);
       recorderRef.current?.stop();
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      audioRef.current?.pause();
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
       }
@@ -349,65 +352,59 @@ export function AcademicAiAdvisor({
     }
   };
 
-  const toggleSpeak = (text: string, idx: number) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      setChatError("Voice playback is not supported in this browser.");
-      return;
-    }
+  const toggleSpeak = async (text: string, idx: number) => {
+    setChatError(null);
     if (speakingIdx === idx) {
-      window.speechSynthesis.cancel();
+      audioRef.current?.pause();
+      audioRef.current = null;
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
       setSpeakingIdx(null);
       return;
     }
-    window.speechSynthesis.cancel();
-    setChatError(null);
 
-    const isBanglaScript = /[\u0980-\u09FF]/.test(text);
-    const isBanglish =
-      !isBanglaScript &&
-      /\b(tomar|amar|korle|hobe|ache|kemon|tumi|ami|korte|parbe|theke|ebong|kintu|gulo|jonno)\b/i.test(
-        text
-      );
-
-    if (isBanglish) {
-      setChatError("Listen works clearly for English or Bengali script (switch to EN or \u09AC\u09BE\u0982\u09B2\u09BE at the top).");
-      return;
+    audioRef.current?.pause();
+    audioRef.current = null;
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
     }
+    setSpeakingIdx(null);
+    setTtsLoadingIdx(idx);
 
-    const voices = window.speechSynthesis.getVoices();
-    if (isBanglaScript) {
-      const bnVoice = voices.find((v) => v.lang.toLowerCase().startsWith("bn"));
-      if (!bnVoice) {
-        setChatError("No Bengali voice is installed in this browser/OS. Switch to EN for voice playback.");
-        return;
+    try {
+      const res = await fetch("/api/academic/ai-advisor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "tts", text }),
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        audioBase64?: string;
+        mimeType?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.success || !data.audioBase64) {
+        throw new Error(data.error || "Voice playback failed.");
       }
-    }
 
-    const cleanSpeech = text
-      .replace(/\*\*/g, "")
-      .replace(/^[\s•*-]+/gm, "")
-      .replace(/[`#_~]/g, "")
-      .replace(/(\d)-(\d)/g, "$1 $2")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    const utter = new SpeechSynthesisUtterance(cleanSpeech);
-    if (isBanglaScript) {
-      const bnVoice = voices.find((v) => v.lang.toLowerCase().startsWith("bn"));
-      if (bnVoice) utter.voice = bnVoice;
-      utter.lang = bnVoice?.lang || "bn-BD";
-    } else {
-      const enVoice =
-        voices.find((v) => v.lang.toLowerCase() === "en-us") ||
-        voices.find((v) => v.lang.toLowerCase().startsWith("en"));
-      if (enVoice) utter.voice = enVoice;
-      utter.lang = enVoice?.lang || "en-US";
+      const audio = new Audio(`data:${data.mimeType || "audio/mpeg"};base64,${data.audioBase64}`);
+      audioRef.current = audio;
+      audio.onended = () => {
+        setSpeakingIdx(null);
+        audioRef.current = null;
+      };
+      audio.onerror = () => {
+        setSpeakingIdx(null);
+        audioRef.current = null;
+      };
+      setSpeakingIdx(idx);
+      await audio.play();
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : "Could not play voice audio.");
+    } finally {
+      setTtsLoadingIdx(null);
     }
-    utter.rate = 0.98;
-    utter.onend = () => setSpeakingIdx(null);
-    utter.onerror = () => setSpeakingIdx(null);
-    setSpeakingIdx(idx);
-    window.speechSynthesis.speak(utter);
   };
 
   const isBusy = loadingMode !== null;
@@ -690,7 +687,7 @@ export function AcademicAiAdvisor({
                             onClick={() => toggleSpeak(m.text, idx)}
                             className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-slate-400 transition hover:bg-slate-800 hover:text-cyan-300"
                           >
-                            {speakingIdx === idx ? <VolumeX className="h-3 w-3 text-cyan-400" /> : <Volume2 className="h-3 w-3" />}
+                            {ttsLoadingIdx === idx ? <Loader2 className="h-3 w-3 animate-spin text-cyan-400" /> : speakingIdx === idx ? <VolumeX className="h-3 w-3 text-cyan-400" /> : <Volume2 className="h-3 w-3" />}
                             {speakingIdx === idx ? "Stop" : "Listen"}
                           </button>
                         )}
