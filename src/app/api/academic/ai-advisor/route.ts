@@ -70,7 +70,14 @@ Completed Terms: ${completedCount}/${totalProgramTerms} (Remaining: ${remainingT
 Current CGPA: ${latestCgpa > 0 ? latestCgpa.toFixed(2) : "Not published"}
 Term History: ${termSummary}
 Pending Retakes: ${retakeSummary}
-Target CGPA: ${targetCgpa.toFixed(2)} (Approx. required average GPA across remaining ${remainingTerms} terms: ${requiredAvgGpaText})`;
+Target CGPA: ${targetCgpa.toFixed(2)} (Approx. required average GPA across remaining ${remainingTerms} terms: ${requiredAvgGpaText})
+
+JTEC CGPA Mechanism:
+- Each term has a fixed credit load (typically 18 to 23 credits per term across 8 terms).
+- Term Quality Points = Term GPA x Term Credits.
+- Cumulative CGPA = Sum of all completed Quality Points / Sum of all completed Credits.
+- Why Target CGPA changes dynamically: Higher-credit terms (like 22-23 Cr) pull CGPA up or down more strongly than lower-credit terms (like 18-19 Cr).
+- Retake Effect: Clearing a failed course replaces the 0.00 grade in that term, increasing Quality Points and lifting both that term GPA and overall CGPA.`;
 
     let instruction = "";
     if (mode === "analyze") {
@@ -81,7 +88,8 @@ Target CGPA: ${targetCgpa.toFixed(2)} (Approx. required average GPA across remai
 Keep it under 140 words. Use plain text and simple numbers (no LaTeX).`;
     } else if (mode === "target_plan") {
       instruction = `Create a practical, realistic action plan to reach Target CGPA ${targetCgpa.toFixed(2)}:
-- State clearly whether ${requiredAvgGpaText} GPA per remaining term is realistic (if > 4.00, state honestly that 4.00 is the max and show the highest achievable CGPA instead)
+- State clearly whether ~${requiredAvgGpaText} GPA per remaining term is realistic (if > 4.00, state honestly that 4.00 is the max and show the highest achievable CGPA instead)
+- Explain briefly how higher-credit upcoming terms help lift CGPA faster
 - Give 3 concrete steps for upcoming terms & retake clearance
 Keep it under 150 words. Use plain text and simple math (no LaTeX).`;
     } else {
@@ -94,7 +102,7 @@ Keep it under 150 words. Use plain text and simple math (no LaTeX).`;
         .map((m) => `${m.role === "user" ? "Student" : "Advisor"}: ${m.text}`)
         .join("\n");
       instruction = `${recentHistory ? `Recent Conversation:\n${recentHistory}\n\n` : ""}Student Question: ${q}
-Answer directly, accurately, and concisely based on the student's actual JTEC term results and retakes above. Reply in the same language the student asked (Bengali or English). Keep it under 160 words and use plain math (no LaTeX).`;
+Answer directly, accurately, and concisely based on the student's actual JTEC term results, retakes, and the JTEC Credit-Weighted CGPA mechanism above. Reply in the same language the student asked (Bengali or English). Keep it under 180 words and use plain math (no LaTeX).`;
     }
 
     const parts: GeminiPart[] = [{ text: `${baseContext}\n\n${instruction}` }];
