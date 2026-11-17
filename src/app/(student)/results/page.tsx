@@ -215,7 +215,7 @@ export default async function StudentResultsPage() {
 
                             <AcademicAiAdvisor
                 studentName={profile.full_name || "Student"}
-                department={(dept as { code?: string } | null)?.code || undefined}
+                department={(dept as { name?: string; code?: string } | null)?.name ? `${(dept as { name?: string; code?: string }).name}${(dept as { code?: string }).code ? ` (${(dept as { code?: string }).code})` : ""}` : (dept as { code?: string } | null)?.code || undefined}
                 storageKey={`results_${user.id}`}
                 terms={passedResults
                   .filter((r) => Number(r.gpa) > 0)

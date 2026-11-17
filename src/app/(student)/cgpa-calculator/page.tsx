@@ -107,7 +107,7 @@ export default async function CgpaCalculatorPage() {
               />
               <AcademicAiAdvisor
                 studentName={profile?.full_name || "Student"}
-                department={deptObj?.code || undefined}
+                department={deptObj?.name ? `${deptObj.name}${deptObj.code ? ` (${deptObj.code})` : ""}` : deptObj?.code || undefined}
                 storageKey={`calc_${user.id}`}
                 terms={publishedResults}
                 retakes={pendingRetakes}

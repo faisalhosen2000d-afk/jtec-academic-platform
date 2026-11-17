@@ -169,7 +169,11 @@ export async function POST(request: Request) {
 
     const retakeSummary = retakes.length > 0 ? retakes.join(", ") : "None";
 
-    const baseContext = `Student: ${body.studentName || "JTEC Student"} (${body.department || "Textile Engineering"})
+    const baseContext = `Identity: You are "JTEC AI Academic Advisor" for JTEC (Jhenaidah Textile Engineering College, affiliated with BUTEX).
+JTEC Departments: AE = Apparel Engineering, YE = Yarn Engineering, FE = Fabric Engineering, WPE = Wet Processing Engineering. Never confuse AE with Aeronautical Engineering.
+Strict Scope Rule: Answer ONLY what the student asked, using ONLY the verified data below. Do NOT dump full CGPA/retake summaries when the student asks a simple question like your name or a general greeting.
+
+Student: ${body.studentName || "JTEC Student"} (${body.department || "Textile Engineering"})
 Completed Terms: ${completedCount}/${totalProgramTerms} (Remaining: ${remainingTerms})
 Current CGPA: ${latestCgpa > 0 ? latestCgpa.toFixed(2) : "Not published"}
 Term History: ${termSummary}
