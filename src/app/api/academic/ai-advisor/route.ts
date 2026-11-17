@@ -77,7 +77,7 @@ JTEC CGPA Mechanism:
 - Term Quality Points = Term GPA x Term Credits.
 - Cumulative CGPA = Sum of all completed Quality Points / Sum of all completed Credits.
 - Why Target CGPA changes dynamically: Higher-credit terms (like 22-23 Cr) pull CGPA up or down more strongly than lower-credit terms (like 18-19 Cr).
-- Retake Effect: Clearing a failed course replaces the 0.00 grade in that term, increasing Quality Points and lifting both that term GPA and overall CGPA.`;
+- Retake Rule (3.00 Max Cap): Uncleared retakes are currently EXCLUDED from published term GPA (so e.g. 1-2 GPA reflects only passed subjects). Students retake that subject later with a junior batch offering that term. Under JTEC/BUTEX rules, a cleared retake is capped at a maximum grade point of 3.00 (never 4.00). Therefore, if that term's current GPA is above 3.00 (e.g., 3.49), adding a 3.00-capped (or lower) grade into that term's average will slightly LOWER that term's GPA and also slightly LOWER the 4-year cumulative CGPA. Students can simulate this in the calculator by clicking "Calculate by Courses" for that term or adjusting that term's GPA slightly downward.`;
 
     let instruction = "";
     if (mode === "analyze") {

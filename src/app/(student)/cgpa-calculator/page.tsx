@@ -11,6 +11,17 @@ interface PublishedResultRow {
   gpa: number;
   cgpa: number | null;
   status?: string | null;
+  remarks?: string | null;
+}
+
+function getRetakeCodes(remarks?: string | null): string[] {
+  if (!remarks) return [];
+  const c = remarks.replace(/^Retakes:\s*/i, "").trim();
+  if (!c || c === "0" || c.toLowerCase() === "none" || c.startsWith("Year Dropped")) return [];
+  return c
+    .split(/[,;|]+/)
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
 }
 
 export default async function CgpaCalculatorPage() {
@@ -38,12 +49,13 @@ export default async function CgpaCalculatorPage() {
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // Pre-load only ACTUALLY COMPLETED term results (exclude air_dropped 0.00 rows so 1-2 remains Target/Projected until passed with 9th batch)
   let publishedResults: Array<{ termKey: string; gpa: number; cgpa: number | null }> = [];
+  const retakeSet = new Set<string>();
+
   if (profile?.student_id) {
     const { data: results } = await rawClient
       .from("term_results")
-      .select("level_term_key, gpa, cgpa, status")
+      .select("level_term_key, gpa, cgpa, status, remarks")
       .or(`student_id.eq.${user.id},student_id_code.eq.${profile.student_id.trim()}`)
       .neq("status", "air_dropped")
       .order("level_term_key", { ascending: true });
@@ -57,11 +69,14 @@ export default async function CgpaCalculatorPage() {
             gpa: Number(r.gpa) || 0,
             cgpa: r.cgpa !== null ? Number(r.cgpa) : null,
           });
+          getRetakeCodes(r.remarks).forEach((code) => retakeSet.add(`${code} (${r.level_term_key})`));
         }
       });
       publishedResults = Array.from(termMap.values());
     }
   }
+
+  const pendingRetakes = Array.from(retakeSet);
 
   return (
     <div className="min-h-full bg-[#060A12] text-slate-100">
@@ -75,9 +90,7 @@ export default async function CgpaCalculatorPage() {
         .dash-stagger-3 { animation: dashFadeUp 0.45s ease-out 0.16s both; }
       `}</style>
       <div className="flex min-h-full">
-
         <div className="flex min-w-0 flex-1 flex-col">
-
           <main className="flex-1 p-5 sm:p-6">
             <div className="mx-auto w-full max-w-6xl space-y-5">
               <CgpaCalculatorClient
@@ -91,6 +104,7 @@ export default async function CgpaCalculatorPage() {
                 department={deptObj?.code || undefined}
                 storageKey={`calc_${user.id}`}
                 terms={publishedResults}
+                retakes={pendingRetakes}
               />
             </div>
           </main>
