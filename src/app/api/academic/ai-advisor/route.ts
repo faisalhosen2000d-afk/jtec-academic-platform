@@ -32,6 +32,8 @@ function pcmToWavBase64(pcmBase64: string, sampleRate = 24000): string {
   return Buffer.concat([header, pcm]).toString("base64");
 }
 
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();

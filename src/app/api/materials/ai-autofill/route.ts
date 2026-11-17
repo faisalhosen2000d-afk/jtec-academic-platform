@@ -70,6 +70,8 @@ function extractXmlTextFromZip(buf: Buffer, entryPattern: RegExp): string {
   return texts.join("\n").slice(0, 24000);
 }
 
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();

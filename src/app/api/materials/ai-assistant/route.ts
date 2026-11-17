@@ -5,6 +5,8 @@ import { callGemini, type GeminiPart } from "@/lib/gemini";
 
 type AiMode = "summary_en" | "summary_bn" | "questions" | "ask";
 
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
