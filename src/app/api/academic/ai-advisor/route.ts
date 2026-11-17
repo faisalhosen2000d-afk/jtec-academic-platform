@@ -13,6 +13,25 @@ interface ChatMsg {
   text: string;
 }
 
+function pcmToWavBase64(pcmBase64: string, sampleRate = 24000): string {
+  const pcm = Buffer.from(pcmBase64, "base64");
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write("data", 36);
+  header.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([header, pcm]).toString("base64");
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -37,61 +56,68 @@ export async function POST(request: Request) {
       mimeType?: string;
       voiceLang?: "auto" | "bn" | "en";
       text?: string;
+      voiceName?: string;
     };
 
     const mode = body.mode || "analyze";
 
     if (mode === "tts") {
-      const rawText = String(body.text || "")
-        .replace(/\*\*/g, "")
-        .replace(/^[\s•*-]+/gm, "")
-        .replace(/[`#_~]/g, "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 1200);
+      const rawText = String(body.text || "").replace(/\*\*/g, "").replace(/^[\s•*-]+/gm, "").replace(/[`#_~]/g, "").replace(/\s+/g, " ").trim().slice(0, 1200);
+      if (!rawText) return NextResponse.json({ success: false, error: "Nothing to read." }, { status: 400 });
 
-      if (!rawText) {
-        return NextResponse.json({ success: false, error: "Nothing to read." }, { status: 400 });
+      const allowedVoices = new Set(["Kore", "Puck", "Aoede", "Charon"]);
+      const voiceName = allowedVoices.has(String(body.voiceName)) ? String(body.voiceName) : "Kore";
+      const apiKey = process.env.GEMINI_API_KEY?.trim();
+
+      if (apiKey) {
+        try {
+          const gRes = await fetch(
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent",
+            {
+              method: "POST",
+              headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+              signal: AbortSignal.timeout(12000),
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: `Read this naturally and clearly:\n${rawText}` }] }],
+                generationConfig: {
+                  responseModalities: ["AUDIO"],
+                  speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+                },
+              }),
+            }
+          );
+          if (gRes.ok) {
+            const gData = (await gRes.json().catch(() => null)) as {
+              candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { data?: string } }> } }>;
+            } | null;
+            const pcmB64 = gData?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+            if (pcmB64) {
+              return NextResponse.json({ success: true, audioBase64: pcmToWavBase64(pcmB64), mimeType: "audio/wav" });
+            }
+          }
+        } catch {
+          // Fall back to standard TTS below
+        }
       }
 
       const tl = /[\u0980-\u09FF]/.test(rawText) ? "bn" : "en";
-      const words = rawText.split(" ");
       const chunks: string[] = [];
-      let current = "";
-      for (const w of words) {
-        if ((current + " " + w).trim().length > 170) {
-          if (current.trim()) chunks.push(current.trim());
-          current = w;
-        } else {
-          current = (current + " " + w).trim();
-        }
+      let cur = "";
+      for (const w of rawText.split(" ")) {
+        if ((cur + " " + w).trim().length > 170) { if (cur.trim()) chunks.push(cur.trim()); cur = w; }
+        else { cur = (cur + " " + w).trim(); }
       }
-      if (current.trim()) chunks.push(current.trim());
-
-      const buffers: Buffer[] = [];
-      for (const chunk of chunks) {
-        const ttsRes = await fetch(
-          `https://translate.google.com/translate_tts?ie=UTF-8&tl=${tl}&client=tw-ob&q=${encodeURIComponent(chunk)}`,
-          {
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            },
-            signal: AbortSignal.timeout(8000),
-          }
-        );
-        if (!ttsRes.ok) {
-          return NextResponse.json({ success: false, error: "Voice audio service unavailable." }, { status: 502 });
-        }
-        buffers.push(Buffer.from(await ttsRes.arrayBuffer()));
+      if (cur.trim()) chunks.push(cur.trim());
+      const bufs: Buffer[] = [];
+      for (const ch of chunks) {
+        const res = await fetch(`https://translate.google.com/translate_tts?ie=UTF-8&tl=${tl}&client=tw-ob&q=${encodeURIComponent(ch)}`, {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!res.ok) return NextResponse.json({ success: false, error: "Voice audio service unavailable." }, { status: 502 });
+        bufs.push(Buffer.from(await res.arrayBuffer()));
       }
-
-      const combined = Buffer.concat(buffers);
-      return NextResponse.json({
-        success: true,
-        audioBase64: combined.toString("base64"),
-        mimeType: "audio/mpeg",
-      });
+      return NextResponse.json({ success: true, audioBase64: Buffer.concat(bufs).toString("base64"), mimeType: "audio/mpeg" });
     }
 
     if (mode === "transcribe") {

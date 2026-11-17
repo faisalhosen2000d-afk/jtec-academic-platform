@@ -105,6 +105,7 @@ export function AcademicAiAdvisor({
   const [editDraft, setEditDraft] = useState("");
 
   const [voiceLang, setVoiceLang] = useState<"auto" | "bn" | "en">("auto");
+  const [voiceName, setVoiceName] = useState<"Kore" | "Puck" | "Aoede" | "Charon">("Kore");
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
@@ -121,7 +122,9 @@ export function AcademicAiAdvisor({
   useEffect(() => {
     setMounted(true);
     try {
-      const saved = localStorage.getItem(`jtec_advisor_${storageKey}`);
+      const savedVoice = localStorage.getItem("jtec_advisor_voice");
+      if (savedVoice === "Kore" || savedVoice === "Puck" || savedVoice === "Aoede" || savedVoice === "Charon") setVoiceName(savedVoice);
+      const saved = localStorage.getItem(`jtec_advisor_`);
       if (saved) setMessages(JSON.parse(saved) as ChatItem[]);
     } catch {
       // ignore storage errors
@@ -376,7 +379,7 @@ export function AcademicAiAdvisor({
       const res = await fetch("/api/academic/ai-advisor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "tts", text }),
+        body: JSON.stringify({ mode: "tts", text, voiceName }),
       });
       const data = (await res.json()) as {
         success?: boolean;
@@ -546,6 +549,23 @@ export function AcademicAiAdvisor({
                 </div>
 
                 <div className="flex items-center gap-2">
+                                    <select
+                    value={voiceName}
+                    onChange={(e) => {
+                      const v = e.target.value as "Kore" | "Puck" | "Aoede" | "Charon";
+                      setVoiceName(v);
+                      try { localStorage.setItem("jtec_advisor_voice", v); } catch {}
+                    }}
+                    className="rounded-xl border border-slate-700/80 bg-[#060A12] px-2 py-1 text-[10.5px] font-semibold text-violet-200 outline-none"
+                    aria-label="AI Voice Preset"
+                    title="Select AI Voice"
+                  >
+                    <option value="Kore">Kore (F)</option>
+                    <option value="Aoede">Aoede (F)</option>
+                    <option value="Puck">Puck (M)</option>
+                    <option value="Charon">Charon (M)</option>
+                  </select>
+
                   <div className="inline-flex items-center rounded-xl border border-slate-700/80 bg-[#060A12] p-0.5">
                     <Globe className="ml-1.5 mr-1 h-3 w-3 text-slate-400" />
                     {(
