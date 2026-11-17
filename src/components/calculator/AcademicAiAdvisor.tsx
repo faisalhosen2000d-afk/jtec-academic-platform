@@ -2,7 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronUp, Loader2, MessageSquare, Send, Sparkles, Target, Trash2, TrendingUp, X } from "lucide-react";
+import {
+  Check,
+  ChevronUp,
+  Copy,
+  Loader2,
+  MessageSquare,
+  Mic,
+  MicOff,
+  Pencil,
+  Send,
+  Sparkles,
+  Target,
+  Trash2,
+  TrendingUp,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
 
 export interface AdvisorTerm {
   termKey: string;
@@ -21,6 +38,35 @@ interface AcademicAiAdvisorProps {
 interface ChatItem {
   role: "user" | "assistant";
   text: string;
+}
+
+interface SpeechRecognitionAlternativeLike {
+  transcript: string;
+}
+
+interface SpeechRecognitionResultLike {
+  0: SpeechRecognitionAlternativeLike;
+  isFinal: boolean;
+}
+
+interface SpeechRecognitionEventLike {
+  results: ArrayLike<SpeechRecognitionResultLike>;
+}
+
+interface SpeechRecognitionInstance {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+interface WindowWithSpeech extends Window {
+  SpeechRecognition?: new () => SpeechRecognitionInstance;
+  webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
 }
 
 function renderFormattedLines(text: string) {
@@ -47,7 +93,7 @@ function renderFormattedLines(text: string) {
       return (
         <div key={i} className="flex items-start gap-2 pl-0.5">
           <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
-          <p className="flex-1 text-xs leading-relaxed text-slate-300">{rendered}</p>
+          <p className="flex-1 text-xs leading-relaxed text-slate-200">{rendered}</p>
         </div>
       );
     }
@@ -80,16 +126,37 @@ export function AcademicAiAdvisor({
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+
+  const [voiceLang, setVoiceLang] = useState<"bn-BD" | "en-US">("bn-BD");
+  const [listening, setListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setMounted(true);
+    const w = window as unknown as WindowWithSpeech;
+    if (w.SpeechRecognition || w.webkitSpeechRecognition) {
+      setSpeechSupported(true);
+    }
     try {
       const saved = localStorage.getItem(`jtec_advisor_${storageKey}`);
       if (saved) setMessages(JSON.parse(saved) as ChatItem[]);
     } catch {
       // ignore storage errors
     }
+    return () => {
+      recognitionRef.current?.stop();
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
   }, [storageKey]);
 
   useEffect(() => {
@@ -149,11 +216,8 @@ export function AcademicAiAdvisor({
     }, 22);
   };
 
-  const sendChat = async (questionText?: string) => {
-    const q = (questionText ?? input).trim();
-    if (!q || chatLoading || streamingText !== null) return;
-    setInput("");
-    const nextMsgs: ChatItem[] = [...messages, { role: "user", text: q }];
+  const sendChatWithHistory = async (q: string, historyBefore: ChatItem[]) => {
+    const nextMsgs: ChatItem[] = [...historyBefore, { role: "user", text: q }];
     setMessages(nextMsgs);
     setChatLoading(true);
     try {
@@ -164,7 +228,7 @@ export function AcademicAiAdvisor({
           mode: "chat",
           targetCgpa: parseFloat(targetCgpa) || 3.5,
           question: q,
-          history: messages,
+          history: historyBefore,
           terms,
           retakes,
           studentName,
@@ -182,6 +246,86 @@ export function AcademicAiAdvisor({
         { role: "assistant", text: err instanceof Error ? err.message : "Could not get a response." },
       ]);
     }
+  };
+
+  const sendChat = async (questionText?: string) => {
+    const q = (questionText ?? input).trim();
+    if (!q || chatLoading || streamingText !== null) return;
+    if (listening) {
+      recognitionRef.current?.stop();
+      setListening(false);
+    }
+    setInput("");
+    setEditingIdx(null);
+    await sendChatWithHistory(q, messages);
+  };
+
+  const handleCopy = async (text: string, idx: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIdx(idx);
+      window.setTimeout(() => setCopiedIdx((prev) => (prev === idx ? null : prev)), 1500);
+    } catch {
+      // ignore clipboard error
+    }
+  };
+
+  const handleSaveEdit = async (idx: number) => {
+    const updated = editDraft.trim();
+    if (!updated || chatLoading || streamingText !== null) return;
+    setEditingIdx(null);
+    setEditDraft("");
+    const historyBefore = messages.slice(0, idx);
+    await sendChatWithHistory(updated, historyBefore);
+  };
+
+  const toggleVoiceInput = () => {
+    const w = window as unknown as WindowWithSpeech;
+    const SpeechRec = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SpeechRec) return;
+
+    if (listening) {
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
+
+    const rec = new SpeechRec();
+    rec.lang = voiceLang;
+    rec.interimResults = true;
+    rec.continuous = false;
+    const baseInput = input.trim();
+
+    rec.onresult = (event) => {
+      let transcript = "";
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i]?.[0]?.transcript ?? "";
+      }
+      setInput(baseInput ? `${baseInput} ${transcript.trim()}` : transcript.trim());
+    };
+    rec.onerror = () => setListening(false);
+    rec.onend = () => setListening(false);
+
+    recognitionRef.current = rec;
+    setListening(true);
+    rec.start();
+  };
+
+  const toggleSpeak = (text: string, idx: number) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (speakingIdx === idx) {
+      window.speechSynthesis.cancel();
+      setSpeakingIdx(null);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text.replace(/\*\*/g, ""));
+    utter.lang = /[\u0980-\u09FF]/.test(text) ? "bn-BD" : "en-US";
+    utter.rate = 1.02;
+    utter.onend = () => setSpeakingIdx(null);
+    utter.onerror = () => setSpeakingIdx(null);
+    setSpeakingIdx(idx);
+    window.speechSynthesis.speak(utter);
   };
 
   const isBusy = loadingMode !== null;
@@ -307,29 +451,39 @@ export function AcademicAiAdvisor({
       {mounted &&
         chatOpen &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-            <div className="flex h-[88dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-slate-800 bg-[#0B1120] shadow-2xl sm:h-[min(580px,88dvh)] sm:max-w-lg sm:rounded-2xl">
-              <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-violet-400" />
-                  <span className="text-sm font-bold text-slate-100">AI Academic Advisor</span>
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-md sm:items-center sm:p-4">
+            <div className="relative flex h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-violet-500/30 bg-[#080E1C]/95 shadow-[0_0_50px_rgba(139,92,246,0.22)] sm:h-[min(620px,88dvh)] sm:max-w-xl sm:rounded-3xl">
+              <div className="pointer-events-none h-0.5 w-full bg-gradient-to-r from-cyan-400 via-violet-500 to-fuchsia-500" />
+
+              <div className="flex items-center justify-between border-b border-slate-800/80 bg-[#0B1222]/90 px-4 py-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-violet-500/40 bg-gradient-to-br from-violet-500/25 to-cyan-500/20 text-violet-300">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-100">AI Academic Advisor</h3>
+                    <p className="text-[11px] text-slate-400">Credit-weighted CGPA & Retake Guide</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-1">
                   {messages.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => setMessages([])}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-rose-300"
+                      onClick={() => {
+                        setMessages([]);
+                        setEditingIdx(null);
+                      }}
+                      className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-rose-300"
                       aria-label="Clear chat"
                       title="Clear chat"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   )}
                   <button
                     type="button"
                     onClick={() => setChatOpen(false)}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                    className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
                     aria-label="Close"
                   >
                     <X className="h-4 w-4" />
@@ -337,23 +491,23 @@ export function AcademicAiAdvisor({
                 </div>
               </div>
 
-              <div className="flex-1 space-y-3 overflow-y-auto p-4">
+              <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
                 {messages.length === 0 && streamingText === null && (
-                  <div className="space-y-2.5">
-                    <p className="text-xs text-slate-400">
-                      Ask about your CGPA targeting mechanism, credit impact, or retake strategy:
+                  <div className="rounded-2xl border border-slate-800/80 bg-[#0D1528]/80 p-4 space-y-3">
+                    <p className="text-xs leading-relaxed text-slate-300">
+                      Ask about your CGPA targeting mechanism, credit impact, or 3.00-capped retake strategy in Bangla or English:
                     </p>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {[
                         "How does CGPA targeting & Quality Points work?",
+                        "Retake clear korle amar CGPA kemon hobe?",
                         "How can I reach 3.50 CGPA?",
-                        "Should I clear retakes first?",
                       ].map((chip) => (
                         <button
                           key={chip}
                           type="button"
                           onClick={() => sendChat(chip)}
-                          className="rounded-lg border border-slate-700/80 bg-[#0E172A] px-2.5 py-1.5 text-left text-[11px] text-slate-300 transition hover:border-violet-500/40 hover:text-violet-200"
+                          className="rounded-xl border border-slate-700/80 bg-[#080E1C] px-3 py-1.5 text-left text-[11px] font-medium text-slate-300 transition hover:border-violet-500/50 hover:bg-violet-500/10 hover:text-violet-200"
                         >
                           {chip}
                         </button>
@@ -363,22 +517,84 @@ export function AcademicAiAdvisor({
                 )}
 
                 {messages.map((m, idx) => (
-                  <div key={idx} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                        m.role === "user"
-                          ? "border border-violet-500/40 bg-violet-600/30 text-slate-100"
-                          : "border border-slate-800 bg-[#0E172A] text-slate-200 space-y-1"
-                      }`}
-                    >
-                      {m.role === "assistant" ? renderFormattedLines(m.text) : m.text}
-                    </div>
+                  <div key={idx} className={`group flex flex-col gap-1 ${m.role === "user" ? "items-end" : "items-start"}`}>
+                    {m.role === "user" && editingIdx === idx ? (
+                      <div className="w-full max-w-[90%] rounded-2xl border border-violet-500/50 bg-[#121A33] p-2.5 space-y-2">
+                        <textarea
+                          value={editDraft}
+                          onChange={(e) => setEditDraft(e.target.value)}
+                          rows={2}
+                          className="w-full resize-none rounded-xl border border-slate-700/80 bg-[#080E1C] p-2 text-xs text-slate-100 outline-none focus:border-violet-400"
+                        />
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditingIdx(null)}
+                            className="rounded-lg border border-slate-700 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-slate-800"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEdit(idx)}
+                            className="rounded-lg bg-violet-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-violet-500"
+                          >
+                            Save & Resend
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed shadow-sm ${
+                          m.role === "user"
+                            ? "border border-violet-500/40 bg-gradient-to-br from-violet-600/35 to-indigo-600/25 text-slate-100"
+                            : "border border-slate-800/90 bg-[#0E172A]/95 text-slate-200 space-y-1"
+                        }`}
+                      >
+                        {m.role === "assistant" ? renderFormattedLines(m.text) : m.text}
+                      </div>
+                    )}
+
+                    {editingIdx !== idx && (
+                      <div className="flex items-center gap-1 px-1 opacity-80 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(m.text, idx)}
+                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+                        >
+                          {copiedIdx === idx ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                          {copiedIdx === idx ? "Copied" : "Copy"}
+                        </button>
+                        {m.role === "user" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingIdx(idx);
+                              setEditDraft(m.text);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-slate-400 transition hover:bg-slate-800 hover:text-violet-300"
+                          >
+                            <Pencil className="h-3 w-3" /> Edit
+                          </button>
+                        )}
+                        {m.role === "assistant" && (
+                          <button
+                            type="button"
+                            onClick={() => toggleSpeak(m.text, idx)}
+                            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-slate-400 transition hover:bg-slate-800 hover:text-cyan-300"
+                          >
+                            {speakingIdx === idx ? <VolumeX className="h-3 w-3 text-cyan-400" /> : <Volume2 className="h-3 w-3" />}
+                            {speakingIdx === idx ? "Stop" : "Listen"}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
 
                 {streamingText !== null && (
                   <div className="flex justify-start">
-                    <div className="max-w-[88%] space-y-1 rounded-2xl border border-slate-800 bg-[#0E172A] px-3.5 py-2.5 text-xs leading-relaxed text-slate-200">
+                    <div className="max-w-[88%] space-y-1 rounded-2xl border border-slate-800/90 bg-[#0E172A]/95 px-3.5 py-2.5 text-xs leading-relaxed text-slate-200">
                       {renderFormattedLines(streamingText)}
                     </div>
                   </div>
@@ -401,19 +617,45 @@ export function AcademicAiAdvisor({
                   e.preventDefault();
                   sendChat();
                 }}
-                className="flex items-center gap-2 border-t border-slate-800 p-3"
+                className="flex items-center gap-2 border-t border-slate-800/80 bg-[#0B1222]/90 p-3"
               >
+                {speechSupported && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setVoiceLang((l) => (l === "bn-BD" ? "en-US" : "bn-BD"))}
+                      className="rounded-lg border border-slate-700/80 bg-[#060A12] px-1.5 py-1.5 text-[10px] font-bold text-cyan-300 hover:border-cyan-500/40"
+                      title="Switch Voice Language"
+                    >
+                      {voiceLang === "bn-BD" ? "BN" : "EN"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={toggleVoiceInput}
+                      className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${
+                        listening
+                          ? "animate-pulse border-rose-500/60 bg-rose-500/20 text-rose-300"
+                          : "border-slate-700/80 bg-[#060A12] text-slate-300 hover:border-violet-500/40 hover:text-violet-300"
+                      }`}
+                      aria-label={listening ? "Stop voice input" : "Start voice input"}
+                      title={listening ? "Listening..." : "Voice input"}
+                    >
+                      {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                    </button>
+                  </div>
+                )}
+
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask in English or Bangla..."
+                  placeholder={listening ? "Listening... speak now" : "Ask in English or Bangla..."}
                   className="flex-1 rounded-xl border border-slate-700/80 bg-[#060A12] px-3 py-2 text-base sm:text-xs text-slate-100 placeholder:text-slate-500 outline-none focus:border-violet-500/50"
                 />
                 <button
                   type="submit"
                   disabled={chatLoading || streamingText !== null || !input.trim()}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600 text-white transition hover:bg-violet-500 disabled:opacity-50"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md transition hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50"
                   aria-label="Send"
                 >
                   <Send className="h-3.5 w-3.5" />
