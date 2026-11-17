@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AcademicAiAdvisor } from "@/components/calculator/AcademicAiAdvisor";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
@@ -211,6 +212,16 @@ export default async function StudentResultsPage() {
                   </div>
                 </div>
               </section>
+
+                            <AcademicAiAdvisor
+                studentName={profile.full_name || "Student"}
+                department={(dept as { code?: string } | null)?.code || undefined}
+                storageKey={`results_${user.id}`}
+                terms={passedResults
+                  .filter((r) => Number(r.gpa) > 0)
+                  .map((r) => ({ termKey: r.level_term_key, gpa: Number(r.gpa), cgpa: r.cgpa !== null ? Number(r.cgpa) : null }))}
+                retakes={Array.from(subjectOriginTerm.keys())}
+              />
 
               {/* Academic Standing & 5-Segment Retake Risk Gauge */}
               <section className="dash-stagger-2 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-5 shadow-xl space-y-3.5">

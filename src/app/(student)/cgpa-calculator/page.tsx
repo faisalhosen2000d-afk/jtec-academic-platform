@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import { CgpaCalculatorClient } from "@/components/calculator/CgpaCalculatorClient";
+import { AcademicAiAdvisor } from "@/components/calculator/AcademicAiAdvisor";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,12 @@ export default async function CgpaCalculatorPage() {
                 studentRoll={profile?.student_id || ""}
                 defaultDepartmentId={defaultDeptId}
                 publishedResults={publishedResults}
+              />
+              <AcademicAiAdvisor
+                studentName={profile?.full_name || "Student"}
+                department={deptObj?.code || undefined}
+                storageKey={`calc_${user.id}`}
+                terms={publishedResults}
               />
             </div>
           </main>
