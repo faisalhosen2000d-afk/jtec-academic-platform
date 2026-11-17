@@ -1,7 +1,74 @@
 import { NextResponse } from "next/server";
+import { inflateRawSync } from "zlib";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { callGemini, type GeminiPart } from "@/lib/gemini";
+
+function extractXmlTextFromZip(buf: Buffer, entryPattern: RegExp): string {
+  const texts: string[] = [];
+  let offset = 0;
+
+  while (offset + 30 <= buf.length) {
+    if (buf.readUInt32LE(offset) !== 0x04034b50) {
+      const nextSig = buf.indexOf(Buffer.from([0x50, 0x4b, 0x03, 0x04]), offset + 1);
+      if (nextSig === -1) break;
+      offset = nextSig;
+      continue;
+    }
+
+    const flags = buf.readUInt16LE(offset + 6);
+    const compression = buf.readUInt16LE(offset + 8);
+    let compSize = buf.readUInt32LE(offset + 18);
+    const nameLen = buf.readUInt16LE(offset + 26);
+    const extraLen = buf.readUInt16LE(offset + 28);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLen + extraLen;
+
+    if (dataStart > buf.length) break;
+    const entryName = buf.toString("utf8", nameStart, nameStart + nameLen);
+
+    if ((flags & 0x08) !== 0 && compSize === 0) {
+      const nextHeader = buf.indexOf(Buffer.from([0x50, 0x4b, 0x03, 0x04]), dataStart);
+      const centralHeader = buf.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]), dataStart);
+      const endPos = nextHeader !== -1 ? nextHeader : centralHeader !== -1 ? centralHeader : buf.length;
+      compSize = Math.max(0, endPos - dataStart - 16);
+    }
+
+    const dataEnd = Math.min(buf.length, dataStart + compSize);
+
+    if (entryPattern.test(entryName) && dataEnd > dataStart) {
+      try {
+        const slice = buf.subarray(dataStart, dataEnd);
+        const rawXml =
+          compression === 0
+            ? slice.toString("utf8")
+            : compression === 8
+              ? inflateRawSync(slice).toString("utf8")
+              : "";
+
+        if (rawXml) {
+          const cleanText = rawXml
+            .replace(/<\/(w:p|a:p|w:tr)>/g, "\n")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/&amp;/g, "&")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&quot;/g, '"')
+            .replace(/[ \t]+/g, " ")
+            .replace(/\n\s+/g, "\n")
+            .trim();
+          if (cleanText) texts.push(cleanText);
+        }
+      } catch {
+        // Skip malformed zip entry
+      }
+    }
+
+    offset = Math.max(offset + 30, dataEnd);
+  }
+
+  return texts.join("\n").slice(0, 24000);
+}
 
 export async function POST(request: Request) {
   try {
@@ -36,19 +103,26 @@ export async function POST(request: Request) {
     const subjectLabel = String(formData.get("subjectLabel") ?? "").trim();
 
     const parts: GeminiPart[] = [];
-    let attachedFile = false;
+    let readContent = false;
+    let extractedDocText = "";
 
     if (uploadedFile instanceof File && uploadedFile.size > 0 && uploadedFile.size <= 3.8 * 1024 * 1024) {
       const ft = (uploadedFile.type || "").toLowerCase();
       const ext = uploadedFile.name.split(".").pop()?.toLowerCase() ?? "";
-      const isSupportedInline =
+      const buffer = Buffer.from(await uploadedFile.arrayBuffer());
+
+      if (ext === "docx" || ft.includes("wordprocessingml")) {
+        extractedDocText = extractXmlTextFromZip(buffer, /^word\/document\.xml$/i);
+        if (extractedDocText.length > 20) readContent = true;
+      } else if (ext === "pptx" || ft.includes("presentationml")) {
+        extractedDocText = extractXmlTextFromZip(buffer, /^ppt\/slides\/slide\d+\.xml$/i);
+        if (extractedDocText.length > 20) readContent = true;
+      } else if (
         ft.includes("pdf") ||
         ft.includes("image") ||
         ft.includes("text/plain") ||
-        ["pdf", "png", "jpg", "jpeg", "webp", "txt"].includes(ext);
-
-      if (isSupportedInline) {
-        const buffer = Buffer.from(await uploadedFile.arrayBuffer());
+        ["pdf", "png", "jpg", "jpeg", "webp", "txt"].includes(ext)
+      ) {
         const mime =
           ft.includes("pdf") || ext === "pdf"
             ? "application/pdf"
@@ -66,23 +140,24 @@ export async function POST(request: Request) {
             data: buffer.toString("base64"),
           },
         });
-        attachedFile = true;
+        readContent = true;
       }
     }
 
     const promptContext = [
       fileName ? `Filename: ${fileName}` : "",
-      subjectLabel ? `Subject: ${subjectLabel}` : "",
+      subjectLabel ? `Selected Subject: ${subjectLabel}` : "",
+      extractedDocText ? `\nExtracted Document Content:\n${extractedDocText}` : "",
     ]
       .filter(Boolean)
       .join("\n");
 
     parts.push({
-      text: `You are helping a textile engineering student at JTEC fill out an academic material upload form.\n${promptContext}\n\n${
-        attachedFile
-          ? "Read the attached document carefully (headings, cover, and chapters)."
-          : "Based on the filename and subject above, infer clean academic metadata."
-      }\nReturn strictly valid JSON with keys "title", "topic", and "description":\n- "title": clean, concise academic title (max 80 chars, no file extension)\n- "topic": main chapter/unit or key topics covered (max 80 chars)\n- "description": clear 1-2 sentence summary of what students will learn from this file (max 220 chars)`,
+      text: `You are helping a textile engineering student at JTEC fill out an academic material upload form. Our search engine matches materials strictly by Title, Topic, and Description.\n${promptContext}\n\n${
+        readContent
+          ? "Read the actual document content carefully and extract exact, search-friendly academic metadata."
+          : "Only filename/subject is available; infer clean academic metadata."
+      }\nReturn strictly valid JSON with keys "title", "topic", and "description":\n- "title": exact, search-friendly academic title in English (include course code/name & type like Note/Suggestion/Question Analysis if present, max 85 chars, no file extension)\n- "topic": comma-separated main chapters & searchable technical keywords from inside the document (max 140 chars) so searching any topic finds this file\n- "description": clear 1-2 sentence summary of what is covered and which exam/years it helps with (max 240 chars)`,
     });
 
     const raw = await callGemini(parts, { jsonMode: true });
@@ -90,7 +165,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      readFullFile: attachedFile,
+      readFullFile: readContent,
       title: String(parsed?.title ?? "").trim().slice(0, 180),
       topic: String(parsed?.topic ?? "").trim().slice(0, 250),
       description: String(parsed?.description ?? "").trim().slice(0, 1000),

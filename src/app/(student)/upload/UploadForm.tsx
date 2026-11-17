@@ -170,7 +170,7 @@ export default function UploadForm({
       if (data.title) setTitle(data.title);
       if (data.topic) setTopic(data.topic);
       if (data.description) setDescription(data.description);
-      setAiSourceNote(data.readFullFile ? "Filled from PDF content" : "Suggested from filename & subject (>3.8MB)");
+      setAiSourceNote(data.readFullFile ? "Filled from file content" : "Suggested from filename & subject");
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI Auto-Fill failed.");
     } finally {
