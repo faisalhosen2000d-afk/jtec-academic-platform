@@ -50,7 +50,7 @@ export default async function CgpaCalculatorPage() {
   );
 
   let publishedResults: Array<{ termKey: string; gpa: number; cgpa: number | null }> = [];
-  const retakeSet = new Set<string>();
+  const subjectOriginTerm = new Map<string, string>();
 
   if (profile?.student_id) {
     const { data: results } = await rawClient
@@ -69,14 +69,20 @@ export default async function CgpaCalculatorPage() {
             gpa: Number(r.gpa) || 0,
             cgpa: r.cgpa !== null ? Number(r.cgpa) : null,
           });
-          getRetakeCodes(r.remarks).forEach((code) => retakeSet.add(`${code} (${r.level_term_key})`));
+          getRetakeCodes(r.remarks).forEach((code) => {
+            if (!subjectOriginTerm.has(code)) {
+              subjectOriginTerm.set(code, r.level_term_key);
+            }
+          });
         }
       });
       publishedResults = Array.from(termMap.values());
     }
   }
 
-  const pendingRetakes = Array.from(retakeSet);
+  const pendingRetakes = Array.from(subjectOriginTerm.entries()).map(
+    ([code, term]) => `${code} (from ${term})`
+  );
 
   return (
     <div className="min-h-full bg-[#060A12] text-slate-100">

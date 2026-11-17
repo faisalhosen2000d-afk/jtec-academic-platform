@@ -220,7 +220,7 @@ export default async function StudentResultsPage() {
                 terms={passedResults
                   .filter((r) => Number(r.gpa) > 0)
                   .map((r) => ({ termKey: r.level_term_key, gpa: Number(r.gpa), cgpa: r.cgpa !== null ? Number(r.cgpa) : null }))}
-                retakes={Array.from(subjectOriginTerm.keys())}
+                retakes={Array.from(subjectOriginTerm.entries()).map(([code, term]) => `${code} (from ${term})`)}
               />
 
               {/* Academic Standing & 5-Segment Retake Risk Gauge */}
