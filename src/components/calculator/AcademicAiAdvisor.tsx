@@ -6,13 +6,14 @@ import {
   Check,
   ChevronUp,
   Copy,
+  Globe,
   Loader2,
   MessageSquare,
   Mic,
-  MicOff,
   Pencil,
   Send,
   Sparkles,
+  Square,
   Target,
   Trash2,
   TrendingUp,
@@ -38,35 +39,6 @@ interface AcademicAiAdvisorProps {
 interface ChatItem {
   role: "user" | "assistant";
   text: string;
-}
-
-interface SpeechRecognitionAlternativeLike {
-  transcript: string;
-}
-
-interface SpeechRecognitionResultLike {
-  0: SpeechRecognitionAlternativeLike;
-  isFinal: boolean;
-}
-
-interface SpeechRecognitionEventLike {
-  results: ArrayLike<SpeechRecognitionResultLike>;
-}
-
-interface SpeechRecognitionInstance {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-}
-
-interface WindowWithSpeech extends Window {
-  SpeechRecognition?: new () => SpeechRecognitionInstance;
-  webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
 }
 
 function renderFormattedLines(text: string) {
@@ -126,25 +98,26 @@ export function AcademicAiAdvisor({
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState("");
 
-  const [voiceLang, setVoiceLang] = useState<"bn-BD" | "en-US">("bn-BD");
-  const [listening, setListening] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
+  const [voiceLang, setVoiceLang] = useState<"auto" | "bn" | "en">("auto");
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
 
-  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<number | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setMounted(true);
-    const w = window as unknown as WindowWithSpeech;
-    if (w.SpeechRecognition || w.webkitSpeechRecognition) {
-      setSpeechSupported(true);
-    }
     try {
       const saved = localStorage.getItem(`jtec_advisor_${storageKey}`);
       if (saved) setMessages(JSON.parse(saved) as ChatItem[]);
@@ -152,7 +125,9 @@ export function AcademicAiAdvisor({
       // ignore storage errors
     }
     return () => {
-      recognitionRef.current?.stop();
+      if (timerRef.current) window.clearInterval(timerRef.current);
+      recorderRef.current?.stop();
+      streamRef.current?.getTracks().forEach((t) => t.stop());
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
       }
@@ -217,6 +192,7 @@ export function AcademicAiAdvisor({
   };
 
   const sendChatWithHistory = async (q: string, historyBefore: ChatItem[]) => {
+    setChatError(null);
     const nextMsgs: ChatItem[] = [...historyBefore, { role: "user", text: q }];
     setMessages(nextMsgs);
     setChatLoading(true);
@@ -250,11 +226,7 @@ export function AcademicAiAdvisor({
 
   const sendChat = async (questionText?: string) => {
     const q = (questionText ?? input).trim();
-    if (!q || chatLoading || streamingText !== null) return;
-    if (listening) {
-      recognitionRef.current?.stop();
-      setListening(false);
-    }
+    if (!q || chatLoading || streamingText !== null || transcribing) return;
     setInput("");
     setEditingIdx(null);
     await sendChatWithHistory(q, messages);
@@ -279,36 +251,102 @@ export function AcademicAiAdvisor({
     await sendChatWithHistory(updated, historyBefore);
   };
 
-  const toggleVoiceInput = () => {
-    const w = window as unknown as WindowWithSpeech;
-    const SpeechRec = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SpeechRec) return;
+  const stopRecordingAndTranscribe = () => {
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.stop();
+    }
+    setRecording(false);
+  };
 
-    if (listening) {
-      recognitionRef.current?.stop();
-      setListening(false);
+  const toggleVoiceRecording = async () => {
+    setChatError(null);
+    if (recording) {
+      stopRecordingAndTranscribe();
       return;
     }
 
-    const rec = new SpeechRec();
-    rec.lang = voiceLang;
-    rec.interimResults = true;
-    rec.continuous = false;
-    const baseInput = input.trim();
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setChatError("Microphone recording is not supported in this browser.");
+      return;
+    }
 
-    rec.onresult = (event) => {
-      let transcript = "";
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i]?.[0]?.transcript ?? "";
-      }
-      setInput(baseInput ? `${baseInput} ${transcript.trim()}` : transcript.trim());
-    };
-    rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      chunksRef.current = [];
 
-    recognitionRef.current = rec;
-    setListening(true);
-    rec.start();
+      const mimeCandidate = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : "";
+
+      const recorder = mimeCandidate ? new MediaRecorder(stream, { mimeType: mimeCandidate }) : new MediaRecorder(stream);
+      recorderRef.current = recorder;
+
+      recorder.ondataavailable = (ev) => {
+        if (ev.data.size > 0) chunksRef.current.push(ev.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        if (blob.size < 400) return;
+
+        setTranscribing(true);
+        try {
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((resolve, reject) => {
+            reader.onloadend = () => {
+              const resStr = String(reader.result || "");
+              resolve(resStr.includes(",") ? resStr.split(",")[1] || "" : resStr);
+            };
+            reader.onerror = () => reject(new Error("Failed to read recorded audio."));
+            reader.readAsDataURL(blob);
+          });
+
+          const res = await fetch("/api/academic/ai-advisor", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              mode: "transcribe",
+              audioBase64: base64,
+              mimeType: blob.type || "audio/webm",
+              voiceLang,
+            }),
+          });
+          const data = (await res.json()) as { success?: boolean; text?: string; error?: string };
+          if (!res.ok || !data.success) throw new Error(data.error || "Could not transcribe voice.");
+          if (data.text) {
+            setInput((prev) => (prev.trim() ? `${prev.trim()} ${data.text}` : data.text || ""));
+          }
+        } catch (err) {
+          setChatError(err instanceof Error ? err.message : "Voice transcription failed.");
+        } finally {
+          setTranscribing(false);
+        }
+      };
+
+      setRecordSeconds(0);
+      setRecording(true);
+      recorder.start();
+      timerRef.current = window.setInterval(() => {
+        setRecordSeconds((s) => {
+          if (s >= 29) {
+            stopRecordingAndTranscribe();
+            return 30;
+          }
+          return s + 1;
+        });
+      }, 1000);
+    } catch {
+      setChatError("Microphone permission denied. Please allow mic access in your browser.");
+    }
   };
 
   const toggleSpeak = (text: string, idx: number) => {
@@ -452,10 +490,10 @@ export function AcademicAiAdvisor({
         chatOpen &&
         createPortal(
           <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-md sm:items-center sm:p-4">
-            <div className="relative flex h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-violet-500/30 bg-[#080E1C]/95 shadow-[0_0_50px_rgba(139,92,246,0.22)] sm:h-[min(620px,88dvh)] sm:max-w-xl sm:rounded-3xl">
+            <div className="relative flex h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-violet-500/30 bg-[#080E1C]/95 shadow-[0_0_50px_rgba(139,92,246,0.22)] sm:h-[min(640px,88dvh)] sm:max-w-xl sm:rounded-3xl">
               <div className="pointer-events-none h-0.5 w-full bg-gradient-to-r from-cyan-400 via-violet-500 to-fuchsia-500" />
 
-              <div className="flex items-center justify-between border-b border-slate-800/80 bg-[#0B1222]/90 px-4 py-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 bg-[#0B1222]/90 px-4 py-3">
                 <div className="flex items-center gap-2.5">
                   <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-violet-500/40 bg-gradient-to-br from-violet-500/25 to-cyan-500/20 text-violet-300">
                     <Sparkles className="h-4 w-4" />
@@ -465,7 +503,32 @@ export function AcademicAiAdvisor({
                     <p className="text-[11px] text-slate-400">Credit-weighted CGPA & Retake Guide</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
+
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex items-center rounded-xl border border-slate-700/80 bg-[#060A12] p-0.5">
+                    <Globe className="ml-1.5 mr-1 h-3 w-3 text-slate-400" />
+                    {(
+                      [
+                        { id: "auto", label: "Auto" },
+                        { id: "bn", label: "\u09AC\u09BE\u0982\u09B2\u09BE" },
+                        { id: "en", label: "EN" },
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setVoiceLang(opt.id)}
+                        className={`rounded-lg px-2 py-1 text-[10.5px] font-semibold transition-all ${
+                          voiceLang === opt.id
+                            ? "bg-gradient-to-r from-violet-600 to-cyan-600 text-white shadow-sm"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
                   {messages.length > 0 && (
                     <button
                       type="button"
@@ -495,7 +558,7 @@ export function AcademicAiAdvisor({
                 {messages.length === 0 && streamingText === null && (
                   <div className="rounded-2xl border border-slate-800/80 bg-[#0D1528]/80 p-4 space-y-3">
                     <p className="text-xs leading-relaxed text-slate-300">
-                      Ask about your CGPA targeting mechanism, credit impact, or 3.00-capped retake strategy in Bangla or English:
+                      Ask about your CGPA targeting mechanism, credit impact, or 3.00-capped retake strategy by typing or using the voice mic:
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {[
@@ -612,6 +675,15 @@ export function AcademicAiAdvisor({
                 <div ref={endRef} />
               </div>
 
+              {chatError && (
+                <div className="mx-3 mb-2 flex items-center justify-between gap-2 rounded-xl border border-rose-500/35 bg-rose-500/10 px-3 py-1.5 text-[11px] text-rose-300">
+                  <span>{chatError}</span>
+                  <button type="button" onClick={() => setChatError(null)} className="text-rose-200 hover:text-white">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -619,42 +691,48 @@ export function AcademicAiAdvisor({
                 }}
                 className="flex items-center gap-2 border-t border-slate-800/80 bg-[#0B1222]/90 p-3"
               >
-                {speechSupported && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setVoiceLang((l) => (l === "bn-BD" ? "en-US" : "bn-BD"))}
-                      className="rounded-lg border border-slate-700/80 bg-[#060A12] px-1.5 py-1.5 text-[10px] font-bold text-cyan-300 hover:border-cyan-500/40"
-                      title="Switch Voice Language"
-                    >
-                      {voiceLang === "bn-BD" ? "BN" : "EN"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={toggleVoiceInput}
-                      className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${
-                        listening
-                          ? "animate-pulse border-rose-500/60 bg-rose-500/20 text-rose-300"
-                          : "border-slate-700/80 bg-[#060A12] text-slate-300 hover:border-violet-500/40 hover:text-violet-300"
-                      }`}
-                      aria-label={listening ? "Stop voice input" : "Start voice input"}
-                      title={listening ? "Listening..." : "Voice input"}
-                    >
-                      {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                    </button>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={toggleVoiceRecording}
+                  disabled={transcribing || chatLoading}
+                  className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border px-2.5 transition ${
+                    recording
+                      ? "animate-pulse border-rose-500/70 bg-rose-500/20 text-rose-200"
+                      : transcribing
+                        ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-200"
+                        : "border-slate-700/80 bg-[#060A12] text-slate-300 hover:border-violet-500/40 hover:text-violet-300"
+                  }`}
+                  aria-label={recording ? "Stop recording" : "Record voice"}
+                  title={recording ? "Tap to stop & transcribe" : "Voice input"}
+                >
+                  {transcribing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : recording ? (
+                    <>
+                      <Square className="h-3.5 w-3.5 fill-current" />
+                      <span className="font-mono text-[11px] font-bold">{recordSeconds}s</span>
+                    </>
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                </button>
 
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder={listening ? "Listening... speak now" : "Ask in English or Bangla..."}
+                  placeholder={
+                    recording
+                      ? "Recording... tap stop when done"
+                      : transcribing
+                        ? "Transcribing voice..."
+                        : "Ask in English or Bangla..."
+                  }
                   className="flex-1 rounded-xl border border-slate-700/80 bg-[#060A12] px-3 py-2 text-base sm:text-xs text-slate-100 placeholder:text-slate-500 outline-none focus:border-violet-500/50"
                 />
                 <button
                   type="submit"
-                  disabled={chatLoading || streamingText !== null || !input.trim()}
+                  disabled={chatLoading || streamingText !== null || transcribing || !input.trim()}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md transition hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50"
                   aria-label="Send"
                 >

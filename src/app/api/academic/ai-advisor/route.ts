@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as {
-      mode?: "analyze" | "target_plan" | "chat";
+      mode?: "analyze" | "target_plan" | "chat" | "transcribe";
       targetCgpa?: number;
       question?: string;
       history?: ChatMsg[];
@@ -33,9 +33,33 @@ export async function POST(request: Request) {
       retakes?: string[];
       studentName?: string;
       department?: string;
+      audioBase64?: string;
+      mimeType?: string;
+      voiceLang?: "auto" | "bn" | "en";
     };
 
     const mode = body.mode || "analyze";
+
+    if (mode === "transcribe") {
+      const audioBase64 = String(body.audioBase64 || "").trim();
+      const mimeType = String(body.mimeType || "audio/webm").split(";")[0] || "audio/webm";
+      if (!audioBase64) {
+        return NextResponse.json({ success: false, error: "No audio recorded." }, { status: 400 });
+      }
+      const langRule =
+        body.voiceLang === "bn"
+          ? "Transcribe accurately in natural Bengali script (keeping English course codes like CHEM-II, CGPA, GPA as-is)."
+          : body.voiceLang === "en"
+            ? "Transcribe accurately in clear English."
+            : "Transcribe accurately in the exact language spoken (Bengali script, English, or natural Banglish as appropriate).";
+
+      const text = await callGemini([
+        { inlineData: { mimeType, data: audioBase64 } },
+        { text: `${langRule} Return ONLY the transcribed text without quotes or extra commentary.` },
+      ]);
+      return NextResponse.json({ success: true, text: text.trim() });
+    }
+
     const terms = Array.isArray(body.terms) ? body.terms.filter((t) => Number(t.gpa) > 0) : [];
     const retakes = Array.isArray(body.retakes) ? body.retakes : [];
     const totalProgramTerms = 8;
