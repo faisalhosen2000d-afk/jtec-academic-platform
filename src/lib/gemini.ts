@@ -4,10 +4,13 @@ export type GeminiPart =
 
 const MODEL_CANDIDATES = [
   "gemini-2.5-flash-lite",
+  "gemini-2.5-flash",
   "gemini-flash-latest",
   "gemini-3.5-flash-lite",
   "gemini-3.8-flash",
 ] as const;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function callGemini(parts: GeminiPart[], options?: { jsonMode?: boolean }): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -17,7 +20,8 @@ export async function callGemini(parts: GeminiPart[], options?: { jsonMode?: boo
 
   let lastError = "AI service is temporarily unavailable.";
 
-  for (const model of MODEL_CANDIDATES) {
+  for (let i = 0; i < MODEL_CANDIDATES.length; i++) {
+    const model = MODEL_CANDIDATES[i];
     try {
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -27,7 +31,7 @@ export async function callGemini(parts: GeminiPart[], options?: { jsonMode?: boo
             "x-goog-api-key": apiKey,
             "Content-Type": "application/json",
           },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(8500),
           body: JSON.stringify({
             contents: [{ parts }],
             generationConfig: {
@@ -38,13 +42,17 @@ export async function callGemini(parts: GeminiPart[], options?: { jsonMode?: boo
         }
       );
 
-      if (response.status === 429) {
-        lastError = "AI is busy right now due to free-tier limits. Please try again in a minute.";
+      if (response.status === 429 || response.status === 503) {
+        lastError =
+          response.status === 429
+            ? "AI is experiencing high traffic right now. Please try again in a few seconds."
+            : `Model ${model} temporarily unavailable (503).`;
+        await sleep(350);
         continue;
       }
 
-      if (response.status === 404 || response.status === 503) {
-        lastError = `Model ${model} temporarily unavailable (${response.status}).`;
+      if (response.status === 404) {
+        lastError = `Model ${model} unavailable (404).`;
         continue;
       }
 

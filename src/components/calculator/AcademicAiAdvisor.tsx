@@ -118,6 +118,7 @@ export function AcademicAiAdvisor({
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -152,6 +153,22 @@ export function AcademicAiAdvisor({
   useEffect(() => {
     if (chatOpen) endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingText, chatOpen, chatLoading]);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 136)}px`;
+  }, [input, chatOpen]);
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setChatOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [chatOpen]);
 
   const runMode = async (mode: "analyze" | "target_plan") => {
     setLoadingMode(mode);
@@ -533,8 +550,8 @@ export function AcademicAiAdvisor({
       {mounted &&
         chatOpen &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-md sm:items-center sm:p-4">
-            <div className="relative flex h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-violet-500/30 bg-[#080E1C]/95 shadow-[0_0_50px_rgba(139,92,246,0.22)] sm:h-[min(640px,88dvh)] sm:max-w-xl sm:rounded-3xl">
+          <div onClick={() => setChatOpen(false)} className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-md sm:items-center sm:p-4">
+            <div onClick={(e) => e.stopPropagation()} className="relative flex h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-violet-500/30 bg-[#080E1C]/95 shadow-[0_0_50px_rgba(139,92,246,0.22)] sm:h-[min(640px,88dvh)] sm:max-w-xl sm:rounded-3xl">
               <div className="pointer-events-none h-0.5 w-full bg-gradient-to-r from-cyan-400 via-violet-500 to-fuchsia-500" />
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 bg-[#0B1222]/90 px-4 py-3">
@@ -597,18 +614,21 @@ export function AcademicAiAdvisor({
                         setMessages([]);
                         setEditingIdx(null);
                       }}
-                      className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-rose-300"
+                      className="inline-flex items-center gap-1 rounded-xl border border-slate-700/70 bg-[#060A12] px-2 py-1 text-[10.5px] font-medium text-slate-400 transition hover:border-rose-500/40 hover:text-rose-300"
                       aria-label="Clear chat"
                       title="Clear chat"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Clear</span>
                     </button>
                   )}
+                  <span className="mx-0.5 h-5 w-px bg-slate-800" />
                   <button
                     type="button"
                     onClick={() => setChatOpen(false)}
-                    className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+                    className="rounded-xl border border-slate-700/70 bg-[#060A12] p-1.5 text-slate-300 transition hover:border-slate-500 hover:bg-slate-800 hover:text-white"
                     aria-label="Close"
+                    title="Close (Esc)"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -750,7 +770,7 @@ export function AcademicAiAdvisor({
                   e.preventDefault();
                   sendChat();
                 }}
-                className="flex items-center gap-2 border-t border-slate-800/80 bg-[#0B1222]/90 p-3"
+                className="flex items-end gap-2 border-t border-slate-800/80 bg-[#0B1222]/90 p-3"
               >
                 <button
                   type="button"
@@ -778,10 +798,17 @@ export function AcademicAiAdvisor({
                   )}
                 </button>
 
-                <input
-                  type="text"
+                <textarea
+                  ref={inputRef}
+                  rows={1}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendChat();
+                    }
+                  }}
                   placeholder={
                     recording
                       ? "Recording... tap stop when done"
@@ -789,7 +816,7 @@ export function AcademicAiAdvisor({
                         ? "Transcribing voice..."
                         : "Ask in English or Bangla..."
                   }
-                  className="flex-1 rounded-xl border border-slate-700/80 bg-[#060A12] px-3 py-2 text-base sm:text-xs text-slate-100 placeholder:text-slate-500 outline-none focus:border-violet-500/50"
+                  className="max-h-36 min-h-[38px] flex-1 resize-none overflow-y-auto rounded-xl border border-slate-700/80 bg-[#060A12] px-3 py-2 text-base sm:text-xs leading-relaxed text-slate-100 placeholder:text-slate-500 outline-none focus:border-violet-500/50"
                 />
                 <button
                   type="submit"
