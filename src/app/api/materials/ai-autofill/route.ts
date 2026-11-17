@@ -101,6 +101,9 @@ export async function POST(request: Request) {
     const uploadedFile = formData.get("file");
     const fileName = String(formData.get("fileName") ?? "").trim();
     const subjectLabel = String(formData.get("subjectLabel") ?? "").trim();
+    const isSampledPdf = String(formData.get("sampledPdf") ?? "") === "true";
+    const totalPages = String(formData.get("totalPages") ?? "").trim();
+    const sampledPages = String(formData.get("sampledPages") ?? "").trim();
 
     const parts: GeminiPart[] = [];
     let readContent = false;
@@ -144,20 +147,39 @@ export async function POST(request: Request) {
       }
     }
 
+    const sampleNote = isSampledPdf
+      ? `Note: This PDF is ${sampledPages} evenly distributed pages sampled from the start, middle, and end of a ${totalPages}-page document.`
+      : "";
+
     const promptContext = [
       fileName ? `Filename: ${fileName}` : "",
       subjectLabel ? `Selected Subject: ${subjectLabel}` : "",
+      sampleNote,
       extractedDocText ? `\nExtracted Document Content:\n${extractedDocText}` : "",
     ]
       .filter(Boolean)
       .join("\n");
 
     parts.push({
-      text: `You are helping a textile engineering student at JTEC fill out an academic material upload form. Our search engine matches materials strictly by Title, Topic, and Description.\n${promptContext}\n\n${
-        readContent
-          ? "Read the actual document content carefully and extract exact, search-friendly academic metadata."
-          : "Only filename/subject is available; infer clean academic metadata."
-      }\nReturn strictly valid JSON with keys "title", "topic", and "description":\n- "title": exact, search-friendly academic title in English (include course code/name & type like Note/Suggestion/Question Analysis if present, max 85 chars, no file extension)\n- "topic": comma-separated main chapters & searchable technical keywords from inside the document (max 140 chars) so searching any topic finds this file\n- "description": clear 1-2 sentence summary of what is covered and which exam/years it helps with (max 240 chars)`,
+      text: `You are helping a textile engineering student at JTEC fill out an academic material upload form. Our search engine matches materials strictly by Title, Topic, and Description.
+${promptContext}
+
+${
+  readContent
+    ? "Read the actual document content carefully and extract exact, search-friendly academic metadata."
+    : "Only filename/subject is available; infer clean academic metadata."
+}
+
+CRITICAL SANITIZATION & ACCURACY RULES:
+1. NEVER include personal student/author names (e.g., "Shamim", "Rahim"), student roll numbers or department+roll tags (e.g., "WPE-50", "YE-12", "AE-08", "Roll-50"), batch/section tags, website/blog watermarks (e.g., "bappibutex.blog", "studocu"), or copy suffixes like "(1)", "final", "updated" in title, topic, or description.
+2. NEVER mistake a student's department+roll tag (like "WPE-50") for a course code or exam name.
+3. Expand common JTEC textile abbreviations cleanly in the title when helpful (e.g., "YM-I" -> "Yarn Manufacturing-I", "FM-I" -> "Fabric Manufacturing-I", "TTQC" -> "Textile Testing & Quality Control").
+4. Keep Description strictly factual about what the file contains; do NOT invent claims like "Useful for WPE-50 exams".
+
+Return strictly valid JSON with keys "title", "topic", and "description":
+- "title": clean, professional academic title in English (max 85 chars, no file extension, no student names/rolls)
+- "topic": comma-separated main chapters & searchable technical keywords from across the document (max 150 chars) so searching any topic finds this file
+- "description": concise, factual 1-2 sentence summary of the academic content covered (max 240 chars)`,
     });
 
     const raw = await callGemini(parts, { jsonMode: true });

@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { preparePdfForAi } from "@/lib/pdf-sampler";
 
 type Subject = {
   id: string;
@@ -156,13 +157,19 @@ export default function UploadForm({
     setAiSourceNote(null);
     setAutoFilling(true);
     try {
+      const prepared = await preparePdfForAi(file, 3.5 * 1024 * 1024);
       const fd = new FormData();
       fd.append("fileName", file.name);
       if (selectedSubject) {
-        fd.append("subjectLabel", ` ${selectedSubject.subject_code} - ${selectedSubject.subject_name} `);
+        fd.append("subjectLabel", `${selectedSubject.subject_code} - ${selectedSubject.subject_name}`);
       }
-      if (file.size <= 3.8 * 1024 * 1024) {
-        fd.append("file", file);
+      if (prepared.file.size <= 3.8 * 1024 * 1024) {
+        fd.append("file", prepared.file);
+      }
+      if (prepared.sampled) {
+        fd.append("sampledPdf", "true");
+        fd.append("totalPages", String(prepared.totalPages ?? ""));
+        fd.append("sampledPages", String(prepared.sampledPages ?? ""));
       }
       const res = await fetch("/api/materials/ai-autofill", { method: "POST", body: fd });
       const data = await res.json();
@@ -170,7 +177,13 @@ export default function UploadForm({
       if (data.title) setTitle(data.title);
       if (data.topic) setTopic(data.topic);
       if (data.description) setDescription(data.description);
-      setAiSourceNote(data.readFullFile ? "Filled from file content" : "Suggested from filename & subject");
+      setAiSourceNote(
+        data.readFullFile
+          ? prepared.sampled
+            ? `Sampled ${prepared.sampledPages}/${prepared.totalPages} pages`
+            : "Filled from file content"
+          : "Suggested from filename & subject"
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI Auto-Fill failed.");
     } finally {
