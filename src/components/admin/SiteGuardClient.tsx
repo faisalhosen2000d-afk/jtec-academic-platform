@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, Send, ShieldCheck, Sparkles } from "lucide-react";
 
 interface SupportTicketRow {
   id: string;
@@ -29,6 +29,38 @@ interface HealthMetrics {
   geminiKeysCount: number;
 }
 
+function renderFormattedLines(text: string) {
+  return text.split("\n").map((line, i) => {
+    const trimmed = line.trim();
+    if (!trimmed) return <div key={i} className="h-1" />;
+    const isBullet = /^[-*•]\s+/.test(trimmed);
+    const clean = trimmed.replace(/^[-*•]\s+/, "");
+    const parts = clean.split(/(\*\*[^*]+\*\*)/g);
+    const rendered = parts.map((p, idx) =>
+      p.startsWith("**") && p.endsWith("**") ? (
+        <strong key={idx} className="font-semibold text-slate-100">
+          {p.slice(2, -2)}
+        </strong>
+      ) : (
+        <span key={idx}>{p}</span>
+      )
+    );
+    if (isBullet) {
+      return (
+        <div key={i} className="flex items-start gap-2 pl-0.5">
+          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
+          <p className="flex-1 text-xs leading-relaxed text-slate-200">{rendered}</p>
+        </div>
+      );
+    }
+    return (
+      <p key={i} className="text-xs leading-relaxed text-slate-200">
+        {rendered}
+      </p>
+    );
+  });
+}
+
 export function SiteGuardClient() {
   const [tickets, setTickets] = useState<SupportTicketRow[]>([]);
   const [health, setHealth] = useState<HealthMetrics | null>(null);
@@ -38,6 +70,7 @@ export function SiteGuardClient() {
   const [auditing, setAuditing] = useState(false);
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [savedNoticeId, setSavedNoticeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
@@ -85,9 +118,11 @@ export function SiteGuardClient() {
     }
   };
 
-  const updateTicket = async (ticketId: string, status: "open" | "in_progress" | "resolved") => {
+  const updateTicket = async (ticketId: string, status: "open" | "in_progress" | "resolved", existingReply?: string | null) => {
     setSavingId(ticketId);
     try {
+      const draft = (replyDrafts[ticketId] ?? "").trim();
+      const finalReply = draft || existingReply || "";
       const res = await fetch("/api/super-admin/site-guard", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -95,10 +130,13 @@ export function SiteGuardClient() {
           action: "update_ticket",
           ticketId,
           status,
-          adminReply: replyDrafts[ticketId] ?? undefined,
+          adminReply: finalReply || undefined,
         }),
       });
       if (res.ok) {
+        setReplyDrafts((prev) => ({ ...prev, [ticketId]: "" }));
+        setSavedNoticeId(ticketId);
+        window.setTimeout(() => setSavedNoticeId((prev) => (prev === ticketId ? null : prev)), 3000);
         await loadData();
       }
     } finally {
@@ -178,7 +216,7 @@ export function SiteGuardClient() {
           <div className="flex items-center gap-2 text-xs font-bold text-violet-300">
             <Sparkles className="h-4 w-4" /> AI Maintenance & Fault Report
           </div>
-          <div className="whitespace-pre-wrap text-xs leading-relaxed text-slate-200">{auditReport}</div>
+          <div className="space-y-1.5">{renderFormattedLines(auditReport)}</div>
         </div>
       )}
 
@@ -221,6 +259,17 @@ export function SiteGuardClient() {
                     <span className="rounded bg-slate-800 px-2 py-0.5 text-[10.5px] text-slate-300">{t.page_path || "/"}</span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-bold uppercase ${
+                        t.status === "resolved"
+                          ? "border border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                          : t.status === "in_progress"
+                            ? "border border-amber-500/40 bg-amber-500/15 text-amber-300"
+                            : "border border-rose-500/40 bg-rose-500/15 text-rose-300"
+                      }`}
+                    >
+                      {t.status.replace("_", " ")}
+                    </span>
                     {t.severity === "high" || t.severity === "critical" ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10.5px] font-bold uppercase text-rose-300">
                         <AlertTriangle className="h-3 w-3" /> {t.severity}
@@ -237,30 +286,45 @@ export function SiteGuardClient() {
                 )}
                 <p className="text-xs text-slate-300">{t.message}</p>
 
+                {t.admin_reply && (
+                  <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                    <div>
+                      <span className="font-semibold">Sent to Student:</span> {t.admin_reply}
+                    </div>
+                  </div>
+                )}
+
+                {savedNoticeId === t.id && (
+                  <p className="text-[11px] font-semibold text-emerald-400">
+                    Reply sent & status updated!
+                  </p>
+                )}
+
                 <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center">
                   <input
                     type="text"
-                    value={replyDrafts[t.id] ?? t.admin_reply ?? ""}
+                    value={replyDrafts[t.id] ?? ""}
                     onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [t.id]: e.target.value }))}
-                    placeholder="Write reply or resolution note for student..."
+                    placeholder={t.admin_reply ? "Write a new reply to update student..." : "Write reply for student..."}
                     className="flex-1 rounded-lg border border-slate-700/80 bg-[#0A1020] px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 outline-none focus:border-cyan-500/50"
                   />
                   <div className="flex gap-1.5">
                     <button
                       type="button"
                       disabled={savingId === t.id}
-                      onClick={() => updateTicket(t.id, "in_progress")}
-                      className="rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/25"
+                      onClick={() => updateTicket(t.id, "in_progress", t.admin_reply)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/25"
                     >
-                      In Progress
+                      <Send className="h-3 w-3" /> Send & Working
                     </button>
                     <button
                       type="button"
                       disabled={savingId === t.id}
-                      onClick={() => updateTicket(t.id, "resolved")}
-                      className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-200 hover:bg-emerald-500/25"
+                      onClick={() => updateTicket(t.id, "resolved", t.admin_reply)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-200 hover:bg-emerald-500/25"
                     >
-                      {savingId === t.id ? "Saving..." : "Mark Resolved"}
+                      <CheckCircle2 className="h-3 w-3" /> {savingId === t.id ? "Sending..." : "Send & Resolve"}
                     </button>
                   </div>
                 </div>
