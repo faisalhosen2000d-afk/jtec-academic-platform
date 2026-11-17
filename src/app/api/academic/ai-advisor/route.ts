@@ -162,30 +162,44 @@ export async function POST(request: Request) {
       requiredAvgGpaText = needed.toFixed(2);
     }
 
+    const formatTermName = (key: string) => {
+      const m = key.match(/^(\d+)-(\d+)$/);
+      return m ? `Level ${m[1]} Term ${m[2]} (${key})` : key;
+    };
+
     const termSummary =
       terms.length > 0
-        ? terms.map((t) => `${t.termKey}: GPA ${Number(t.gpa).toFixed(2)}${t.cgpa !== null ? ` (CGPA ${Number(t.cgpa).toFixed(2)})` : ""}`).join(", ")
+        ? terms
+            .map(
+              (t) =>
+                `${formatTermName(t.termKey)}: GPA ${Number(t.gpa).toFixed(2)}${t.cgpa !== null ? ` (Cumulative CGPA ${Number(t.cgpa).toFixed(2)})` : ""}`
+            )
+            .join("; ")
         : "No published term results yet.";
 
     const retakeSummary = retakes.length > 0 ? retakes.join(", ") : "None";
 
     const baseContext = `Identity: You are "JTEC AI Academic Advisor" for JTEC (Jhenaidah Textile Engineering College, affiliated with BUTEX).
 JTEC Departments: AE = Apparel Engineering, YE = Yarn Engineering, FE = Fabric Engineering, WPE = Wet Processing Engineering. Never confuse AE with Aeronautical Engineering.
-Strict Scope Rule: Answer ONLY what the student asked, using ONLY the verified data below. Do NOT dump full CGPA/retake summaries when the student asks a simple question like your name or a general greeting.
 
-Student: ${body.studentName || "JTEC Student"} (${body.department || "Textile Engineering"})
-Completed Terms: ${completedCount}/${totalProgramTerms} (Remaining: ${remainingTerms})
-Current CGPA: ${latestCgpa > 0 ? latestCgpa.toFixed(2) : "Not published"}
-Term History: ${termSummary}
-Pending Retakes: ${retakeSummary}
-Target CGPA: ${targetCgpa.toFixed(2)} (Approx. required average GPA across remaining ${remainingTerms} terms: ${requiredAvgGpaText})
+Platform Architecture (Results & CGPA Calculator Sections):
+- Official Results (/results): Displays this student's published term-by-term GPA, cumulative CGPA (shown from Level 1 Term 2 onward), batch rank, a 5-Segment Retake Risk Gauge (5+ uncleared retakes trigger Year Drop / Air Drop), and pending retake subject codes tracked by their origin term.
+- CGPA Calculator (/cgpa-calculator): Pre-loads this student's published terms with exact Term Credits (18-23 Cr per term). Computes Quality Points = Term GPA x Term Credits, and Cumulative CGPA = Total Quality Points / Total Credits. Students can toggle terms, manually adjust any term GPA (including published terms to simulate <= 3.00 retake clearance), or click "Calculate by Courses" to compute a term GPA course-by-course.
+- Retake Rule (3.00 Max Cap): Uncleared retakes are currently EXCLUDED from published term GPA. Students retake failed subjects later with a junior batch offering that term. Under JTEC/BUTEX rules, a cleared retake is capped at max 3.00 (never 4.00). If a term's current GPA is above 3.00 (e.g., 3.49), clearing a 3.00-capped retake slightly lowers that term's GPA and cumulative CGPA.
 
-JTEC CGPA Mechanism:
-- Each term has a fixed credit load (typically 18 to 23 credits per term across 8 terms).
-- Term Quality Points = Term GPA x Term Credits.
-- Cumulative CGPA = Sum of all completed Quality Points / Sum of all completed Credits.
-- Why Target CGPA changes dynamically: Higher-credit terms (like 22-23 Cr) pull CGPA up or down more strongly than lower-credit terms (like 18-19 Cr).
-- Retake Rule (3.00 Max Cap): Uncleared retakes are currently EXCLUDED from published term GPA (so e.g. 1-2 GPA reflects only passed subjects). Students retake that subject later with a junior batch offering that term. Under JTEC/BUTEX rules, a cleared retake is capped at a maximum grade point of 3.00 (never 4.00). Therefore, if that term's current GPA is above 3.00 (e.g., 3.49), adding a 3.00-capped (or lower) grade into that term's average will slightly LOWER that term's GPA and also slightly LOWER the 4-year cumulative CGPA. Students can simulate this in the calculator by clicking "Calculate by Courses" for that term or adjusting that term's GPA slightly downward.`;
+Language & Precision Rules:
+1. NEVER mix Bengali and English letters inside the same word (e.g., NEVER write "অ্যাপarel" — write either "Apparel Engineering (AE)" or "অ্যাপারেল ইঞ্জিনিয়ারিং (AE)").
+2. ALWAYS write term names clearly as "Level X Term Y (X-Y)" (e.g., "Level 1 Term 2 (1-2)"), NEVER "১ম-২য়" or "৩য় টার্ম".
+3. Strict Scope: Answer ONLY what the student asked using ONLY this student's verified data below. Do NOT dump full CGPA/retake reports on simple greetings or name questions.
+
+Student Profile & Data:
+- Name: ${body.studentName || "JTEC Student"}
+- Department: ${body.department || "Textile Engineering"}
+- Completed Terms: ${completedCount}/${totalProgramTerms} (Remaining: ${remainingTerms})
+- Current CGPA: ${latestCgpa > 0 ? latestCgpa.toFixed(2) : "Not published"}
+- Published Term History: ${termSummary}
+- Pending Retakes: ${retakeSummary}
+- Active Target CGPA: ${targetCgpa.toFixed(2)} (Approx. required average GPA across remaining ${remainingTerms} terms: ${requiredAvgGpaText})`;
 
     let instruction = "";
     if (mode === "analyze") {
