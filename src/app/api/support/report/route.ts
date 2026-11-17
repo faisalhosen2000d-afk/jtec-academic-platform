@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       : pRow?.departments?.code || "Unknown";
 
     const diagnostics: string[] = [
-      `Account verified: ${pRow?.is_verified ? "Yes" : "No"} (${pRow?.verification_status || "unknown"})`,
+      `Account verified: ${pRow?.is_verified || pRow?.verification_status === "approved" ? "Yes" : "No"} (${pRow?.verification_status || "unknown"})`,
       `Student Roll: ${roll || "Missing"}, Department: ${deptLabel}`,
       `Student's existing open tickets: ${openTicketsCount ?? 0}`,
     ];
