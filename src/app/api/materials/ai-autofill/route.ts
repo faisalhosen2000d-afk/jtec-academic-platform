@@ -182,7 +182,16 @@ Return strictly valid JSON with keys "title", "topic", and "description":
 - "description": concise, factual 1-2 sentence summary of the academic content covered (max 240 chars)`,
     });
 
-    const raw = await callGemini(parts, { jsonMode: true });
+    let raw: string;
+    try {
+      raw = await callGemini(parts, { jsonMode: true });
+    } catch {
+      const hasInline = parts.some((p) => "inlineData" in p);
+      if (!hasInline) throw new Error("AI Auto-Fill timed out. Please try again.");
+      readContent = false;
+      const textOnlyParts = parts.filter((p) => !("inlineData" in p));
+      raw = await callGemini(textOnlyParts, { jsonMode: true });
+    }
     const parsed = JSON.parse(raw) as { title?: string; topic?: string; description?: string };
 
     return NextResponse.json({

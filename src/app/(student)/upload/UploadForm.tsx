@@ -157,7 +157,7 @@ export default function UploadForm({
     setAiSourceNote(null);
     setAutoFilling(true);
     try {
-      const prepared = await preparePdfForAi(file, 3.5 * 1024 * 1024);
+      const prepared = await preparePdfForAi(file, 1.8 * 1024 * 1024);
       const fd = new FormData();
       fd.append("fileName", file.name);
       if (selectedSubject) {

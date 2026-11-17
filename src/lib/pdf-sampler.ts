@@ -12,9 +12,6 @@ function pickDistributedIndices(totalPages: number, targetCount: number): number
     return Array.from({ length: totalPages }, (_, i) => i);
   }
   const indices = new Set<number>([0, totalPages - 1]);
-  if (totalPages > 2 && targetCount >= 3) {
-    indices.add(1);
-  }
   const step = (totalPages - 1) / Math.max(1, targetCount - 1);
   for (let i = 1; i < targetCount - 1; i++) {
     indices.add(Math.min(totalPages - 1, Math.round(i * step)));
@@ -24,7 +21,7 @@ function pickDistributedIndices(totalPages: number, targetCount: number): number
 
 export async function preparePdfForAi(
   file: File,
-  maxBytes = 3.5 * 1024 * 1024,
+  maxBytes = 1.8 * 1024 * 1024,
 ): Promise<PreparedPdfResult> {
   const isPdf =
     file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -40,8 +37,8 @@ export async function preparePdfForAi(
       return { file, sampled: false };
     }
 
-    for (const targetCount of [10, 7, 5, 3, 2, 1]) {
-      if (targetCount > totalPages && targetCount !== 10) continue;
+    for (const targetCount of [5, 4, 3, 2, 1]) {
+      if (targetCount > totalPages && targetCount !== 5) continue;
       const chosen = pickDistributedIndices(totalPages, targetCount);
       const outDoc = await PDFDocument.create();
       const copied = await outDoc.copyPages(srcDoc, chosen);
