@@ -7,6 +7,7 @@ import { getActivePlatformSettings, isMaintenanceCurrentlyActive, isStudentAutho
 import { StudentAccessGateWrapper } from "@/components/student/StudentAccessGateWrapper";
 import { StudentSidebar } from "@/components/dashboard/student-sidebar";
 import { StudentHeader } from "@/components/dashboard/student-header";
+import { StudentSupportWidget } from "@/components/student/StudentSupportWidget";
 import { Clock, AlertCircle, ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -135,6 +136,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
             </div>
           </div>
         </div>
+        {isApproved && <StudentSupportWidget />}
       </StudentAccessGateWrapper>
     </>
   );

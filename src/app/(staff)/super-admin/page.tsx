@@ -72,6 +72,15 @@ const academicModules: ModuleCard[] = [
     accent: "cyan",
     icon: "codes",
   },
+  {
+    title: "AI Site Guard & Support",
+    description:
+      "Monitor platform health, run AI fault audits, and resolve student issue reports.",
+    href: "/super-admin/site-guard",
+    action: "Open Guard",
+    accent: "rose",
+    icon: "audit",
+  },
 ];
 
 const contentModules: ModuleCard[] = [
