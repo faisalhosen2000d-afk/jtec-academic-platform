@@ -168,7 +168,7 @@ export function StudentSupportWidget() {
                     className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:from-cyan-500 hover:to-indigo-500 disabled:opacity-50"
                   >
                     {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                    Send to Super Admin
+                    {submitting ? "AI Guard Checking..." : "Check & Send to Super Admin"}
                   </button>
                 </form>
               ) : (
