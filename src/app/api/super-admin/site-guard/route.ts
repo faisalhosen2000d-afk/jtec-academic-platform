@@ -95,18 +95,50 @@ export async function POST(request: Request) {
       if (!body.ticketId) {
         return NextResponse.json({ success: false, error: "Ticket ID required." }, { status: 400 });
       }
-      const { error } = await auth.serviceSupabase
+      const nextStatus = body.status || "resolved";
+      const cleanReply = body.adminReply?.trim() || null;
+
+      const { data: updatedTicket, error } = await auth.serviceSupabase
         .from("support_tickets")
         .update({
-          status: body.status || "resolved",
-          admin_reply: body.adminReply?.trim() || null,
+          status: nextStatus,
+          admin_reply: cleanReply,
           updated_at: new Date().toISOString(),
         } as never)
-        .eq("id", body.ticketId);
+        .eq("id", body.ticketId)
+        .select("user_id, category, page_path")
+        .maybeSingle();
 
       if (error) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
       }
+
+      const tRow = updatedTicket as {
+        user_id?: string | null;
+        category?: string | null;
+        page_path?: string | null;
+      } | null;
+
+      if (tRow?.user_id) {
+        try {
+          await auth.serviceSupabase.from("notifications").insert({
+            recipient_id: tRow.user_id,
+            type: nextStatus === "resolved" ? "support_resolved" : "support_update",
+            title:
+              nextStatus === "resolved"
+                ? "Issue Resolved by Super Admin"
+                : "Super Admin Update on Your Report",
+            body: cleanReply
+              ? `Admin Reply: ${cleanReply}`
+              : `Your ${tRow.category || "support"} report status is now ${nextStatus.replace("_", " ")}.`,
+            link_url: tRow.page_path || "/dashboard",
+            is_read: false,
+          } as never);
+        } catch {
+          // Do not fail ticket update if notification insert fails
+        }
+      }
+
       return NextResponse.json({ success: true });
     }
 
@@ -146,8 +178,8 @@ Live Platform Health Metrics:
 - Open Support Tickets: ${health.openTickets} (High/Critical: ${health.highSeverityOpen})
 - Pending Student Verifications: ${health.pendingVerifications}
 - Pending Material Reviews: ${health.pendingMaterials}
-- Unlinked Term Result Rows (student_id is null): ${health.unlinkedResults}
-- Legacy Materials Missing SHA-256 Hash: ${health.missingHashMaterials}
+- Unregistered Student Result Rows (normal batch-uploaded results whose students have not registered yet; auto-linked by roll upon signup): ${health.unlinkedResults}
+- Legacy Materials Missing SHA-256 Hash (older files uploaded before duplicate-blocker; normal): ${health.missingHashMaterials}
 - Active Gemini API Failover Keys: ${health.geminiKeysCount}
 
 Recent Open Issues:
