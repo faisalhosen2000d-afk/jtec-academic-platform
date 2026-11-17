@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { NoticeAttachmentActions } from "@/components/notices/NoticeAttachmentActions";
 import { NoticeImagePreview } from "@/components/notices/NoticeImagePreview";
+import { NoticeAiHighlights } from "@/components/notices/NoticeAiHighlights";
 
 type PageProps = {
   params: Promise<{
@@ -110,6 +111,8 @@ export default async function NoticeDetailsPage({
                     </span>
                   )}
                 </div>
+
+                <NoticeAiHighlights noticeId={notice.id} hasAttachments={Boolean(attachments && attachments.length > 0)} />
 
                 <div className="mt-6 whitespace-pre-wrap text-sm leading-7 text-slate-200">
                   {notice.content}
