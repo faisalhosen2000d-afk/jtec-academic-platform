@@ -55,13 +55,12 @@ export function NoticeAiHighlights({ noticeId, hasAttachments }: NoticeAiHighlig
     setLoadingMode(mode);
     setError(null);
     setCollapsed(false);
-    setActiveTitle(
+    const nextTitle =
       mode === "bn"
         ? "\u09B8\u09B9\u099C \u09AC\u09BE\u0982\u09B2\u09BE\u09DF \u09AE\u09C2\u09B2 \u09AA\u09DF\u09C7\u09A8\u09CD\u099F"
         : mode === "ask"
           ? "Notice AI Answer"
-          : "Key Highlights (EN)"
-    );
+          : "Key Highlights (EN)";
     try {
       const res = await fetch("/api/notices/ai-highlights", {
         method: "POST",
@@ -74,6 +73,7 @@ export function NoticeAiHighlights({ noticeId, hasAttachments }: NoticeAiHighlig
       });
       const data = (await res.json()) as { success?: boolean; reply?: string; error?: string };
       if (!res.ok || !data.success) throw new Error(data.error || "Could not summarize notice.");
+      setActiveTitle(nextTitle);
       setOutput(data.reply || "");
       if (mode === "ask") setQuestion("");
     } catch (err) {

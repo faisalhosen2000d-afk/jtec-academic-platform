@@ -4,7 +4,7 @@ export type GeminiPart =
 
 const MODEL_CANDIDATES = [
   "gemini-2.5-flash-lite",
-  "gemini-2.5-flash",
+  
   "gemini-flash-latest",
   "gemini-3.5-flash-lite",
   "gemini-3.8-flash",
@@ -31,7 +31,7 @@ export async function callGemini(parts: GeminiPart[], options?: { jsonMode?: boo
             "x-goog-api-key": apiKey,
             "Content-Type": "application/json",
           },
-          signal: AbortSignal.timeout(8500),
+          signal: AbortSignal.timeout(12000),
           body: JSON.stringify({
             contents: [{ parts }],
             generationConfig: {
