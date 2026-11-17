@@ -350,16 +350,60 @@ export function AcademicAiAdvisor({
   };
 
   const toggleSpeak = (text: string, idx: number) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setChatError("Voice playback is not supported in this browser.");
+      return;
+    }
     if (speakingIdx === idx) {
       window.speechSynthesis.cancel();
       setSpeakingIdx(null);
       return;
     }
     window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text.replace(/\*\*/g, ""));
-    utter.lang = /[\u0980-\u09FF]/.test(text) ? "bn-BD" : "en-US";
-    utter.rate = 1.02;
+    setChatError(null);
+
+    const isBanglaScript = /[\u0980-\u09FF]/.test(text);
+    const isBanglish =
+      !isBanglaScript &&
+      /\b(tomar|amar|korle|hobe|ache|kemon|tumi|ami|korte|parbe|theke|ebong|kintu|gulo|jonno)\b/i.test(
+        text
+      );
+
+    if (isBanglish) {
+      setChatError("Listen works clearly for English or Bengali script (switch to EN or \u09AC\u09BE\u0982\u09B2\u09BE at the top).");
+      return;
+    }
+
+    const voices = window.speechSynthesis.getVoices();
+    if (isBanglaScript) {
+      const bnVoice = voices.find((v) => v.lang.toLowerCase().startsWith("bn"));
+      if (!bnVoice) {
+        setChatError("No Bengali voice is installed in this browser/OS. Switch to EN for voice playback.");
+        return;
+      }
+    }
+
+    const cleanSpeech = text
+      .replace(/\*\*/g, "")
+      .replace(/^[\s•*-]+/gm, "")
+      .replace(/[`#_~]/g, "")
+      .replace(/(\d)-(\d)/g, "$1 $2")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const utter = new SpeechSynthesisUtterance(cleanSpeech);
+    if (isBanglaScript) {
+      const bnVoice = voices.find((v) => v.lang.toLowerCase().startsWith("bn"));
+      if (bnVoice) utter.voice = bnVoice;
+      utter.lang = bnVoice?.lang || "bn-BD";
+    } else {
+      const enVoice =
+        voices.find((v) => v.lang.toLowerCase() === "en-us") ||
+        voices.find((v) => v.lang.toLowerCase().startsWith("en"));
+      if (enVoice) utter.voice = enVoice;
+      utter.lang = enVoice?.lang || "en-US";
+    }
+    utter.rate = 0.98;
     utter.onend = () => setSpeakingIdx(null);
     utter.onerror = () => setSpeakingIdx(null);
     setSpeakingIdx(idx);

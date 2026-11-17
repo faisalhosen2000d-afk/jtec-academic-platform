@@ -126,7 +126,13 @@ Keep it under 150 words. Use plain text and simple math (no LaTeX).`;
         .map((m) => `${m.role === "user" ? "Student" : "Advisor"}: ${m.text}`)
         .join("\n");
       instruction = `${recentHistory ? `Recent Conversation:\n${recentHistory}\n\n` : ""}Student Question: ${q}
-Answer directly, accurately, and concisely based on the student's actual JTEC term results, retakes, and the JTEC Credit-Weighted CGPA mechanism above. Reply in the same language the student asked (Bengali or English). Keep it under 180 words and use plain math (no LaTeX).`;
+Answer directly, accurately, and concisely based on the student's actual JTEC term results, retakes, and the JTEC Credit-Weighted CGPA mechanism above. ${
+        body.voiceLang === "bn"
+          ? "Reply in clear, natural Bengali script (বাংলা). Keep course codes like CHEM-II, CGPA, GPA in English."
+          : body.voiceLang === "en"
+            ? "Reply in clear English."
+            : "Reply in the same language the student asked (Bengali script or English; avoid messy Banglish)."
+      } Keep it under 180 words and use plain math (no LaTeX).`;
     }
 
     const parts: GeminiPart[] = [{ text: `${baseContext}\n\n${instruction}` }];
