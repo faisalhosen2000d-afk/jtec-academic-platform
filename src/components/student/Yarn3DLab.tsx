@@ -31,6 +31,88 @@ function disposeObject3D(root: THREE.Object3D): void {
   });
 }
 
+function buildHelicalStrand(
+  parent: THREE.Group,
+  options: {
+    yOffset: number;
+    length: number;
+    strandRadius: number;
+    helixRadius: number;
+    turns: number;
+    phase: number;
+    colorHex: number;
+    opacity?: number;
+    addFibers?: boolean;
+  }
+) {
+  const {
+    yOffset,
+    length,
+    strandRadius,
+    helixRadius,
+    turns,
+    phase,
+    colorHex,
+    opacity = 1,
+    addFibers = true,
+  } = options;
+
+  const samples = 96;
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const x = -length / 2 + t * length;
+    const angle = t * Math.PI * 2 * turns + phase;
+    const y = yOffset + Math.cos(angle) * helixRadius;
+    const z = Math.sin(angle) * helixRadius;
+    pts.push(new THREE.Vector3(x, y, z));
+  }
+
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const geo = new THREE.TubeGeometry(curve, 96, strandRadius, 18, false);
+  const mat = new THREE.MeshStandardMaterial({
+    color: colorHex,
+    roughness: 0.52,
+    metalness: 0.08,
+    transparent: opacity < 1,
+    opacity,
+  });
+  parent.add(new THREE.Mesh(geo, mat));
+
+  if (addFibers) {
+    // 2 fine surface twist filaments so even 1-Ply looks like spun twisted yarn
+    for (let f = 0; f < 2; f++) {
+      const fPts: THREE.Vector3[] = [];
+      const fPhase = phase + f * Math.PI;
+      const fOffset = strandRadius * 0.92;
+      for (let i = 0; i <= samples; i++) {
+        const t = i / samples;
+        const x = -length / 2 + t * length;
+        const mainAng = t * Math.PI * 2 * turns + phase;
+        const fiberAng = t * Math.PI * 2 * (turns * 3.5) + fPhase;
+        const cy = yOffset + Math.cos(mainAng) * helixRadius;
+        const cz = Math.sin(mainAng) * helixRadius;
+        fPts.push(
+          new THREE.Vector3(
+            x,
+            cy + Math.cos(fiberAng) * fOffset,
+            cz + Math.sin(fiberAng) * fOffset
+          )
+        );
+      }
+      const fCurve = new THREE.CatmullRomCurve3(fPts);
+      const fGeo = new THREE.TubeGeometry(fCurve, 96, strandRadius * 0.16, 8, false);
+      const fMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.4,
+        transparent: true,
+        opacity: 0.28,
+      });
+      parent.add(new THREE.Mesh(fGeo, fMat));
+    }
+  }
+}
+
 export default function Yarn3DLab({
   mode,
   plyCount,
@@ -47,8 +129,8 @@ export default function Yarn3DLab({
   const stateRef = useRef({
     isPlaying: true,
     wrapStep: 1 as 1 | 2 | 3,
-    rotX: 0.25,
-    rotY: 0.45,
+    rotX: 0.18,
+    rotY: 0.28,
     zoom: 1,
   });
 
@@ -60,18 +142,22 @@ export default function Yarn3DLab({
     stateRef.current.wrapStep = wrapStep;
   }, [wrapStep]);
 
+  const resultantTex = singleTex * Math.max(1, Math.min(4, plyCount));
+  const approxDiameterMm = 0.036 * Math.sqrt(Math.max(1, resultantTex));
+
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
 
     const width = container.clientWidth || 560;
-    const height = container.clientHeight || 320;
+    const height = container.clientHeight || 350;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x090d16);
 
+    const baseZ = mode === "ply" ? 4.9 : 6.4;
     const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
-    camera.position.set(0, 1.4, 7.2);
+    camera.position.set(0, 0.75, baseZ);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     renderer.setSize(width, height);
@@ -79,22 +165,22 @@ export default function Yarn3DLab({
     container.innerHTML = "";
     container.appendChild(renderer.domElement);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.85);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.95);
     scene.add(ambient);
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.35);
-    keyLight.position.set(5, 8, 6);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.45);
+    keyLight.position.set(4, 7, 6);
     scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.65);
-    rimLight.position.set(-5, -3, -4);
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.75);
+    rimLight.position.set(-5, -2, -4);
     scene.add(rimLight);
 
     const rootGroup = new THREE.Group();
     scene.add(rootGroup);
 
-    const grid = new THREE.GridHelper(12, 16, 0x1e293b, 0x111827);
-    grid.position.y = -2.1;
+    const grid = new THREE.GridHelper(12, 18, 0x334155, 0x1e293b);
+    grid.position.y = -1.85;
     rootGroup.add(grid);
 
     let reelWheel: THREE.Group | null = null;
@@ -107,47 +193,43 @@ export default function Yarn3DLab({
 
     if (mode === "ply") {
       const clampedPly = Math.max(1, Math.min(4, plyCount));
-      const strandRadius = Math.max(0.08, Math.min(0.28, 0.065 + Math.sqrt(Math.max(1, singleTex)) * 0.022));
-      const helixRadius = clampedPly === 1 ? 0 : strandRadius * (clampedPly === 2 ? 1.05 : clampedPly === 3 ? 1.22 : 1.38);
-      const length = 5.4;
-      const turns = 3.2;
-      const samples = 96;
+      const strandRadius = Math.max(0.06, Math.min(0.26, 0.05 + Math.sqrt(Math.max(1, singleTex)) * 0.022));
+      const helixRadius =
+        clampedPly === 1 ? 0 : strandRadius * (clampedPly === 2 ? 1.05 : clampedPly === 3 ? 1.24 : 1.4);
+      const length = 4.6;
 
+      // Active Yarn (top)
       for (let p = 0; p < clampedPly; p++) {
         const phase = (p * Math.PI * 2) / clampedPly;
-        const pts: THREE.Vector3[] = [];
-        for (let i = 0; i <= samples; i++) {
-          const t = i / samples;
-          const x = -length / 2 + t * length;
-          const angle = t * Math.PI * 2 * turns + phase;
-          const y = Math.cos(angle) * helixRadius;
-          const z = Math.sin(angle) * helixRadius;
-          pts.push(new THREE.Vector3(x, y, z));
-        }
-        const curve = new THREE.CatmullRomCurve3(pts);
-        const geo = new THREE.TubeGeometry(curve, 96, strandRadius, 16, false);
         const colorHex = PLY_COLORS[p % PLY_COLORS.length] ?? 0x22d3ee;
-        const mat = new THREE.MeshStandardMaterial({
-          color: colorHex,
-          roughness: 0.42,
-          metalness: 0.12,
+        buildHelicalStrand(rootGroup, {
+          yOffset: 0.42,
+          length,
+          strandRadius,
+          helixRadius,
+          turns: 3.4,
+          phase,
+          colorHex,
+          addFibers: true,
         });
-        const mesh = new THREE.Mesh(geo, mat);
-        rootGroup.add(mesh);
       }
 
-      const binderRadius = helixRadius + strandRadius * 1.08;
-      [-length / 2 + 0.12, length / 2 - 0.12].forEach((bx) => {
-        const ringGeo = new THREE.TorusGeometry(binderRadius, 0.035, 12, 32);
-        const ringMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.6, roughness: 0.3 });
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.rotation.y = Math.PI / 2;
-        ring.position.x = bx;
-        rootGroup.add(ring);
+      // Reference 30 Ne (19.68 Tex, 1-Ply) Yarn (bottom) for instant visual thickness comparison
+      const refRadius = 0.05 + Math.sqrt(19.68) * 0.022;
+      buildHelicalStrand(rootGroup, {
+        yOffset: -0.78,
+        length,
+        strandRadius: refRadius,
+        helixRadius: 0,
+        turns: 3.4,
+        phase: 0,
+        colorHex: 0x64748b,
+        opacity: 0.65,
+        addFibers: true,
       });
     } else if (mode === "wrap_reel") {
       const coneGroup = new THREE.Group();
-      coneGroup.position.set(-2.9, -1.1, 0);
+      coneGroup.position.set(-2.6, -1.0, 0);
       const coneBase = new THREE.Mesh(
         new THREE.CylinderGeometry(0.45, 0.52, 0.16, 24),
         new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5 })
@@ -162,14 +244,14 @@ export default function Yarn3DLab({
       rootGroup.add(coneGroup);
 
       const stand = new THREE.Mesh(
-        new THREE.BoxGeometry(0.22, 2.5, 0.22),
+        new THREE.BoxGeometry(0.22, 2.4, 0.22),
         new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5, roughness: 0.4 })
       );
-      stand.position.set(-0.85, -0.8, -0.45);
+      stand.position.set(-0.65, -0.75, -0.45);
       rootGroup.add(stand);
 
       reelWheel = new THREE.Group();
-      reelWheel.position.set(-0.85, 0.25, 0);
+      reelWheel.position.set(-0.65, 0.28, 0);
       const hub = new THREE.Mesh(
         new THREE.CylinderGeometry(0.18, 0.18, 0.9, 20),
         new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.6, roughness: 0.3 })
@@ -180,10 +262,10 @@ export default function Yarn3DLab({
       for (let a = 0; a < 6; a++) {
         const ang = (a * Math.PI * 2) / 6;
         const arm = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.035, 0.035, 1.35, 10),
+          new THREE.CylinderGeometry(0.035, 0.035, 1.3, 10),
           new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.7, roughness: 0.25 })
         );
-        arm.position.set(Math.cos(ang) * 0.68, Math.sin(ang) * 0.68, 0);
+        arm.position.set(Math.cos(ang) * 0.65, Math.sin(ang) * 0.65, 0);
         arm.rotation.z = ang + Math.PI / 2;
         reelWheel.add(arm);
 
@@ -192,12 +274,12 @@ export default function Yarn3DLab({
           new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.65, roughness: 0.3 })
         );
         bar.rotation.x = Math.PI / 2;
-        bar.position.set(Math.cos(ang) * 1.3, Math.sin(ang) * 1.3, 0);
+        bar.position.set(Math.cos(ang) * 1.25, Math.sin(ang) * 1.25, 0);
         reelWheel.add(bar);
       }
 
       const woundBand = new THREE.Mesh(
-        new THREE.CylinderGeometry(1.32, 1.32, 0.36, 6),
+        new THREE.CylinderGeometry(1.27, 1.27, 0.36, 6),
         new THREE.MeshStandardMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.72, roughness: 0.6 })
       );
       woundBand.rotation.x = Math.PI / 2;
@@ -205,7 +287,7 @@ export default function Yarn3DLab({
       rootGroup.add(reelWheel);
 
       const balanceGroup = new THREE.Group();
-      balanceGroup.position.set(2.1, -1.5, 0);
+      balanceGroup.position.set(2.05, -1.45, 0);
       const body = new THREE.Mesh(
         new THREE.BoxGeometry(1.9, 0.55, 1.5),
         new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.3 })
@@ -329,7 +411,7 @@ export default function Yarn3DLab({
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      stateRef.current.zoom = Math.max(0.6, Math.min(1.85, stateRef.current.zoom - e.deltaY * 0.001));
+      stateRef.current.zoom = Math.max(0.6, Math.min(2.0, stateRef.current.zoom - e.deltaY * 0.001));
     };
 
     const domEl = renderer.domElement;
@@ -340,7 +422,7 @@ export default function Yarn3DLab({
 
     const resizeObserver = new ResizeObserver(() => {
       const w = container.clientWidth || 560;
-      const h = container.clientHeight || 320;
+      const h = container.clientHeight || 350;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
@@ -352,7 +434,7 @@ export default function Yarn3DLab({
       rafId = requestAnimationFrame(animate);
 
       if (stateRef.current.isPlaying && !isDragging && mode === "ply") {
-        stateRef.current.rotY += 0.004;
+        stateRef.current.rotY += 0.0035;
       }
 
       if (reelWheel && stateRef.current.isPlaying && stateRef.current.wrapStep === 1) {
@@ -371,7 +453,7 @@ export default function Yarn3DLab({
 
       rootGroup.rotation.x = stateRef.current.rotX;
       rootGroup.rotation.y = stateRef.current.rotY;
-      camera.position.z = 7.2 / stateRef.current.zoom;
+      camera.position.z = baseZ / stateRef.current.zoom;
       renderer.render(scene, camera);
     };
     animate();
@@ -389,8 +471,8 @@ export default function Yarn3DLab({
   }, [mode, plyCount, singleTex, wrapTurns, beesleyThreads, resetTick]);
 
   const handleReset = () => {
-    stateRef.current.rotX = 0.25;
-    stateRef.current.rotY = 0.45;
+    stateRef.current.rotX = 0.18;
+    stateRef.current.rotY = 0.28;
     stateRef.current.zoom = 1;
     setResetTick((t) => t + 1);
   };
@@ -444,7 +526,66 @@ export default function Yarn3DLab({
         </div>
       </div>
 
-      <div ref={mountRef} className="w-full h-[290px] sm:h-[330px] cursor-grab active:cursor-grabbing" />
+      {/* 3D Canvas + Live HUD Overlay */}
+      <div className="relative">
+        <div ref={mountRef} className="w-full h-[320px] sm:h-[360px] cursor-grab active:cursor-grabbing" />
+
+        <div className="pointer-events-none absolute top-3 left-3 right-3 flex flex-wrap items-start justify-between gap-2">
+          {mode === "ply" && (
+            <>
+              <div className="rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-3 py-2 text-[11px] space-y-0.5">
+                <div className="text-cyan-300 font-semibold">
+                  {"\u0989\u09aa\u09b0\u09c7\u09b0 \u09b0\u0999\u09bf\u09a8 \u09b8\u09c1\u09a4\u09be = \u09a4\u09cb\u09ae\u09be\u09b0 \u0987\u09a8\u09aa\u09c1\u099f"} ({plyCount}-Ply, {resultantTex.toFixed(1)} Tex)
+                </div>
+                <div className="text-slate-400">
+                  {"\u09a8\u09bf\u099a\u09c7\u09b0 \u09a7\u09c2\u09b8\u09b0 \u09b8\u09c1\u09a4\u09be = 30 Ne (19.7 Tex) \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8"}
+                </div>
+              </div>
+              <div className="rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-3 py-2 text-[11px] text-right">
+                <div className="text-slate-200 font-mono">
+                  {"\u0986\u09a8\u09c1\u09ae\u09be\u09a8\u09bf\u0995 \u09ac\u09cd\u09af\u09be\u09b8"}: ~{approxDiameterMm.toFixed(2)} mm
+                </div>
+                <div
+                  className={
+                    resultantTex > 22
+                      ? "text-amber-300 font-medium"
+                      : resultantTex < 17
+                      ? "text-cyan-300 font-medium"
+                      : "text-emerald-400 font-medium"
+                  }
+                >
+                  {resultantTex > 22
+                    ? "30 Ne \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u099a\u09c7\u09df\u09c7 \u09ae\u09cb\u099f\u09be"
+                    : resultantTex < 17
+                    ? "30 Ne \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u099a\u09c7\u09df\u09c7 \u099a\u09bf\u0995\u09a8"
+                    : "\u09aa\u09cd\u09b0\u09be\u09df 30 Ne \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u09b8\u09ae\u09be\u09a8"}
+                </div>
+              </div>
+            </>
+          )}
+
+          {mode === "wrap_reel" && (
+            <div className="rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-3 py-2 text-[11px] space-y-0.5">
+              <div className="text-cyan-300 font-semibold">
+                {wrapStep === 1
+                  ? "\u09a7\u09be\u09aa \u09e7: \u09b0\u200d\u09cd\u09af\u09be\u09aa \u09b0\u09bf\u09b2\u09c7 \u09b8\u09c1\u09a4\u09be \u09aa\u09cd\u09af\u09be\u0981\u099a\u09be\u09a8\u09cb \u09b9\u099a\u09cd\u099b\u09c7"
+                  : wrapStep === 2
+                  ? "\u09a7\u09be\u09aa \u09e8: \u09b8\u09c1\u09a4\u09be \u0995\u09c7\u099f\u09c7 \u09ac\u09cd\u09af\u09be\u09b2\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u09aa\u09cd\u09af\u09be\u09a8\u09c7 \u09b0\u09be\u0996\u09be \u09b9\u09df\u09c7\u099b\u09c7"
+                  : `\u09a7\u09be\u09aa \u09e9: \u09a1\u09bf\u099c\u09bf\u099f\u09be\u09b2 \u09ac\u09cd\u09af\u09be\u09b2\u09c7\u09a8\u09cd\u09b8\u09c7 \u0993\u099c\u09a8 \u09aa\u09be\u0993\u09df\u09be \u0997\u09c7\u099b\u09c7 (${wrapWeightGrains.toFixed(1)} gr)`}
+              </div>
+              <div className="text-slate-400">
+                {"\u09ac\u09be\u09ae\u09c7: Yarn Cone | \u09ae\u09be\u099d\u09c7: Wrap Reel (1.5 yd/turn) | \u09a1\u09be\u09a8\u09c7: Digital Balance"}
+              </div>
+            </div>
+          )}
+
+          {mode === "beesley" && (
+            <div className="rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-3 py-2 text-[11px] text-slate-300">
+              {"\u09ac\u09be\u09ae\u09c7: \u09b9\u09c1\u0995\u09c7 \u0995\u09be\u099f\u09be \u09b8\u09c1\u09a4\u09be | \u09a1\u09be\u09a8\u09c7: \u09b8\u09ac\u09c1\u099c Datum \u09a6\u09be\u0997 (Target = 30 Ne)"}
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="px-4 py-2 border-t border-slate-800/80 bg-slate-900/50 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
         <span>{"\u09ae\u09be\u0989\u09b8/\u099f\u09be\u099a \u09a6\u09bf\u09df\u09c7 \u09a1\u09cd\u09b0\u09cd\u09af\u09be\u0997 \u0995\u09b0\u09c7 \u09e9\u09ec\u09e6\u00b0 \u0998\u09c1\u09b0\u09bf\u09df\u09c7 \u098f\u09ac\u0982 \u09b8\u09cd\u0995\u09cd\u09b0\u09b2 \u0995\u09b0\u09c7 \u099c\u09c1\u09ae \u0995\u09b0\u09c7 \u09a6\u09c7\u0996\u09cb"}</span>
