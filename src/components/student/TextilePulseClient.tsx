@@ -50,7 +50,9 @@ export function TextilePulseClient() {
     setError(null);
     try {
       const res = await fetch(`/api/textile-pulse?date=${encodeURIComponent(briefDate)}&more=1`);
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: { success?: boolean; error?: string; items?: TextileBriefItem[]; briefDate?: string; availableDates?: string[] } = {};
+      try { data = JSON.parse(rawText); } catch { throw new Error("Server took too long. Please click Refresh Today."); }
       if (!res.ok || !data.success) throw new Error(data.error || "Could not load more news.");
       setItems(data.items || []);
     } catch (err) {

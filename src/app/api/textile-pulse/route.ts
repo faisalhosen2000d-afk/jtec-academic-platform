@@ -151,7 +151,11 @@ export async function GET(request: Request) {
 
     if ((items.length === 0 || loadMore) && targetDate === todayDhaka) {
       const existingUrls = new Set(items.map((it) => it.url));
-      const rawHeadlines = (await fetchLiveTextileHeadlines()).filter((h) => !existingUrls.has(h.url));
+      const allNew = (await fetchLiveTextileHeadlines()).filter((h) => !existingUrls.has(h.url));
+      const rawHeadlines = [
+        ...allNew.filter((h) => h.hintRegion === "bangladesh").slice(0, 8),
+        ...allNew.filter((h) => h.hintRegion === "global").slice(0, 8),
+      ];
       if (rawHeadlines.length > 0) {
         const headlineList = rawHeadlines
           .map((h, i) => `[${i}] (${h.hintRegion}) Title: ${h.title} | Source: ${h.source} | Date: ${h.pubDate}`)
@@ -176,7 +180,7 @@ Return strictly valid JSON object with key "items" (array of 4-8 objects):
 - "student_takeaway_bn": 1 short sentence in Bengali explaining why this matters for textile engineering students (max 140 chars)`,
             },
           ],
-          { jsonMode: true, timeoutMs: 42000 }
+          { jsonMode: true, timeoutMs: 18000 }
         );
 
         const parsed = JSON.parse(rawJson) as {
