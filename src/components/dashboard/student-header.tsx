@@ -20,6 +20,8 @@ import {
   Trophy,
   Calculator,
   MessageSquare,
+  Newspaper,
+  Sliders,
 } from "lucide-react";
 import { signOut } from "@/server/actions/auth";
 import { useUnreadNotifications } from "@/lib/use-unread-notifications";
@@ -34,6 +36,8 @@ const pageTitles: Record<string, string> = {
   "/results": "Results",
   "/ranking": "Ranking",
   "/cgpa-calculator": "CGPA Calculator",
+  "/textile-pulse": "Textile Pulse",
+  "/textile-tools": "Textile Tools",
   "/messages": "Conversations",
   "/notifications": "Notifications",
   "/profile": "Profile",
@@ -47,6 +51,8 @@ const mobileNavItems = [
   { label: "Results", href: "/results", icon: GraduationCap },
   { label: "Ranking", href: "/ranking", icon: Trophy },
   { label: "CGPA Calculator", href: "/cgpa-calculator", icon: Calculator },
+  { label: "Textile Pulse", href: "/textile-pulse", icon: Newspaper },
+  { label: "Textile Tools", href: "/textile-tools", icon: Sliders },
   { label: "Conversations", href: "/messages", icon: MessageSquare },
   { label: "Notifications", href: "/notifications", icon: Bell },
   { label: "Profile", href: "/profile", icon: User },
