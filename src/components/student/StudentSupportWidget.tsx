@@ -66,6 +66,17 @@ export function StudentSupportWidget() {
   };
 
   useEffect(() => {
+    try {
+      if (!sessionStorage.getItem("jtec_pulse_ping")) {
+        sessionStorage.setItem("jtec_pulse_ping", "1");
+        fetch("/api/textile-pulse").catch(() => {});
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
     if (open && tab === "history") {
       loadHistory();
     }
