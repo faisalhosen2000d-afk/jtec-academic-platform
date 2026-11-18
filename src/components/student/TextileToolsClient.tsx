@@ -1,3 +1,4 @@
+import PremiumSelect from "../PremiumSelect";
 "use client";
 
 import { useMemo, useState } from "react";
@@ -330,7 +331,7 @@ export function TextileToolsClient() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">{"From System (\u0989\u09ce\u09b8 \u09b8\u09bf\u09b8\u09cd\u099f\u09c7\u09ae)"}</label>
-                  <select
+                  <PremiumSelect
                     value={fromSys}
                     onChange={(e) => setFromSys(e.target.value as CountSystemId)}
                     className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
@@ -340,12 +341,12 @@ export function TextileToolsClient() {
                         {s.label} ({s.type})
                       </option>
                     ))}
-                  </select>
+                  </PremiumSelect>
                 </div>
 
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">{"To System (\u09b2\u0995\u09cd\u09b7\u09cd\u09af \u09b8\u09bf\u09b8\u09cd\u099f\u09c7\u09ae)"}</label>
-                  <select
+                  <PremiumSelect
                     value={toSys}
                     onChange={(e) => setToSys(e.target.value as CountSystemId)}
                     className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
@@ -355,7 +356,7 @@ export function TextileToolsClient() {
                         {s.label} ({s.type})
                       </option>
                     ))}
-                  </select>
+                  </PremiumSelect>
                 </div>
               </div>
 
@@ -691,7 +692,7 @@ export function TextileToolsClient() {
                 onChange={(e) => setLenVal(Number(e.target.value) || 0)}
                 className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
               />
-              <select
+              <PremiumSelect
                 value={lenFrom}
                 onChange={(e) => setLenFrom(e.target.value as LengthUnit)}
                 className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
@@ -703,8 +704,8 @@ export function TextileToolsClient() {
                 <option value="m">Meter (m)</option>
                 <option value="cm">Centimeter (cm)</option>
                 <option value="spyndle">Spyndle (14400 yd)</option>
-              </select>
-              <select
+              </PremiumSelect>
+              <PremiumSelect
                 value={lenTo}
                 onChange={(e) => setLenTo(e.target.value as LengthUnit)}
                 className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
@@ -716,7 +717,7 @@ export function TextileToolsClient() {
                 <option value="m">Meter (m)</option>
                 <option value="cm">Centimeter (cm)</option>
                 <option value="spyndle">Spyndle (14400 yd)</option>
-              </select>
+              </PremiumSelect>
             </div>
             <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 font-mono text-lg text-cyan-300 font-bold">
               {lenVal} {lenFrom} = {lenConverted.toFixed(4)} {lenTo}
@@ -741,7 +742,7 @@ export function TextileToolsClient() {
                 onChange={(e) => setWtVal(Number(e.target.value) || 0)}
                 className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
               />
-              <select
+              <PremiumSelect
                 value={wtFrom}
                 onChange={(e) => setWtFrom(e.target.value as WeightUnit)}
                 className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
@@ -752,8 +753,8 @@ export function TextileToolsClient() {
                 <option value="grain">Grain</option>
                 <option value="kg">Kilogram (kg)</option>
                 <option value="ton">Metric Ton</option>
-              </select>
-              <select
+              </PremiumSelect>
+              <PremiumSelect
                 value={wtTo}
                 onChange={(e) => setWtTo(e.target.value as WeightUnit)}
                 className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
@@ -764,7 +765,7 @@ export function TextileToolsClient() {
                 <option value="lb">Pound (lb)</option>
                 <option value="kg">Kilogram (kg)</option>
                 <option value="ton">Metric Ton</option>
-              </select>
+              </PremiumSelect>
             </div>
             <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 font-mono text-lg text-emerald-400 font-bold">
               {wtVal} {wtFrom} = {wtConverted.toFixed(4)} {wtTo}
