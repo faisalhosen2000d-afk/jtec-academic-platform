@@ -42,6 +42,7 @@ export function TextilePulseClient() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dateMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -65,17 +66,14 @@ export function TextilePulseClient() {
   const loadBrief = async (refresh = false, dateStr?: string) => {
     if (refresh) setRefreshing(true);
     else setLoading(true);
+    setShowAll(false);
     setError(null);
     try {
       const qs = refresh ? "?refresh=true" : dateStr ? `?date=${encodeURIComponent(dateStr)}` : "";
       const res = await fetch(`/api/textile-pulse${qs}`);
-      const data = (await res.json()) as {
-        success?: boolean;
-        briefDate?: string;
-        availableDates?: string[];
-        items?: TextileBriefItem[];
-        error?: string;
-      };
+      const rawBriefText = await res.text();
+      let data: { success?: boolean; briefDate?: string; availableDates?: string[]; items?: TextileBriefItem[]; error?: string } = {};
+      try { data = JSON.parse(rawBriefText); } catch { throw new Error("Server took too long. Please click Refresh Today."); }
       if (!res.ok || !data.success) throw new Error(data.error || "Could not load Textile Pulse.");
       setItems(data.items || []);
       setBriefDate(data.briefDate || "");
@@ -257,7 +255,7 @@ export function TextilePulseClient() {
                   {"\u09AC\u09BE\u0982\u09B2\u09BE\u09A6\u09C7\u09B6\u09C7\u09B0 \u099F\u09C7\u0995\u09CD\u09B8\u099F\u09BE\u0987\u09B2 \u0993 RMG \u0986\u09AA\u09A1\u09C7\u099F"}
                 </h2>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">{bdItems.map(renderCard)}</div>
+              <div className="grid gap-4 md:grid-cols-2">{(showAll ? bdItems : bdItems.slice(0, 4)).map(renderCard)}</div>
             </section>
           )}
 
@@ -269,18 +267,18 @@ export function TextilePulseClient() {
                   {"\u09AC\u09BF\u09B6\u09CD\u09AC\u09C7\u09B0 \u099F\u09C7\u0995\u09CD\u09B8\u099F\u09BE\u0987\u09B2 \u0987\u09A8\u09CB\u09AD\u09C7\u09B6\u09A8 \u0993 \u09AA\u09CD\u09B0\u09AF\u09C1\u0995\u09CD\u09A4\u09BF"}
                 </h2>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">{globalItems.map(renderCard)}</div>
+              <div className="grid gap-4 md:grid-cols-2">{(showAll ? globalItems : globalItems.slice(0, 4)).map(renderCard)}</div>
             </section>
           )}
-          {(!availableDates[0] || briefDate === availableDates[0]) && items.length > 0 && items.length < 24 && (
+          {(!availableDates[0] || briefDate === availableDates[0]) && items.length > 0 && (!showAll || items.length < 24) && (
             <div className="flex justify-center pt-2">
               <button
                 type="button"
-                onClick={loadMoreNews}
+                onClick={() => { if (!showAll && items.length > 8) { setShowAll(true); } else { void loadMoreNews(); } }}
                 disabled={loadingMore}
                 className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/15 px-5 py-2.5 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/25 disabled:opacity-50 transition"
               >
-                {loadingMore ? "Loading more news..." : "See More (+8 News)"}
+                {loadingMore ? "Loading more news..." : !showAll && items.length > 8 ? `See More (+${items.length - 8} News)` : "See More (+8 News)"}
               </button>
             </div>
           )}
