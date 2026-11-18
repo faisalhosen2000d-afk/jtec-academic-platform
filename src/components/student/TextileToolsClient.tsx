@@ -1,775 +1,968 @@
 "use client";
 
-import { Noto_Sans_Bengali } from "next/font/google";
-
 import { useMemo, useState } from "react";
 import {
-  CheckCircle2,
-  Droplets,
-  FlaskConical,
-  Grid3X3,
+  Calculator,
+  Scale,
   Layers,
-  Ruler,
-  Scissors,
+  Droplets,
+  Shirt,
+  FlaskConical,
+  ArrowRightLeft,
+  Info,
   Sparkles,
-  XCircle,
-  BookOpen,
 } from "lucide-react";
+import Yarn3DLab, { type Lab3DMode } from "./Yarn3DLab";
 
-type ToolTab = "yarn" | "fabric" | "dyeing" | "garment" | "ttqc";
+type ToolTab = "yarn" | "units" | "weaving" | "dyeing" | "garment" | "ttqc";
 
-const notoBengali = Noto_Sans_Bengali({ subsets: ["bengali"], weight: ["400", "500", "600", "700"], display: "swap" });
+type CountSystemId =
+  | "tex"
+  | "denier"
+  | "dtex"
+  | "ktex"
+  | "jute"
+  | "ne"
+  | "nm"
+  | "nek"
+  | "lea"
+  | "ysw";
+
+interface CountSystemMeta {
+  id: CountSystemId;
+  label: string;
+  short: string;
+  type: "Direct" | "Indirect";
+  definition: string;
+  toTex: (v: number) => number;
+  fromTex: (tex: number) => number;
+}
+
+const COUNT_SYSTEMS: CountSystemMeta[] = [
+  {
+    id: "tex",
+    label: "Tex (Universal SI)",
+    short: "Tex",
+    type: "Direct",
+    definition: "\u09e7,\u09e6\u09e6\u09e6 \u09ae\u09bf\u099f\u09be\u09b0 \u09b8\u09c1\u09a4\u09be\u09b0 \u0993\u099c\u09a8 \u09af\u09a4 \u0997\u09cd\u09b0\u09be\u09ae",
+    toTex: (v) => v,
+    fromTex: (t) => t,
+  },
+  {
+    id: "denier",
+    label: "Denier (Filament/Polyester)",
+    short: "Denier",
+    type: "Direct",
+    definition: "\u09ef,\u09e6\u09e6\u09e6 \u09ae\u09bf\u099f\u09be\u09b0 \u09b8\u09c1\u09a4\u09be\u09b0 \u0993\u099c\u09a8 \u09af\u09a4 \u0997\u09cd\u09b0\u09be\u09ae (Denier = 9 \u00d7 Tex)",
+    toTex: (v) => v / 9,
+    fromTex: (t) => t * 9,
+  },
+  {
+    id: "dtex",
+    label: "Decitex (dtex)",
+    short: "dtex",
+    type: "Direct",
+    definition: "\u09e7\u09e6,\u09e6\u09e6\u09e6 \u09ae\u09bf\u099f\u09be\u09b0 \u09b8\u09c1\u09a4\u09be\u09b0 \u0993\u099c\u09a8 \u09af\u09a4 \u0997\u09cd\u09b0\u09be\u09ae (dtex = 10 \u00d7 Tex)",
+    toTex: (v) => v / 10,
+    fromTex: (t) => t * 10,
+  },
+  {
+    id: "ktex",
+    label: "Kilotex (ktex / Sliver)",
+    short: "ktex",
+    type: "Direct",
+    definition: "\u09e7,\u09e6\u09e6\u09e6 \u09ae\u09bf\u099f\u09be\u09b0 \u09b8\u09cd\u09b2\u09be\u0987\u09ad\u09be\u09b0/\u09b0\u09cb\u09ad\u09bf\u09df\u09c7\u09b0 \u0993\u099c\u09a8 \u09af\u09a4 \u0995\u09c7\u099c\u09bf",
+    toTex: (v) => v * 1000,
+    fromTex: (t) => t / 1000,
+  },
+  {
+    id: "jute",
+    label: "Jute (lb / spyndle)",
+    short: "lb/spyndle",
+    type: "Direct",
+    definition: "\u09e7\u09ea,\u09ea\u09e6\u09e6 \u0997\u099c (1 spyndle) \u09aa\u09be\u099f\u09c7\u09b0 \u09b8\u09c1\u09a4\u09be\u09b0 \u0993\u099c\u09a8 \u09af\u09a4 \u09aa\u09be\u0989\u09a8\u09cd\u09a1",
+    toTex: (v) => v * 34.45,
+    fromTex: (t) => t / 34.45,
+  },
+  {
+    id: "ne",
+    label: "Ne (English Cotton)",
+    short: "Ne",
+    type: "Indirect",
+    definition: "\u09e7 \u09aa\u09be\u0989\u09a8\u09cd\u09a1 (453.6 gm) \u0993\u099c\u09a8\u09c7 \u09af\u09a4\u099f\u09bf 840 yd \u09b9\u09cd\u09af\u09be\u0982\u0995 \u09a5\u09be\u0995\u09c7",
+    toTex: (v) => 590.54 / Math.max(0.0001, v),
+    fromTex: (t) => 590.54 / Math.max(0.0001, t),
+  },
+  {
+    id: "nm",
+    label: "Nm (Metric Count)",
+    short: "Nm",
+    type: "Indirect",
+    definition: "\u09e7 \u0995\u09c7\u099c\u09bf (1000 gm) \u0993\u099c\u09a8\u09c7 \u09af\u09a4 \u0995\u09bf\u09b2\u09cb\u09ae\u09bf\u099f\u09be\u09b0 (1000 m) \u09b8\u09c1\u09a4\u09be \u09a5\u09be\u0995\u09c7",
+    toTex: (v) => 1000 / Math.max(0.0001, v),
+    fromTex: (t) => 1000 / Math.max(0.0001, t),
+  },
+  {
+    id: "nek",
+    label: "NeK (Worsted Wool)",
+    short: "NeK",
+    type: "Indirect",
+    definition: "\u09e7 \u09aa\u09be\u0989\u09a8\u09cd\u09a1 \u0993\u099c\u09a8\u09c7 \u09af\u09a4\u099f\u09bf 560 yd \u09b9\u09cd\u09af\u09be\u0982\u0995 \u09a5\u09be\u0995\u09c7",
+    toTex: (v) => 885.81 / Math.max(0.0001, v),
+    fromTex: (t) => 885.81 / Math.max(0.0001, t),
+  },
+  {
+    id: "lea",
+    label: "Lea / NeL (Linen)",
+    short: "Lea",
+    type: "Indirect",
+    definition: "\u09e7 \u09aa\u09be\u0989\u09a8\u09cd\u09a1 \u0993\u099c\u09a8\u09c7 \u09af\u09a4\u099f\u09bf 300 yd \u09b2\u09bf \u09a5\u09be\u0995\u09c7",
+    toTex: (v) => 1653.52 / Math.max(0.0001, v),
+    fromTex: (t) => 1653.52 / Math.max(0.0001, t),
+  },
+  {
+    id: "ysw",
+    label: "YSW (Yorkshire Woollen)",
+    short: "YSW",
+    type: "Indirect",
+    definition: "\u09e7 \u09aa\u09be\u0989\u09a8\u09cd\u09a1 \u0993\u099c\u09a8\u09c7 \u09af\u09a4\u099f\u09bf 256 yd \u09b8\u09cd\u0995\u09bf\u09a8 \u09a5\u09be\u0995\u09c7",
+    toTex: (v) => 1937.71 / Math.max(0.0001, v),
+    fromTex: (t) => 1937.71 / Math.max(0.0001, t),
+  },
+];
+
+function Fraction({
+  num,
+  den,
+  prefix,
+  suffix,
+}: {
+  num: string;
+  den: string;
+  prefix?: string;
+  suffix?: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-2 font-mono text-sm sm:text-base text-slate-100">
+      {prefix && <span className="text-cyan-300 font-semibold">{prefix}</span>}
+      <span className="inline-flex flex-col items-center leading-tight">
+        <span className="px-2 pb-1 border-b border-cyan-400/70 text-center">{num}</span>
+        <span className="px-2 pt-1 text-center text-amber-200">{den}</span>
+      </span>
+      {suffix && <span className="text-emerald-300 font-semibold">{suffix}</span>}
+    </span>
+  );
+}
+
+type LengthUnit = "yd" | "in" | "m" | "cm" | "hank" | "lea" | "spyndle";
+const LENGTH_TO_YD: Record<LengthUnit, number> = {
+  yd: 1,
+  in: 1 / 36,
+  m: 1.0936133,
+  cm: 1.0936133 / 100,
+  hank: 840,
+  lea: 120,
+  spyndle: 14400,
+};
+
+type WeightUnit = "lb" | "oz" | "gm" | "grain" | "kg" | "ton";
+const WEIGHT_TO_GM: Record<WeightUnit, number> = {
+  gm: 1,
+  lb: 453.6,
+  oz: 453.6 / 16,
+  grain: 453.6 / 7000,
+  kg: 1000,
+  ton: 1_000_000,
+};
 
 export function TextileToolsClient() {
-  const [tab, setTab] = useState<ToolTab>("yarn");
+  const [activeTab, setActiveTab] = useState<ToolTab>("yarn");
 
-  // 1. Yarn (YE)
-  const [ne, setNe] = useState(30);
-  const [tm, setTm] = useState(4.2);
-  const [leaLbs, setLeaLbs] = useState(78);
+  const [fromSys, setFromSys] = useState<CountSystemId>("ne");
+  const [toSys, setToSys] = useState<CountSystemId>("tex");
+  const [inputCount, setInputCount] = useState<number>(30);
+  const [plyCount, setPlyCount] = useState<number>(2);
+  const [lab3DMode, setLab3DMode] = useState<Lab3DMode>("ply");
 
-  // 2. Fabric (FE)
-  const [warpNe, setWarpNe] = useState(30);
-  const [weftNe, setWeftNe] = useState(30);
-  const [epi, setEpi] = useState(96);
-  const [ppi, setPpi] = useState(76);
-  const [warpCrimp, setWarpCrimp] = useState(6);
-  const [weftCrimp, setWeftCrimp] = useState(5);
+  const [wrapTurns, setWrapTurns] = useState<number>(80);
+  const [wrapWeightGrains, setWrapWeightGrains] = useState<number>(33.3);
+  const [beesleyThreads, setBeesleyThreads] = useState<number>(30);
 
-  // 3. Dyeing (WPE)
-  const [fabricKg, setFabricKg] = useState(150);
-  const [liquorRatio, setLiquorRatio] = useState(8);
-  const [shadePct, setShadePct] = useState(2.5);
-  const [saltGl, setSaltGl] = useState(60);
-  const [sodaGl, setSodaGl] = useState(15);
+  const [lenVal, setLenVal] = useState<number>(1);
+  const [lenFrom, setLenFrom] = useState<LengthUnit>("hank");
+  const [lenTo, setLenTo] = useState<LengthUnit>("yd");
 
-  // 4. Garment & IE (AE)
-  const [bodyLen, setBodyLen] = useState(72);
-  const [sleeveLen, setSleeveLen] = useState(23);
-  const [halfChest, setHalfChest] = useState(54);
-  const [allowance, setAllowance] = useState(5);
-  const [garmentGsm, setGarmentGsm] = useState(180);
-  const [wastagePct, setWastagePct] = useState(10);
-  const [smv, setSmv] = useState(14.5);
-  const [cpm, setCpm] = useState(0.045);
-  const [lineEff, setLineEff] = useState(55);
+  const [wtVal, setWtVal] = useState<number>(1);
+  const [wtFrom, setWtFrom] = useState<WeightUnit>("lb");
+  const [wtTo, setWtTo] = useState<WeightUnit>("grain");
 
-  // 5. TTQC Lab
-  const [beforeWarp, setBeforeWarp] = useState(350);
-  const [afterWarp, setAfterWarp] = useState(338);
-  const [beforeWeft, setBeforeWeft] = useState(350);
-  const [afterWeft, setAfterWeft] = useState(341);
-  const [maxShrinkLimit, setMaxShrinkLimit] = useState(5);
+  const [gsmInput, setGsmInput] = useState<number>(180);
+  const [ozInput, setOzInput] = useState<number>(5.31);
 
-  // Derived Yarn
-  const tex = useMemo(() => (ne > 0 ? 590.5 / ne : 0), [ne]);
-  const denier = useMemo(() => tex * 9, [tex]);
-  const tpi = useMemo(() => tm * Math.sqrt(Math.max(1, ne)), [tm, ne]);
-  const csp = useMemo(() => ne * leaLbs, [ne, leaLbs]);
-  const yarnRadiusPx = useMemo(() => Math.min(26, Math.max(4, 95 / Math.sqrt(Math.max(4, ne)))), [ne]);
+  const [epi, setEpi] = useState<number>(84);
+  const [ppi, setPpi] = useState<number>(64);
+  const [warpNe, setWarpNe] = useState<number>(30);
+  const [weftNe, setWeftNe] = useState<number>(30);
 
-  // Derived Fabric
-  const fabricGsm = useMemo(() => {
-    const wPart = (epi * (1 + warpCrimp / 100)) / Math.max(1, warpNe);
-    const fPart = (ppi * (1 + weftCrimp / 100)) / Math.max(1, weftNe);
-    return 23.25 * (wPart + fPart);
-  }, [epi, ppi, warpNe, weftNe, warpCrimp, weftCrimp]);
+  const [fabricKg, setFabricKg] = useState<number>(100);
+  const [mlRatio, setMlRatio] = useState<number>(8);
+  const [shadePct, setShadePct] = useState<number>(2.5);
+  const [saltGpl, setSaltGpl] = useState<number>(40);
 
-  const coverFactor = useMemo(() => {
-    const k1 = epi / Math.sqrt(Math.max(1, warpNe));
-    const k2 = ppi / Math.sqrt(Math.max(1, weftNe));
-    const kc = k1 + k2 - (k1 * k2) / 28;
-    const pct = Math.min(100, Math.max(0, (kc / 28) * 100));
-    return { k1, k2, kc, pct };
-  }, [epi, ppi, warpNe, weftNe]);
+  const [bodyLenCm, setBodyLenCm] = useState<number>(72);
+  const [sleeveLenCm, setSleeveLenCm] = useState<number>(24);
+  const [chestWidthCm, setChestWidthCm] = useState<number>(54);
+  const [garmentGsm, setGarmentGsm] = useState<number>(160);
+  const [wastagePct, setWastagePct] = useState<number>(8);
+  const [smv, setSmv] = useState<number>(12);
+  const [efficiencyPct, setEfficiencyPct] = useState<number>(65);
+  const [cmPerMinUsd, setCmPerMinUsd] = useState<number>(0.08);
 
-  // Derived Dyeing
-  const totalWaterL = useMemo(() => fabricKg * liquorRatio, [fabricKg, liquorRatio]);
-  const totalDyeKg = useMemo(() => (fabricKg * shadePct) / 100, [fabricKg, shadePct]);
-  const totalSaltKg = useMemo(() => (totalWaterL * saltGl) / 1000, [totalWaterL, saltGl]);
-  const totalSodaKg = useMemo(() => (totalWaterL * sodaGl) / 1000, [totalWaterL, sodaGl]);
+  const [beforeWashCm, setBeforeWashCm] = useState<number>(50);
+  const [afterWashCm, setAfterWashCm] = useState<number>(48.5);
 
-  // Derived Garment
-  const consPerDozenKg = useMemo(() => {
-    const areaCm2 = (bodyLen + sleeveLen + allowance) * (halfChest + allowance) * 2;
-    const baseKgDozen = (areaCm2 * garmentGsm * 12) / 10_000_000;
-    return baseKgDozen * (1 + wastagePct / 100);
-  }, [bodyLen, sleeveLen, halfChest, allowance, garmentGsm, wastagePct]);
+  const fromMeta = COUNT_SYSTEMS.find((s) => s.id === fromSys) ?? COUNT_SYSTEMS[5]!;
+  const toMeta = COUNT_SYSTEMS.find((s) => s.id === toSys) ?? COUNT_SYSTEMS[0]!;
 
-  const cmPerPiece = useMemo(
-    () => (lineEff > 0 ? (smv * cpm) / (lineEff / 100) : 0),
-    [smv, cpm, lineEff]
-  );
+  const singleTex = useMemo(() => {
+    const safeVal = Math.max(0.001, inputCount || 0.001);
+    return fromMeta.toTex(safeVal);
+  }, [fromMeta, inputCount]);
 
-  // Derived TTQC
-  const warpShrinkPct = useMemo(
-    () => (beforeWarp > 0 ? ((beforeWarp - afterWarp) / beforeWarp) * 100 : 0),
-    [beforeWarp, afterWarp]
-  );
-  const weftShrinkPct = useMemo(
-    () => (beforeWeft > 0 ? ((beforeWeft - afterWeft) / beforeWeft) * 100 : 0),
-    [beforeWeft, afterWeft]
-  );
-  const ttqcPass =
-    Math.abs(warpShrinkPct) <= maxShrinkLimit && Math.abs(weftShrinkPct) <= maxShrinkLimit;
+  const resultantTex = singleTex * plyCount;
+  const convertedSingle = toMeta.fromTex(singleTex);
+  const convertedResultant = toMeta.fromTex(resultantTex);
 
-  const guideByTab: Record<
-    ToolTab,
-    {
-      title: string;
-      purpose: string;
-      howTo: string[];
-      terms: Array<{ name: string; desc: string }>;
-      formulas: Array<{ label: string; expr: string }>;
-    }
-  > = {
-    yarn: {
-      title: "সুতা ও স্পিনিং নির্দেশিকা (Yarn & Spinning - YE)",
-      purpose: "এখানে আমরা পরীক্ষা করছি সুতার কাউন্ট (Ne) বদলালে সুতার আসল ব্যাস (মোটা/চিকন), ওজন (Tex/Denier), পাক (TPI) এবং শক্তি (CSP) কীভাবে বদলায়।",
-      howTo: [
-        "ধাপ ১: English Cotton Count (Ne) স্লাইডারটি 6s (মোটা ডেনিম সুতা) থেকে 80s (চিকন শার্টের সুতা) পর্যন্ত সরান এবং ডান পাশের ভিজুয়ালে দেখুন Ne বাড়লে সুতা চিকন হয়ে যাচ্ছে।",
-        "ধাপ ২: স্পিনিং ল্যাবের Twist Multiplier (TM) ও Lea Strength (lbs) বসিয়ে দেখুন সুতার পাকের রেখাগুলো কীভাবে ঘন হয় এবং CSP শক্তি Low/Standard/High দেখায়।",
-      ],
-      terms: [
-        { name: "Ne (English Cotton Count)", desc: "Indirect পদ্ধতি: ১ পাউন্ড সুতায় ৮৪০ গজের কয়টি হ্যাংক আছে। Ne যত বেশি, সুতা তত চিকন।" },
-        { name: "Tex ও Denier", desc: "Direct পদ্ধতি: ১,০০০ মিটার (Tex) বা ৯,০০০ মিটার (Denier) সুতার ওজন (গ্রামে)। মান বাড়লে সুতা মোটা হয়।" },
-        { name: "TM (Twist Multiplier) ও TPI (Turns Per Inch)", desc: "প্রতি ইঞ্চি সুতায় কয়টি পাক আছে। TPI বাড়লে সুতার দৃঢ়তা বাড়ে।" },
-        { name: "CSP (Count Strength Product)", desc: "সুতার কাউন্ট × লি স্ট্রেংথ (পাউন্ড)। ২২০০+ হলে উচ্চমানের Combed সুতা।" },
-      ],
-      formulas: [
-        { label: "Tex (টেক্স)", expr: `590.5 ÷ ${ne} Ne = ${tex.toFixed(2)} Tex` },
-        { label: "Denier (ডেনিয়ার)", expr: `${tex.toFixed(2)} Tex × 9 = ${denier.toFixed(1)} Denier` },
-        { label: "TPI (প্রতি ইঞ্চি পাক)", expr: `${tm} × √${ne} = ${tpi.toFixed(2)} TPI` },
-        { label: "CSP (শক্তি সূচক)", expr: `${ne} Ne × ${leaLbs} lbs = ${Math.round(csp)}` },
-      ],
-    },
-    fabric: {
-      title: "কাপড় ও ওয়েভিং নির্দেশিকা (Fabric & Weaving - FE)",
-      purpose: "এখানে আমরা পরীক্ষা করছি সুতার কাউন্ট ও ঘনত্ব (EPI/PPI) বদলালে কাপড়ের ওজন (GSM) এবং বুননের জালি (Cover Factor) কতটা ঘন বা পাতলা হয়।",
-      howTo: [
-        "ধাপ ১: কাপড়ের নমুনা থেকে Warp/Weft Ne, EPI, PPI এবং Crimp % ইনপুট দিন।",
-        "ধাপ ২: ডান পাশের লাইভ Weave Grid-এ লক্ষ্য করুন—EPI/PPI বাড়ালে নীল (Warp) ও বেগুনি (Weft) সুতার ফাঁকা জায়গা কমে বুনন ঘন হচ্ছে।",
-      ],
-      terms: [
-        { name: "EPI (Ends Per Inch) ও PPI (Picks Per Inch)", desc: "Pick Glass দিয়ে মাপা প্রতি ইঞ্চি কাপড়ে Warp ও Weft সুতার সংখ্যা।" },
-        { name: "Crimp % (ক্রিম্প)", desc: "বুননের কারণে কাপড়ের ভেতর সুতার ঢেউখেলানো অতিরিক্ত দৈর্ঘ্য; এটি বাড়লে GSM বাড়ে।" },
-        { name: "GSM (Grams per Square Meter)", desc: "১ বর্গমিটার কাপড়ের ওজন (গ্রামে)—কাপড় কতটা ভারী বা হালকা তা বোঝায়।" },
-        { name: "Cover Factor (Kc)", desc: "কাপড়ের কত % জায়গা সুতা দিয়ে ঢাকা আছে (৫৫-৮০% হলে ব্যালেন্সড, ৮০%+ হলে খুব টাইট)।" },
-      ],
-      formulas: [
-        {
-          label: "Fabric GSM",
-          expr: `23.25 × [(${epi}×${(1 + warpCrimp / 100).toFixed(2)})÷${warpNe} + (${ppi}×${(1 + weftCrimp / 100).toFixed(2)})÷${weftNe}] = ${fabricGsm.toFixed(1)} g/m²`,
-        },
-        { label: "Warp Cover (K1)", expr: `${epi} ÷ √${warpNe} = ${coverFactor.k1.toFixed(2)}` },
-        { label: "Weft Cover (K2)", expr: `${ppi} ÷ √${weftNe} = ${coverFactor.k2.toFixed(2)}` },
-        { label: "Cloth Cover (Kc)", expr: `K1 + K2 - (K1×K2)÷28 = ${coverFactor.kc.toFixed(2)} (${coverFactor.pct.toFixed(0)}%)` },
-      ],
-    },
-    dyeing: {
-      title: "ডাইং রেসিপি নির্দেশিকা (Exhaust Dyeing - WPE)",
-      purpose: "এখানে আমরা পরীক্ষা করছি কাপড়ের ওজন, পানির অনুপাত (M:L) ও শেড % অনুযায়ী ডাই-বাথে কতটুকু পানি, রঙ ও কেমিক্যাল লাগবে।",
-      howTo: [
-        "ধাপ ১: মোট কাপড়ের ওজন (kg) এবং মেশিনের Liquor Ratio (যেমন 1:8) বসান।",
-        "ধাপ ২: ডান পাশের ভার্চুয়াল ডাই-বাথ ট্যাংকে দেখুন—M:L বাড়ালে পানির লেভেল বাড়বে, আর Shade % বাড়ালে রঙের গাঢ়ত্ব গাঢ় হবে।",
-      ],
-      terms: [
-        { name: "Liquor Ratio (M:L - Material to Liquor)", desc: "কাপড়ের ওজন ও পানির অনুপাত (১:৮ মানে ১ কেজি কাপড়ে ৮ লিটার পানি)।" },
-        { name: "Shade % (owf - On Weight of Fabric)", desc: "শুকনো কাপড়ের ওজনের শতকরা কত ভাগ ডাই/রঙ লাগবে।" },
-        { name: "g/L (Grams per Liter)", desc: "মোট পানির আয়তন অনুযায়ী প্রতি লিটারে কত গ্রাম Salt বা Soda Ash লাগবে।" },
-      ],
-      formulas: [
-        { label: "মোট পানি (Liters)", expr: `${fabricKg} kg × ${liquorRatio} = ${totalWaterL.toFixed(0)} Liters` },
-        { label: "ডাই / রঙ (kg)", expr: `(${fabricKg} kg × ${shadePct}%) ÷ 100 = ${totalDyeKg.toFixed(2)} kg` },
-        { label: "Salt (লবণ)", expr: `(${totalWaterL.toFixed(0)} L × ${saltGl} g/L) ÷ 1000 = ${totalSaltKg.toFixed(1)} kg` },
-        { label: "Soda Ash (সোডা অ্যাশ)", expr: `(${totalWaterL.toFixed(0)} L × ${sodaGl} g/L) ÷ 1000 = ${totalSodaKg.toFixed(1)} kg` },
-      ],
-    },
-    garment: {
-      title: "গার্মেন্টস কনজাম্পশন ও কস্টিং নির্দেশিকা (Garment & IE - AE)",
-      purpose: "এখানে আমরা পরীক্ষা করছি টি-শার্টের মাপ, GSM ও Wastage% অনুযায়ী ১ ডজনে কত কেজি কাপড় লাগে এবং SMV ও Efficiency অনুযায়ী তৈরি খরচ (CM) কত পড়ে।",
-      howTo: [
-        "ধাপ ১: Body Length, Sleeve, 1/2 Chest, Allowance ও Fabric GSM বসান এবং টি-শার্টের ডায়াগ্রামে মাপগুলো মিলিয়ে দেখুন।",
-        "ধাপ ২: Wastage %, SMV, CPM ও Line Efficiency % বসিয়ে দেখুন প্রতি পিস ও প্রতি ডজন CM খরচ এবং Usable vs Wastage বার কীভাবে বদলায়।",
-      ],
-      terms: [
-        { name: "Fabric Consumption (kg/dz)", desc: "কাটিং ওয়েস্টেজসহ ১২ পিস (১ ডজন) গার্মেন্টস বানাতে মোট কত কেজি কাপড় লাগবে।" },
-        { name: "SMV (Standard Minute Value)", desc: "অ্যালাউন্সসহ ১টি গার্মেন্টস সেলাই করতে স্ট্যান্ডার্ড কত মিনিট সময় লাগে।" },
-        { name: "CPM (Cost Per Minute)", desc: "ফ্যাক্টরির প্রতি মিনিট উৎপাদন ও শ্রম খরচ (ডলারে)।" },
-        { name: "CM (Cost of Making)", desc: "শুধু গার্মেন্টস কাটিং-সুইং-ফিনিশিং তৈরির খরচ (প্রতি পিস বা প্রতি ডজন)।" },
-      ],
-      formulas: [
-        {
-          label: "কাপড় / ডজন (kg)",
-          expr: `[((${bodyLen}+${sleeveLen}+${allowance}) × (${halfChest}+${allowance}) × 2 × ${garmentGsm} × 12) ÷ 10⁷] × ${(1 + wastagePct / 100).toFixed(2)} = ${consPerDozenKg.toFixed(2)} kg`,
-        },
-        { label: "CM / পিস ($)", expr: `(${smv} min × ${cpm}) ÷ (${lineEff}% ÷ 100) = ${cmPerPiece.toFixed(2)}` },
-        { label: "CM / ডজন ($)", expr: `${cmPerPiece.toFixed(2)} × 12 = ${(cmPerPiece * 12).toFixed(2)}` },
-      ],
-    },
-    ttqc: {
-      title: "TTQC শ্রিঙ্কেজ ল্যাব নির্দেশিকা (ISO 3759 / AATCC TM135)",
-      purpose: "এখানে আমরা পরীক্ষা করছি ধোয়ার পর (After Wash) কাপড় দৈর্ঘ্যে ও প্রস্থে কত % সংকুচিত (Shrink) হয়েছে এবং বায়ারের লিমিটের ভেতর PASS করেছে কি না।",
-      howTo: [
-        "ধাপ ১: কাপড়ে ৩৫০ মিমি × ৩৫০ মিমি বেঞ্চমার্ক দাগ দিয়ে ধোয়ার ও শুকানোর পর Warp ও Weft দিকের নতুন মাপ বসান।",
-        "ধাপ ২: ডান পাশের ওভারলে বক্সে দেখুন—মূল ড্যাশড বক্সের তুলনায় কাপড় কতটুকু ছোট হলো এবং অটোমেটিক PASS নাকি FAIL দেখায়।",
-      ],
-      terms: [
-        { name: "Before Wash (L0)", desc: "ধোয়ার আগে গ্লাস টেমপ্লেট দিয়ে কাপড়ে আঁকা মূল মাপ (সাধারণত ৩৫০ মিমি)।" },
-        { name: "After Wash (L1)", desc: "স্ট্যান্ডার্ড ওয়াশ ও ড্রাই করার পর পাওয়া নতুন দৈর্ঘ্য।" },
-        { name: "Shrinkage % (সংকোচন)", desc: "মান পজিটিভ হলে কাপড় ছোট হয়েছে, নেগেটিভ হলে লম্বা/স্ট্রেচ হয়েছে। সাধারণত <= ৫% গ্রহণযোগ্য।" },
-      ],
-      formulas: [
-        { label: "Warp Shrinkage", expr: `((${beforeWarp} - ${afterWarp}) ÷ ${beforeWarp}) × 100 = ${warpShrinkPct.toFixed(2)}%` },
-        { label: "Weft Shrinkage", expr: `((${beforeWeft} - ${afterWeft}) ÷ ${beforeWeft}) × 100 = ${weftShrinkPct.toFixed(2)}%` },
-        { label: "ল্যাব ফলাফল", expr: `Max(|${warpShrinkPct.toFixed(2)}%|, |${weftShrinkPct.toFixed(2)}%|) <= ${maxShrinkLimit}% -> ${ttqcPass ? "PASS" : "FAIL"}` },
-      ],
-    },
-  };
+  const usageBadge = useMemo(() => {
+    if (resultantTex < 14) return "Fine Poplin / Dress Shirtings (\u0996\u09c1\u09ac\u0987 \u09ae\u09bf\u09b9\u09bf \u09b8\u09c1\u09a4\u09be)";
+    if (resultantTex < 24) return "Combed T-Shirt Jersey / Polo (\u09b8\u09ac\u099a\u09c7\u09df\u09c7 \u09aa\u09cd\u09b0\u099a\u09b2\u09bf\u09a4 \u0997\u09be\u09b0\u09cd\u09ae\u09c7\u09a8\u09cd\u099f\u09b8 \u09b8\u09c1\u09a4\u09be)";
+    if (resultantTex < 45) return "Heavy Fleece / Chino Twill (\u09ae\u09be\u099d\u09be\u09b0\u09bf-\u09ae\u09cb\u099f\u09be \u09ac\u09c1\u09a8\u09a8)";
+    if (resultantTex < 120) return "Denim / Canvas / Workwear (\u09ad\u09be\u09b0\u09c0 \u09ae\u09cb\u099f\u09be \u09b8\u09c1\u09a4\u09be)";
+    return "Jute / Industrial Cord / Rope (\u0985\u09a4\u09cd\u09af\u09a8\u09cd\u09a4 \u09ae\u09cb\u099f\u09be \u09b8\u09c1\u09a4\u09be)";
+  }, [resultantTex]);
 
-  const activeGuide = guideByTab[tab];
+  const wrapLengthYd = wrapTurns * 1.5;
+  const wrapLengthM = wrapLengthYd * 0.9144;
+  const wrapWeightGm = wrapWeightGrains * (453.6 / 7000);
+  const wrapNe = (wrapLengthYd * 7000) / (840 * Math.max(0.01, wrapWeightGrains));
+  const wrapTex = (wrapWeightGm * 1000) / Math.max(0.01, wrapLengthM);
 
-  const tabs: Array<{ id: ToolTab; label: string; sub: string; icon: typeof Layers }> = [
-    { id: "yarn", label: "Yarn & Spinning", sub: "YE", icon: Layers },
-    { id: "fabric", label: "Fabric & Weave", sub: "FE", icon: Grid3X3 },
-    { id: "dyeing", label: "Dyeing Recipe", sub: "WPE", icon: Droplets },
-    { id: "garment", label: "Garment & CM", sub: "AE", icon: Scissors },
-    { id: "ttqc", label: "TTQC Testing Lab", sub: "QC", icon: FlaskConical },
+  const lenConverted = (lenVal * LENGTH_TO_YD[lenFrom]) / LENGTH_TO_YD[lenTo];
+  const wtConverted = (wtVal * WEIGHT_TO_GM[wtFrom]) / WEIGHT_TO_GM[wtTo];
+
+  const weavingGsm = (epi / Math.max(1, warpNe) + ppi / Math.max(1, weftNe)) * 23.25;
+  const warpCover = epi / Math.sqrt(Math.max(1, warpNe));
+  const weftCover = ppi / Math.sqrt(Math.max(1, weftNe));
+
+  const totalWaterL = fabricKg * mlRatio;
+  const dyeKg = (fabricKg * shadePct) / 100;
+  const saltKg = (totalWaterL * saltGpl) / 1000;
+
+  const consKgPerDozen =
+    (((bodyLenCm + sleeveLenCm + 4) * (chestWidthCm + 3) * 2 * garmentGsm) / 10_000_000) *
+    12 *
+    (1 + wastagePct / 100);
+  const cmPerDozenUsd = (smv * 12 * cmPerMinUsd) / Math.max(0.05, efficiencyPct / 100);
+
+  const shrinkagePct = ((afterWashCm - beforeWashCm) / Math.max(0.1, beforeWashCm)) * 100;
+
+  const tabs: { id: ToolTab; label: string; icon: typeof Calculator }[] = [
+    { id: "yarn", label: "Yarn & 3D Lab", icon: Calculator },
+    { id: "units", label: "Unit Converter", icon: Scale },
+    { id: "weaving", label: "Weaving & GSM", icon: Layers },
+    { id: "dyeing", label: "Dyeing & Wet", icon: Droplets },
+    { id: "garment", label: "Garment & CM", icon: Shirt },
+    { id: "ttqc", label: "TTQC & Shrinkage", icon: FlaskConical },
   ];
 
   return (
-    <div className={`${notoBengali.className} space-y-5`}>
-      {/* Hero */}
-      <section className="rounded-2xl border border-cyan-500/25 bg-gradient-to-br from-[#081722] via-[#0B1222] to-[#111329] p-5 sm:p-6 shadow-xl">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950/30 p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-400 px-3 py-0.5 text-[10.5px] font-bold uppercase tracking-wider text-slate-950">
-              <Sparkles className="h-3.5 w-3.5" />
-              Interactive Visual Engineering Suite
-            </span>
-            <h1 className="mt-2.5 font-serif text-2xl font-bold text-white sm:text-3xl">
-              Textile Mill, Garment &amp; TTQC Visual Calculators
+            <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-cyan-400" />
+              JTEC Interactive Textile Lab &amp; Calculators
             </h1>
-            <p className="mt-1 text-xs text-slate-400">
-              Adjust sliders &amp; values to watch yarn diameter, weave density, dye bath shade, marker layout, and shrinkage update live.
+            <p className="text-sm text-slate-300 mt-1">
+              {"\u09e7\u09e6\u099f\u09bf Count System, 3D Multi-Ply \u0993 Lab \u09af\u09a8\u09cd\u09a4\u09cd\u09b0\u09aa\u09be\u09a4\u09bf (Wrap Reel, Beesley's Balance) \u098f\u09ac\u0982 \u0995\u09cd\u09b2\u09be\u09b8\u09c7\u09b0 \u09b8\u09ac Unit Conversion\u0964"}
             </p>
           </div>
+          <span className="px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-xs font-medium text-cyan-300">
+            3D Interactive Lab
+          </span>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        <div className="mt-5 flex flex-wrap gap-2">
           {tabs.map((t) => {
             const Icon = t.icon;
-            const active = tab === t.id;
+            const active = activeTab === t.id;
             return (
               <button
                 key={t.id}
                 type="button"
-                onClick={() => setTab(t.id)}
-                className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all ${
+                onClick={() => setActiveTab(t.id)}
+                className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition ${
                   active
-                    ? "border-cyan-400/60 bg-gradient-to-r from-cyan-500/20 to-violet-500/20 text-white shadow-[0_0_18px_rgba(6,182,212,0.18)]"
-                    : "border-slate-800 bg-[#060A12] text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                    ? "bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20"
+                    : "bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/60"
                 }`}
               >
-                <Icon className={`h-3.5 w-3.5 ${active ? "text-cyan-300" : "text-slate-500"}`} />
+                <Icon className="w-4 h-4" />
                 <span>{t.label}</span>
-                <span className="rounded bg-slate-800/90 px-1.5 py-0.5 text-[10px] text-slate-300">
-                  {t.sub}
-                </span>
               </button>
             );
           })}
         </div>
-      </section>
+      </div>
 
-      {/* TAB 1: YARN */}
-      {tab === "yarn" && (
-        <div className="grid gap-5 lg:grid-cols-12">
-          <div className="space-y-4 rounded-2xl border border-slate-800 bg-[#0A1020] p-5 lg:col-span-6">
-            <h2 className="text-sm font-bold text-white">Yarn Count, Twist (TPI) &amp; CSP</h2>
-            <div className="space-y-3">
-              <div>
-                <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-slate-400">English Cotton Count (Ne)</span>
-                  <span className="font-mono font-bold text-cyan-300">{ne} Ne</span>
-                </div>
-                <input
-                  type="range"
-                  min={6}
-                  max={80}
-                  step={1}
-                  value={ne}
-                  onChange={(e) => setNe(Number(e.target.value))}
-                  className="w-full accent-cyan-400"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <label className="space-y-1 text-xs">
-                  <span className="text-slate-400">Twist Multiplier (TM)</span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={tm}
-                    onChange={(e) => setTm(Number(e.target.value) || 0)}
-                    className="w-full rounded-xl border border-slate-700 bg-[#060A12] px-3 py-2 font-mono text-slate-100 outline-none focus:border-cyan-500/50"
-                  />
-                </label>
-                <label className="space-y-1 text-xs">
-                  <span className="text-slate-400">Lea Strength (lbs)</span>
-                  <input
-                    type="number"
-                    step="1"
-                    value={leaLbs}
-                    onChange={(e) => setLeaLbs(Number(e.target.value) || 0)}
-                    className="w-full rounded-xl border border-slate-700 bg-[#060A12] px-3 py-2 font-mono text-slate-100 outline-none focus:border-cyan-500/50"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-2 sm:grid-cols-4">
-              {[
-                { label: "Tex", val: tex.toFixed(2) },
-                { label: "Denier", val: denier.toFixed(1) },
-                { label: "TPI", val: tpi.toFixed(2) },
-                { label: "CSP", val: Math.round(csp).toString() },
-              ].map((m) => (
-                <div key={m.label} className="rounded-xl border border-slate-800 bg-[#060A12] p-3 text-center">
-                  <div className="text-[10px] font-semibold uppercase text-slate-400">{m.label}</div>
-                  <div className="mt-1 font-mono text-base font-bold text-cyan-300">{m.val}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col justify-between rounded-2xl border border-cyan-500/25 bg-[#0A1020] p-5 lg:col-span-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-cyan-200">Live Visual: Yarn Thickness &amp; Twist</h3>
-              <span className="rounded-full border border-emerald-500/35 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-300">
-                {csp >= 2200 ? "High Strength (Combed)" : csp >= 1700 ? "Standard (Carded)" : "Low CSP"}
-              </span>
-            </div>
-
-            <div className="my-4 flex flex-col items-center justify-center rounded-xl border border-slate-800/80 bg-[#060A12] p-5">
-              <svg viewBox="0 0 360 110" className="w-full max-w-md">
-                <defs>
-                  <linearGradient id="yarnGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#67e8f9" />
-                    <stop offset="50%" stopColor="#06b6d4" />
-                    <stop offset="100%" stopColor="#0e7490" />
-                  </linearGradient>
-                </defs>
-                <rect
-                  x="20"
-                  y={55 - yarnRadiusPx}
-                  width="240"
-                  height={yarnRadiusPx * 2}
-                  rx={yarnRadiusPx}
-                  fill="url(#yarnGrad)"
-                  className="transition-all duration-300"
-                />
-                {Array.from({ length: Math.min(18, Math.max(4, Math.round(tpi / 2))) }).map((_, i) => {
-                  const x = 35 + i * 12;
-                  return (
-                    <line
-                      key={i}
-                      x1={x}
-                      y1={55 - yarnRadiusPx + 2}
-                      x2={x + 7}
-                      y2={55 + yarnRadiusPx - 2}
-                      stroke="#083344"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    />
-                  );
-                })}
-                <circle
-                  cx="310"
-                  cy="55"
-                  r={yarnRadiusPx}
-                  fill="url(#yarnGrad)"
-                  stroke="#a5f3fc"
-                  strokeWidth="1.5"
-                  className="transition-all duration-300"
-                />
-                <text x="310" y="98" textAnchor="middle" fill="#94a3b8" fontSize="10">
-                  Cross-Section
-                </text>
-              </svg>
-              <p className="mt-2 text-center text-xs text-slate-400">
-                Higher <strong className="text-cyan-300">Ne</strong> = finer yarn ({tex.toFixed(1)} g/1000m). Higher{" "}
-                <strong className="text-cyan-300">TPI</strong> = tighter twist spirals.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: FABRIC */}
-      {tab === "fabric" && (
-        <div className="grid gap-5 lg:grid-cols-12">
-          <div className="space-y-4 rounded-2xl border border-slate-800 bg-[#0A1020] p-5 lg:col-span-6">
-            <h2 className="text-sm font-bold text-white">Woven GSM &amp; Cover Factor Calculator</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "Warp Count (Ne)", val: warpNe, set: setWarpNe },
-                { label: "Weft Count (Ne)", val: weftNe, set: setWeftNe },
-                { label: "Ends / Inch (EPI)", val: epi, set: setEpi },
-                { label: "Picks / Inch (PPI)", val: ppi, set: setPpi },
-                { label: "Warp Crimp (%)", val: warpCrimp, set: setWarpCrimp },
-                { label: "Weft Crimp (%)", val: weftCrimp, set: setWeftCrimp },
-              ].map((f) => (
-                <label key={f.label} className="space-y-1 text-xs">
-                  <span className="text-slate-400">{f.label}</span>
-                  <input
-                    type="number"
-                    value={f.val}
-                    onChange={(e) => f.set(Number(e.target.value) || 0)}
-                    className="w-full rounded-xl border border-slate-700 bg-[#060A12] px-3 py-2 font-mono text-slate-100 outline-none focus:border-cyan-500/50"
-                  />
-                </label>
-              ))}
-            </div>
-            <div className="grid grid-cols-3 gap-3 pt-1">
-              <div className="rounded-xl border border-slate-800 bg-[#060A12] p-3 text-center">
-                <div className="text-[10px] uppercase text-slate-400">Fabric GSM</div>
-                <div className="mt-1 font-mono text-lg font-bold text-emerald-300">{fabricGsm.toFixed(1)}</div>
-              </div>
-              <div className="rounded-xl border border-slate-800 bg-[#060A12] p-3 text-center">
-                <div className="text-[10px] uppercase text-slate-400">Cloth Cover (Kc)</div>
-                <div className="mt-1 font-mono text-lg font-bold text-cyan-300">{coverFactor.kc.toFixed(2)}</div>
-              </div>
-              <div className="rounded-xl border border-slate-800 bg-[#060A12] p-3 text-center">
-                <div className="text-[10px] uppercase text-slate-400">Full Cover %</div>
-                <div className="mt-1 font-mono text-lg font-bold text-violet-300">{coverFactor.pct.toFixed(0)}%</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col justify-between rounded-2xl border border-violet-500/25 bg-[#0A1020] p-5 lg:col-span-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-violet-200">Live Visual: Weave Density Grid</h3>
-              <span className="text-xs font-semibold text-slate-400">
-                {coverFactor.pct >= 80 ? "Tight / High Cover" : coverFactor.pct >= 55 ? "Balanced Weave" : "Open / Sheer"}
-              </span>
-            </div>
-            <div className="my-4 flex flex-col items-center justify-center rounded-xl border border-slate-800/80 bg-[#060A12] p-5">
-              <svg viewBox="0 0 220 150" className="w-full max-w-xs">
-                {Array.from({ length: Math.min(18, Math.max(4, Math.round(epi / 10))) }).map((_, i) => {
-                  const count = Math.min(18, Math.max(4, Math.round(epi / 10)));
-                  const x = 15 + (i * 190) / Math.max(1, count - 1);
-                  const strokeW = Math.min(8, Math.max(2, 120 / Math.max(6, warpNe)));
-                  return (
-                    <line
-                      key={`w-${i}`}
-                      x1={x}
-                      y1="10"
-                      x2={x}
-                      y2="140"
-                      stroke="#38bdf8"
-                      strokeOpacity="0.75"
-                      strokeWidth={strokeW}
-                    />
-                  );
-                })}
-                {Array.from({ length: Math.min(14, Math.max(4, Math.round(ppi / 10))) }).map((_, j) => {
-                  const count = Math.min(14, Math.max(4, Math.round(ppi / 10)));
-                  const y = 15 + (j * 120) / Math.max(1, count - 1);
-                  const strokeW = Math.min(8, Math.max(2, 120 / Math.max(6, weftNe)));
-                  return (
-                    <line
-                      key={`f-${j}`}
-                      x1="10"
-                      y1={y}
-                      x2="210"
-                      y2={y}
-                      stroke="#a78bfa"
-                      strokeOpacity="0.65"
-                      strokeWidth={strokeW}
-                    />
-                  );
-                })}
-              </svg>
-              <p className="mt-2 text-center text-xs text-slate-400">
-                Blue = Warp ({epi} EPI), Violet = Weft ({ppi} PPI). Increasing EPI/PPI tightens the cloth cover.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: DYEING */}
-      {tab === "dyeing" && (
-        <div className="grid gap-5 lg:grid-cols-12">
-          <div className="space-y-4 rounded-2xl border border-slate-800 bg-[#0A1020] p-5 lg:col-span-6">
-            <h2 className="text-sm font-bold text-white">Exhaust Dyeing Recipe Calculator (owf% &amp; M:L)</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "Fabric Weight (kg)", val: fabricKg, set: setFabricKg, step: "5" },
-                { label: "Liquor Ratio (1 : M)", val: liquorRatio, set: setLiquorRatio, step: "1" },
-                { label: "Dye Shade (% owf)", val: shadePct, set: setShadePct, step: "0.25" },
-                { label: "Glauber Salt (g/L)", val: saltGl, set: setSaltGl, step: "5" },
-                { label: "Soda Ash (g/L)", val: sodaGl, set: setSodaGl, step: "1" },
-              ].map((f) => (
-                <label key={f.label} className="space-y-1 text-xs">
-                  <span className="text-slate-400">{f.label}</span>
-                  <input
-                    type="number"
-                    step={f.step}
-                    value={f.val}
-                    onChange={(e) => f.set(Number(e.target.value) || 0)}
-                    className="w-full rounded-xl border border-slate-700 bg-[#060A12] px-3 py-2 font-mono text-slate-100 outline-none focus:border-cyan-500/50"
-                  />
-                </label>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                { label: "Total Water", val: `${totalWaterL.toFixed(0)} L` },
-                { label: "Dye Required", val: `${totalDyeKg.toFixed(2)} kg` },
-                { label: "Salt", val: `${totalSaltKg.toFixed(1)} kg` },
-                { label: "Soda Ash", val: `${totalSodaKg.toFixed(1)} kg` },
-              ].map((m) => (
-                <div key={m.label} className="rounded-xl border border-slate-800 bg-[#060A12] p-3 text-center">
-                  <div className="text-[10px] uppercase text-slate-400">{m.label}</div>
-                  <div className="mt-1 font-mono text-sm font-bold text-cyan-300">{m.val}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col justify-between rounded-2xl border border-cyan-500/25 bg-[#0A1020] p-5 lg:col-span-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-cyan-200">Live Visual: Virtual Dye-Bath Tank</h3>
-              <span className="font-mono text-xs text-slate-400">M:L = 1:{liquorRatio}</span>
-            </div>
-            <div className="my-4 flex flex-col items-center justify-center rounded-xl border border-slate-800/80 bg-[#060A12] p-5">
-              <div className="relative h-40 w-44 overflow-hidden rounded-b-2xl rounded-t-md border-2 border-slate-600 bg-slate-950">
-                <div
-                  className="absolute bottom-0 left-0 right-0 transition-all duration-500"
-                  style={{
-                    height: `${Math.min(95, Math.max(20, liquorRatio * 7))}%`,
-                    backgroundColor: `rgba(139, 92, 246, ${Math.min(0.92, Math.max(0.2, shadePct / 5))})`,
-                  }}
-                />
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-lg border border-white/25 bg-black/40 px-3 py-1.5 text-[11px] font-bold text-white backdrop-blur-sm">
-                  {fabricKg} kg Fabric
-                </div>
-              </div>
-              <p className="mt-3 text-center text-xs text-slate-400">
-                Bath depth scales with <strong className="text-cyan-300">1:{liquorRatio}</strong> ratio; shade intensity reflects{" "}
-                <strong className="text-violet-300">{shadePct}% owf</strong>.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: GARMENT */}
-      {tab === "garment" && (
-        <div className="grid gap-5 lg:grid-cols-12">
-          <div className="space-y-4 rounded-2xl border border-slate-800 bg-[#0A1020] p-5 lg:col-span-6">
-            <h2 className="text-sm font-bold text-white">Knit T-Shirt Consumption &amp; CM Costing</h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {[
-                { label: "Body Length (cm)", val: bodyLen, set: setBodyLen },
-                { label: "Sleeve Length (cm)", val: sleeveLen, set: setSleeveLen },
-                { label: "1/2 Chest (cm)", val: halfChest, set: setHalfChest },
-                { label: "Allowance (cm)", val: allowance, set: setAllowance },
-                { label: "Fabric GSM", val: garmentGsm, set: setGarmentGsm },
-                { label: "Wastage (%)", val: wastagePct, set: setWastagePct },
-                { label: "Garment SMV (min)", val: smv, set: setSmv },
-                { label: "Factory CPM ($)", val: cpm, set: setCpm },
-                { label: "Line Eff. (%)", val: lineEff, set: setLineEff },
-              ].map((f) => (
-                <label key={f.label} className="space-y-1 text-xs">
-                  <span className="text-slate-400">{f.label}</span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={f.val}
-                    onChange={(e) => f.set(Number(e.target.value) || 0)}
-                    className="w-full rounded-xl border border-slate-700 bg-[#060A12] px-2.5 py-1.5 font-mono text-slate-100 outline-none focus:border-cyan-500/50"
-                  />
-                </label>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-xl border border-slate-800 bg-[#060A12] p-3 text-center">
-                <div className="text-[10px] uppercase text-slate-400">Fabric / Dozen</div>
-                <div className="mt-1 font-mono text-base font-bold text-emerald-300">{consPerDozenKg.toFixed(2)} kg</div>
-              </div>
-              <div className="rounded-xl border border-slate-800 bg-[#060A12] p-3 text-center">
-                <div className="text-[10px] uppercase text-slate-400">CM / Piece</div>
-                <div className="mt-1 font-mono text-base font-bold text-cyan-300">${cmPerPiece.toFixed(2)}</div>
-              </div>
-              <div className="rounded-xl border border-slate-800 bg-[#060A12] p-3 text-center">
-                <div className="text-[10px] uppercase text-slate-400">CM / Dozen</div>
-                <div className="mt-1 font-mono text-base font-bold text-violet-300">${(cmPerPiece * 12).toFixed(2)}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col justify-between rounded-2xl border border-emerald-500/25 bg-[#0A1020] p-5 lg:col-span-6">
-            <h3 className="text-sm font-bold text-emerald-200">Live Visual: Garment Spec &amp; Wastage Split</h3>
-            <div className="my-4 flex flex-col items-center justify-center rounded-xl border border-slate-800/80 bg-[#060A12] p-5 space-y-4">
-              <svg viewBox="0 0 220 150" className="w-full max-w-[230px]">
-                <path
-                  d="M65,25 L90,20 Q110,32 130,20 L155,25 L190,52 L172,72 L152,58 L152,135 L68,135 L68,58 L48,72 L30,52 Z"
-                  fill="#0f172a"
-                  stroke="#34d399"
-                  strokeWidth="2"
-                />
-                <line x1="68" y1="88" x2="152" y2="88" stroke="#38bdf8" strokeDasharray="3 3" />
-                <text x="110" y="83" textAnchor="middle" fill="#38bdf8" fontSize="9">
-                  1/2 Chest: {halfChest}cm
-                </text>
-                <line x1="164" y1="25" x2="164" y2="135" stroke="#a78bfa" strokeDasharray="3 3" />
-                <text x="170" y="108" fill="#a78bfa" fontSize="9">
-                  L: {bodyLen}cm
-                </text>
-                <text x="42" y="42" fill="#fbbf24" fontSize="8.5">
-                  SL: {sleeveLen}cm
-                </text>
-              </svg>
-
-              <div className="w-full space-y-1">
-                <div className="flex justify-between text-[11px] text-slate-400">
-                  <span>Usable Fabric ({(100 - wastagePct).toFixed(0)}%)</span>
-                  <span className="text-amber-300">Wastage ({wastagePct}%)</span>
-                </div>
-                <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
-                  <div className="bg-emerald-500 transition-all" style={{ width: `${Math.max(0, 100 - wastagePct)}%` }} />
-                  <div className="bg-amber-400 transition-all" style={{ width: `${Math.min(100, wastagePct)}%` }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 5: TTQC */}
-      {tab === "ttqc" && (
-        <div className="grid gap-5 lg:grid-cols-12">
-          <div className="space-y-4 rounded-2xl border border-slate-800 bg-[#0A1020] p-5 lg:col-span-6">
-            <h2 className="text-sm font-bold text-white">TTQC Lab: Fabric Shrinkage Test (ISO 3759 / AATCC 135)</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "Warp Before Wash (mm)", val: beforeWarp, set: setBeforeWarp },
-                { label: "Warp After Wash (mm)", val: afterWarp, set: setAfterWarp },
-                { label: "Weft Before Wash (mm)", val: beforeWeft, set: setBeforeWeft },
-                { label: "Weft After Wash (mm)", val: afterWeft, set: setAfterWeft },
-                { label: "Buyer Max Limit (%)", val: maxShrinkLimit, set: setMaxShrinkLimit },
-              ].map((f) => (
-                <label key={f.label} className="space-y-1 text-xs">
-                  <span className="text-slate-400">{f.label}</span>
-                  <input
-                    type="number"
-                    value={f.val}
-                    onChange={(e) => f.set(Number(e.target.value) || 0)}
-                    className="w-full rounded-xl border border-slate-700 bg-[#060A12] px-3 py-2 font-mono text-slate-100 outline-none focus:border-cyan-500/50"
-                  />
-                </label>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-xl border border-slate-800 bg-[#060A12] p-3 text-center">
-                <div className="text-[10px] uppercase text-slate-400">Warp Shrink</div>
-                <div className="mt-1 font-mono text-base font-bold text-cyan-300">{warpShrinkPct.toFixed(2)}%</div>
-              </div>
-              <div className="rounded-xl border border-slate-800 bg-[#060A12] p-3 text-center">
-                <div className="text-[10px] uppercase text-slate-400">Weft Shrink</div>
-                <div className="mt-1 font-mono text-base font-bold text-violet-300">{weftShrinkPct.toFixed(2)}%</div>
-              </div>
-              <div className="rounded-xl border border-slate-800 bg-[#060A12] p-3 text-center">
-                <div className="text-[10px] uppercase text-slate-400">Lab Result</div>
-                <div className={`mt-1 inline-flex items-center gap-1 text-sm font-bold ${ttqcPass ? "text-emerald-400" : "text-rose-400"}`}>
-                  {ttqcPass ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-                  {ttqcPass ? "PASS" : "FAIL"}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col justify-between rounded-2xl border border-cyan-500/25 bg-[#0A1020] p-5 lg:col-span-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-cyan-200">Live Visual: Before vs After Template Overlay</h3>
-              <Ruler className="h-4 w-4 text-cyan-400" />
-            </div>
-            <div className="my-4 flex flex-col items-center justify-center rounded-xl border border-slate-800/80 bg-[#060A12] p-6">
-              <div className="relative flex h-40 w-40 items-center justify-center border-2 border-dashed border-slate-500">
-                <span className="absolute -top-5 text-[10px] text-slate-400">
-                  Original ({beforeWarp}x{beforeWeft}mm)
+      {activeTab === "yarn" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="lg:col-span-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-semibold text-white">10-System Yarn Count &amp; Ply Converter</h2>
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-cyan-300 border border-slate-700">
+                  {fromMeta.type} {"->"} {toMeta.type}
                 </span>
-                <div
-                  className={`flex items-center justify-center border-2 transition-all duration-300 ${
-                    ttqcPass ? "border-emerald-400 bg-emerald-500/20 text-emerald-200" : "border-rose-400 bg-rose-500/20 text-rose-200"
-                  }`}
-                  style={{
-                    width: `${Math.min(100, Math.max(55, (afterWeft / Math.max(1, beforeWeft)) * 100))}%`,
-                    height: `${Math.min(100, Math.max(55, (afterWarp / Math.max(1, beforeWarp)) * 100))}%`,
-                  }}
-                >
-                  <span className="font-mono text-[10.5px] font-bold">
-                    {afterWarp}x{afterWeft}mm
-                  </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">{"From System (\u0989\u09ce\u09b8 \u09b8\u09bf\u09b8\u09cd\u099f\u09c7\u09ae)"}</label>
+                  <select
+                    value={fromSys}
+                    onChange={(e) => setFromSys(e.target.value as CountSystemId)}
+                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
+                  >
+                    {COUNT_SYSTEMS.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label} ({s.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">{"To System (\u09b2\u0995\u09cd\u09b7\u09cd\u09af \u09b8\u09bf\u09b8\u09cd\u099f\u09c7\u09ae)"}</label>
+                  <select
+                    value={toSys}
+                    onChange={(e) => setToSys(e.target.value as CountSystemId)}
+                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
+                  >
+                    {COUNT_SYSTEMS.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label} ({s.type})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-              <p className="mt-4 text-center text-xs text-slate-400">
-                Dashed box = pre-wash benchmark; shaded box = post-wash dimensional stability (limit &le; {maxShrinkLimit}%).
-              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">
+                    Single Yarn Count ({fromMeta.short})
+                  </label>
+                  <input
+                    type="number"
+                    min={0.1}
+                    step="0.5"
+                    value={inputCount}
+                    onChange={(e) => setInputCount(Number(e.target.value) || 0)}
+                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">{"Ply / Fold (\u0995\u09df\u099f\u09bf \u09b8\u09c1\u09a4\u09be \u098f\u0995\u09b8\u09be\u09a5\u09c7)"}</label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[1, 2, 3, 4].map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPlyCount(p)}
+                        className={`py-2 rounded-xl text-xs font-semibold border transition ${
+                          plyCount === p
+                            ? "bg-cyan-500/20 border-cyan-400 text-cyan-300"
+                            : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {p}-Ply
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="rounded-xl bg-slate-950/90 border border-slate-800 p-3.5">
+                  <div className="text-[11px] text-slate-400">Single Yarn ({toMeta.short})</div>
+                  <div className="text-xl font-bold text-cyan-300 mt-0.5">
+                    {convertedSingle.toFixed(2)} {toMeta.short}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">1-Ply = {singleTex.toFixed(2)} Tex</div>
+                </div>
+
+                <div className="rounded-xl bg-slate-950/90 border border-emerald-500/30 p-3.5">
+                  <div className="text-[11px] text-emerald-300">
+                    Resultant {plyCount}-Ply ({toMeta.short})
+                  </div>
+                  <div className="text-xl font-bold text-emerald-400 mt-0.5">
+                    {convertedResultant.toFixed(2)} {toMeta.short}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-1">
+                    Total = {resultantTex.toFixed(2)} Tex
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-cyan-950/30 border border-cyan-500/20 p-3 text-xs text-cyan-200">
+                <span className="font-semibold">{"\u09ac\u09cd\u09af\u09ac\u09b9\u09be\u09b0\u09c7\u09b0 \u0995\u09cd\u09b7\u09c7\u09a4\u09cd\u09b0:"}</span> {usageBadge}
+              </div>
+            </div>
+
+            <div className="lg:col-span-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
+              <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                <Info className="w-4 h-4 text-amber-400" />
+                <span>{"\u09b8\u09c2\u09a4\u09cd\u09b0 (Stacked Fraction) \u0993 \u09aa\u09b0\u09bf\u09ac\u09b0\u09cd\u09a4\u09a8 \u09ac\u09bf\u09b6\u09cd\u09b2\u09c7\u09b7\u09a3"}</span>
+              </h3>
+
+              <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 space-y-3">
+                <div className="text-xs text-slate-400">
+                  {"\u09e7) \u09aa\u09cd\u09b0\u09a5\u09ae\u09c7 \u0987\u09a8\u09aa\u09c1\u099f"} ({fromMeta.short}) {"\u09a5\u09c7\u0995\u09c7 \u0986\u09a8\u09cd\u09a4\u09b0\u09cd\u099c\u09be\u09a4\u09bf\u0995"} <span className="text-cyan-300">Tex</span>{"-\u098f \u09b0\u09c2\u09aa\u09be\u09a8\u09cd\u09a4\u09b0:"}
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {fromMeta.type === "Indirect" ? (
+                    <Fraction
+                      prefix="Tex ="
+                      num={fromMeta.id === "ne" ? "590.54" : fromMeta.id === "nm" ? "1000" : fromMeta.id === "nek" ? "885.81" : fromMeta.id === "lea" ? "1653.52" : "1937.71"}
+                      den={`${fromMeta.short} (${inputCount})`}
+                      suffix={`= ${singleTex.toFixed(2)} Tex`}
+                    />
+                  ) : (
+                    <div className="font-mono text-sm text-slate-100">
+                      <span className="text-cyan-300 font-semibold">Tex =</span>{" "}
+                      {fromMeta.id === "tex"
+                        ? `${inputCount} Tex`
+                        : fromMeta.id === "denier"
+                        ? `${inputCount} / 9 = ${singleTex.toFixed(2)} Tex`
+                        : fromMeta.id === "dtex"
+                        ? `${inputCount} / 10 = ${singleTex.toFixed(2)} Tex`
+                        : fromMeta.id === "ktex"
+                        ? `${inputCount} * 1000 = ${singleTex.toFixed(2)} Tex`
+                        : `${inputCount} * 34.45 = ${singleTex.toFixed(2)} Tex`}
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-slate-800 pt-3 text-xs text-slate-400">
+                  {"\u09e8)"} <span className="text-emerald-300">{plyCount}-Ply Resultant Count</span> {"\u09a8\u09bf\u09b0\u09cd\u09a3\u09df:"}
+                </div>
+                <div className="flex flex-wrap items-center gap-4">
+                  {toMeta.type === "Indirect" ? (
+                    <Fraction
+                      prefix={`Resultant ${toMeta.short} =`}
+                      num={`Single ${toMeta.short} (${convertedSingle.toFixed(2)})`}
+                      den={`Ply (${plyCount})`}
+                      suffix={`= ${convertedResultant.toFixed(2)} ${toMeta.short}`}
+                    />
+                  ) : (
+                    <div className="font-mono text-sm text-slate-100">
+                      <span className="text-emerald-300 font-semibold">Resultant {toMeta.short} =</span>{" "}
+                      {convertedSingle.toFixed(2)} * {plyCount} ={" "}
+                      <span className="text-emerald-400 font-bold">{convertedResultant.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-amber-950/20 border border-amber-500/25 p-3.5 text-xs text-slate-300 space-y-1.5 leading-relaxed">
+                <div className="font-semibold text-amber-300">{"\u0995\u09c7\u09a8 \u0993 \u0995\u09cb\u09a5\u09be\u09df \u09aa\u09b0\u09bf\u09ac\u09b0\u09cd\u09a4\u09a8 \u09b9\u099a\u09cd\u099b\u09c7?"}</div>
+                <p>
+                  <span className="text-white font-medium">{fromMeta.short}:</span> {fromMeta.definition}
+                </p>
+                <p>
+                  <span className="text-white font-medium">Ply ({plyCount}-Ply):</span> {"\u09ae\u09cb\u099f \u09b8\u09c1\u09a4\u09be \u09ae\u09cb\u099f\u09be \u09b9\u09df (Resultant Tex ="} {resultantTex.toFixed(1)} Tex). {"\u09a4\u09be\u0987 Direct \u09b8\u09bf\u09b8\u09cd\u099f\u09c7\u09ae\u09c7 \u09ae\u09be\u09a8"} <span className="text-cyan-300">{"\u09ac\u09be\u09dc\u09c7"}</span> {"(\u0997\u09c1\u09a3 \u09b9\u09df), \u0995\u09bf\u09a8\u09cd\u09a4\u09c1 Indirect \u09b8\u09bf\u09b8\u09cd\u099f\u09c7\u09ae\u09c7 \u09ae\u09be\u09a8"} <span className="text-amber-300">{"\u0995\u09ae\u09c7"}</span> {"(\u09ad\u09be\u0997 \u09b9\u09df)\u0964"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base sm:text-lg font-semibold text-white">
+                  3D Interactive Yarn &amp; Lab Instruments
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {"\u0995\u09c7\u09a8 \u098f\u0995\u09be\u09a7\u09bf\u0995 \u09af\u09a8\u09cd\u09a4\u09cd\u09b0 \u09ac\u09cd\u09af\u09ac\u09b9\u09be\u09b0 \u0995\u09b0\u09be \u09b9\u09df \u098f\u09ac\u0982 \u0995\u09c0\u09ad\u09be\u09ac\u09c7 \u09ae\u09be\u09a8 \u09ac\u09b8\u09be\u09a8\u09cb \u09b9\u09df \u09a4\u09be \u09e9\u09a1\u09bf-\u09a4\u09c7 \u09a6\u09c7\u0996\u09cb"}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLab3DMode("ply")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
+                    lab3DMode === "ply"
+                      ? "bg-cyan-500 text-slate-950 border-cyan-400"
+                      : "bg-slate-950 text-slate-300 border-slate-700 hover:text-white"
+                  }`}
+                >
+                  1. 3D Multi-Ply Yarn
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLab3DMode("wrap_reel")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
+                    lab3DMode === "wrap_reel"
+                      ? "bg-cyan-500 text-slate-950 border-cyan-400"
+                      : "bg-slate-950 text-slate-300 border-slate-700 hover:text-white"
+                  }`}
+                >
+                  2. Wrap Reel + Balance (Cone)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLab3DMode("beesley")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
+                    lab3DMode === "beesley"
+                      ? "bg-cyan-500 text-slate-950 border-cyan-400"
+                      : "bg-slate-950 text-slate-300 border-slate-700 hover:text-white"
+                  }`}
+                >
+                  3. Beesley&apos;s Balance (Swatch)
+                </button>
+              </div>
+            </div>
+
+            <Yarn3DLab
+              mode={lab3DMode}
+              plyCount={plyCount}
+              singleTex={singleTex}
+              wrapTurns={wrapTurns}
+              wrapWeightGrains={wrapWeightGrains}
+              beesleyThreads={beesleyThreads}
+            />
+
+            {lab3DMode === "wrap_reel" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 space-y-3">
+                  <div className="text-sm font-semibold text-cyan-300">{"Wrap Reel + Balance \u0987\u09a8\u09aa\u09c1\u099f"}</div>
+                  <div>
+                    <label className="flex justify-between text-xs text-slate-400 mb-1">
+                      <span>Wrap Reel Turns (1 turn = 1.5 yd)</span>
+                      <span className="text-white font-mono">{wrapTurns} turns = {wrapLengthYd.toFixed(1)} yd</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={10}
+                      max={160}
+                      step={5}
+                      value={wrapTurns}
+                      onChange={(e) => setWrapTurns(Number(e.target.value))}
+                      className="w-full accent-cyan-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex justify-between text-xs text-slate-400 mb-1">
+                      <span>Sample Weight (grains)</span>
+                      <span className="text-white font-mono">{wrapWeightGrains.toFixed(1)} gr ({wrapWeightGm.toFixed(2)} gm)</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={5}
+                      max={120}
+                      step={0.5}
+                      value={wrapWeightGrains}
+                      onChange={(e) => setWrapWeightGrains(Number(e.target.value))}
+                      className="w-full accent-emerald-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 space-y-3">
+                  <div className="text-sm font-semibold text-emerald-300">{"\u09b2\u09be\u0987\u09ad \u09b8\u09c2\u09a4\u09cd\u09b0 \u0993 \u09ab\u09b2\u09be\u09ab\u09b2"}</div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Fraction
+                      prefix="Ne ="
+                      num={`${wrapLengthYd.toFixed(0)} yd * 7000`}
+                      den={`840 * ${wrapWeightGrains.toFixed(1)} gr`}
+                      suffix={`= ${wrapNe.toFixed(2)} Ne`}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    <span className="text-white font-medium">{"\u0995\u0996\u09a8 \u09ac\u09cd\u09af\u09ac\u09b9\u09be\u09b0 \u09b9\u09df?"}</span> {"\u09af\u0996\u09a8 \u09a4\u09cb\u09ae\u09be\u09b0 \u09b9\u09be\u09a4\u09c7 \u09b8\u09c1\u09a4\u09be\u09b0 Cone \u09ac\u09be Bobbin \u09a5\u09be\u0995\u09c7 (80 turns = 120 yd = 1 Lea \u09b2\u09ae\u09cd\u09ac\u09be \u09b8\u09c1\u09a4\u09be \u09a8\u09c7\u0993\u09df\u09be \u09af\u09be\u09df)\u0964 \u098f\u0995\u0987 \u09a6\u09c8\u09b0\u09cd\u0998\u09cd\u09af\u09c7 \u0993\u099c\u09a8"} (<span className="text-amber-300">grains</span>) {"\u09ac\u09be\u09dc\u09b2\u09c7 \u09b8\u09c1\u09a4\u09be \u09ae\u09cb\u099f\u09be \u09b9\u09df, \u09a4\u09be\u0987"} <span className="text-cyan-300">{"Ne \u0995\u09ae\u09c7"}</span> {"\u0986\u09b0"} <span className="text-emerald-300">Tex ({wrapTex.toFixed(1)}) {"\u09ac\u09be\u09dc\u09c7"}</span>.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {lab3DMode === "beesley" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 space-y-3">
+                  <div className="text-sm font-semibold text-cyan-300">{"Beesley's Balance \u0987\u09a8\u09aa\u09c1\u099f"}</div>
+                  <div>
+                    <label className="flex justify-between text-xs text-slate-400 mb-1">
+                      <span>{"\u09b9\u09c1\u0995\u09c7 \u099d\u09cb\u09b2\u09be\u09a8\u09cb \u0995\u09be\u099f\u09be \u09b8\u09c1\u09a4\u09be\u09b0 \u09b8\u0982\u0996\u09cd\u09af\u09be (n)"}</span>
+                      <span className="text-white font-mono">{beesleyThreads} {"\u099f\u09bf \u09b8\u09c1\u09a4\u09be"}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={10}
+                      max={60}
+                      step={1}
+                      value={beesleyThreads}
+                      onChange={(e) => setBeesleyThreads(Number(e.target.value))}
+                      className="w-full accent-amber-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 space-y-2">
+                  <div className="text-sm font-semibold text-emerald-300">
+                    {"\u09ab\u09b2\u09be\u09ab\u09b2:"} {beesleyThreads} Ne ({(590.54 / beesleyThreads).toFixed(2)} Tex)
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    <span className="text-white font-medium">{"\u0995\u09c7\u09a8 \u098f\u099f\u09bf \u09b2\u09be\u0997\u09c7?"}</span> {"\u099b\u09cb\u099f \u0995\u09be\u09aa\u09dc\u09c7\u09b0 \u099f\u09c1\u0995\u09b0\u09be (Fabric Swatch) \u09a5\u09c7\u0995\u09c7 \u09e7\u09e8\u09e6 \u0997\u099c \u09b8\u09c1\u09a4\u09be \u09aa\u09be\u0993\u09df\u09be \u09b8\u09ae\u09cd\u09ad\u09ac \u09a8\u09df! \u09a4\u09be\u0987 \u09a8\u09bf\u09b0\u09cd\u09a6\u09bf\u09b7\u09cd\u099f \u099f\u09c7\u09ae\u09aa\u09cd\u09b2\u09c7\u099f \u09a6\u09bf\u09df\u09c7 \u099b\u09cb\u099f \u099b\u09cb\u099f \u09b8\u09c1\u09a4\u09be \u0995\u09c7\u099f\u09c7 \u09b9\u09c1\u0995\u09c7 \u099d\u09cb\u09b2\u09be\u09a4\u09c7 \u09b9\u09df\u0964 \u09af\u09a4\u099f\u09bf \u09b8\u09c1\u09a4\u09be \u09a6\u09bf\u09b2\u09c7 \u09aa\u09df\u09c7\u09a8\u09cd\u099f\u09be\u09b0 \u09b6\u09c2\u09a8\u09cd\u09af \u09a6\u09be\u0997\u09c7 \u0986\u09b8\u09c7, \u09b8\u09c7\u0987 \u09b8\u0982\u0996\u09cd\u09af\u09be\u0987 \u09b8\u09b0\u09be\u09b8\u09b0\u09bf"} <span className="text-cyan-300">Ne Count</span>!
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+            <h3 className="text-base font-semibold text-white mb-3">
+              All 10 Systems Live Comparison ({inputCount} {fromMeta.short}, {plyCount}-Ply)
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400">
+                    <th className="py-2 px-3">System</th>
+                    <th className="py-2 px-3">Type</th>
+                    <th className="py-2 px-3">Single (1-Ply)</th>
+                    <th className="py-2 px-3">Resultant ({plyCount}-Ply)</th>
+                    <th className="py-2 px-3">{"\u09b8\u0982\u099c\u09cd\u099e\u09be (\u09ac\u09be\u0982\u09b2\u09be\u09df)"}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/70">
+                  {COUNT_SYSTEMS.map((s) => (
+                    <tr key={s.id} className="hover:bg-slate-800/40">
+                      <td className="py-2.5 px-3 font-medium text-white">{s.label}</td>
+                      <td className="py-2.5 px-3">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                            s.type === "Direct"
+                              ? "bg-amber-500/15 text-amber-300"
+                              : "bg-cyan-500/15 text-cyan-300"
+                          }`}
+                        >
+                          {s.type}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-cyan-300">
+                        {s.fromTex(singleTex).toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-emerald-400 font-semibold">
+                        {s.fromTex(resultantTex).toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-400 text-xs">{s.definition}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
       )}
-      {/* Engineering Guide & Live Formula Breakdown */}
-      <section className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-5 space-y-4">
-        <div className="space-y-1.5 border-b border-slate-800/80 pb-3">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-cyan-400" />
-            <h3 className="text-sm font-bold text-white">{activeGuide.title}</h3>
-          </div>
-          <p className="text-xs leading-relaxed text-cyan-200/90">{activeGuide.purpose}</p>
-        </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="rounded-xl border border-slate-800 bg-[#060A12] p-4 space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-300">ধাপে ধাপে পরীক্ষা করার নিয়ম</h4>
-            <ul className="space-y-2 text-xs leading-relaxed text-slate-300">
-              {activeGuide.howTo.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
+      {activeTab === "units" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
+            <h2 className="text-base font-semibold text-white flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-cyan-400" />
+              <span>{"Length Unit Conversion (\u09a6\u09c8\u09b0\u09cd\u0998\u09cd\u09af)"}</span>
+            </h2>
+            <div className="grid grid-cols-3 gap-2">
+              <input
+                type="number"
+                value={lenVal}
+                onChange={(e) => setLenVal(Number(e.target.value) || 0)}
+                className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
+              />
+              <select
+                value={lenFrom}
+                onChange={(e) => setLenFrom(e.target.value as LengthUnit)}
+                className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
+              >
+                <option value="hank">Hank (840 yd)</option>
+                <option value="lea">Lea (120 yd)</option>
+                <option value="yd">Yard (yd)</option>
+                <option value="in">Inch (in)</option>
+                <option value="m">Meter (m)</option>
+                <option value="cm">Centimeter (cm)</option>
+                <option value="spyndle">Spyndle (14400 yd)</option>
+              </select>
+              <select
+                value={lenTo}
+                onChange={(e) => setLenTo(e.target.value as LengthUnit)}
+                className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
+              >
+                <option value="yd">Yard (yd)</option>
+                <option value="lea">Lea (120 yd)</option>
+                <option value="hank">Hank (840 yd)</option>
+                <option value="in">Inch (in)</option>
+                <option value="m">Meter (m)</option>
+                <option value="cm">Centimeter (cm)</option>
+                <option value="spyndle">Spyndle (14400 yd)</option>
+              </select>
+            </div>
+            <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 font-mono text-lg text-cyan-300 font-bold">
+              {lenVal} {lenFrom} = {lenConverted.toFixed(4)} {lenTo}
+            </div>
+            <ul className="text-xs text-slate-300 space-y-1.5 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+              <li>1 yard = 36 inch</li>
+              <li>1 hank = 840 yds = 7 Lea ({"\u0985\u09b0\u09cd\u09a5\u09be\u09ce"} 1 Lea = 120 yds)</li>
+              <li>1 meter = 1.0936 yds ({"\u09aa\u09cd\u09b0\u09be\u09df"} 1.09 yds) = 39.37 inch</li>
+              <li>1 inch = 2.54 cm | 1 spyndle (Jute) = 14,400 yds</li>
             </ul>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-[#060A12] p-4 space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-violet-300">টার্ম ও পূর্ণরূপ পরিচিতি</h4>
-            <dl className="space-y-2 text-xs">
-              {activeGuide.terms.map((t) => (
-                <div key={t.name}>
-                  <dt className="font-semibold text-slate-100">{t.name}</dt>
-                  <dd className="text-slate-400">{t.desc}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
+            <h2 className="text-base font-semibold text-white flex items-center gap-2">
+              <Scale className="w-4 h-4 text-emerald-400" />
+              <span>{"Weight & Fabric GSM Conversion (\u0993\u099c\u09a8)"}</span>
+            </h2>
+            <div className="grid grid-cols-3 gap-2">
+              <input
+                type="number"
+                value={wtVal}
+                onChange={(e) => setWtVal(Number(e.target.value) || 0)}
+                className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
+              />
+              <select
+                value={wtFrom}
+                onChange={(e) => setWtFrom(e.target.value as WeightUnit)}
+                className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
+              >
+                <option value="lb">Pound (lb)</option>
+                <option value="oz">Ounce (oz)</option>
+                <option value="gm">Gram (gm)</option>
+                <option value="grain">Grain</option>
+                <option value="kg">Kilogram (kg)</option>
+                <option value="ton">Metric Ton</option>
+              </select>
+              <select
+                value={wtTo}
+                onChange={(e) => setWtTo(e.target.value as WeightUnit)}
+                className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
+              >
+                <option value="grain">Grain</option>
+                <option value="gm">Gram (gm)</option>
+                <option value="oz">Ounce (oz)</option>
+                <option value="lb">Pound (lb)</option>
+                <option value="kg">Kilogram (kg)</option>
+                <option value="ton">Metric Ton</option>
+              </select>
+            </div>
+            <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 font-mono text-lg text-emerald-400 font-bold">
+              {wtVal} {wtFrom} = {wtConverted.toFixed(4)} {wtTo}
+            </div>
+            <ul className="text-xs text-slate-300 space-y-1.5 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+              <li>1 lb = 16 oz = 453.6 gm = 7000 grain</li>
+              <li>1 kg = 2.2046 lb | 1 ton = 2204.6 lb ({"\u09aa\u09cd\u09b0\u09be\u09df"} 2204 lb) = 1000 kg</li>
+            </ul>
 
-          <div className="rounded-xl border border-slate-800 bg-[#060A12] p-4 space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-300">লাইভ সূত্র ও হিসাব</h4>
-            <div className="space-y-2">
-              {activeGuide.formulas.map((f) => (
-                <div key={f.label} className="rounded-lg border border-slate-800/80 bg-[#0A1020] px-3 py-2">
-                  <div className="text-[10.5px] font-semibold uppercase text-slate-400">{f.label}</div>
-                  <div className="mt-0.5 font-mono text-[11px] text-emerald-300 break-all">{f.expr}</div>
-                </div>
-              ))}
+            <div className="border-t border-slate-800 pt-3 grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">GSM (g/m2)</label>
+                <input
+                  type="number"
+                  value={gsmInput}
+                  onChange={(e) => {
+                    const g = Number(e.target.value) || 0;
+                    setGsmInput(g);
+                    setOzInput(Number((g / 33.90575).toFixed(3)));
+                  }}
+                  className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">oz/yd2 (1 oz/yd2 = 33.91 GSM)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={ozInput}
+                  onChange={(e) => {
+                    const o = Number(e.target.value) || 0;
+                    setOzInput(o);
+                    setGsmInput(Number((o * 33.90575).toFixed(2)));
+                  }}
+                  className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
+                />
+              </div>
             </div>
           </div>
         </div>
-      </section>
+      )}
+
+      {activeTab === "weaving" && (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
+          <h2 className="text-base font-semibold text-white">Weaving GSM &amp; Cover Factor Calculator</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">EPI</label>
+              <input type="number" value={epi} onChange={(e) => setEpi(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">PPI</label>
+              <input type="number" value={ppi} onChange={(e) => setPpi(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Warp Count (Ne)</label>
+              <input type="number" value={warpNe} onChange={(e) => setWarpNe(Number(e.target.value) || 1)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Weft Count (Ne)</label>
+              <input type="number" value={weftNe} onChange={(e) => setWeftNe(Number(e.target.value) || 1)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
+              <div className="text-xs text-slate-400">Estimated GSM</div>
+              <div className="text-xl font-bold text-cyan-300">{weavingGsm.toFixed(2)} g/m2</div>
+            </div>
+            <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
+              <div className="text-xs text-slate-400">Warp Cover Factor (K1)</div>
+              <div className="text-xl font-bold text-emerald-400">{warpCover.toFixed(2)}</div>
+            </div>
+            <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
+              <div className="text-xs text-slate-400">Weft Cover Factor (K2)</div>
+              <div className="text-xl font-bold text-amber-300">{weftCover.toFixed(2)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "dyeing" && (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
+          <h2 className="text-base font-semibold text-white">Dyeing Recipe (M:L, % owf &amp; g/L)</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Fabric Weight (kg)</label>
+              <input type="number" value={fabricKg} onChange={(e) => setFabricKg(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Liquor Ratio (1 : M:L)</label>
+              <input type="number" value={mlRatio} onChange={(e) => setMlRatio(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Dye Shade (% owf)</label>
+              <input type="number" step="0.1" value={shadePct} onChange={(e) => setShadePct(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Salt (g/L)</label>
+              <input type="number" value={saltGpl} onChange={(e) => setSaltGpl(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
+              <div className="text-xs text-slate-400">Total Liquor Volume</div>
+              <div className="text-xl font-bold text-cyan-300">{totalWaterL.toFixed(1)} Liters</div>
+            </div>
+            <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
+              <div className="text-xs text-slate-400">Required Dye</div>
+              <div className="text-xl font-bold text-emerald-400">{dyeKg.toFixed(3)} kg</div>
+            </div>
+            <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
+              <div className="text-xs text-slate-400">Required Salt</div>
+              <div className="text-xl font-bold text-amber-300">{saltKg.toFixed(2)} kg</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "garment" && (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
+          <h2 className="text-base font-semibold text-white">Garment Fabric Consumption &amp; CM Costing</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Body Length (cm)</label>
+              <input type="number" value={bodyLenCm} onChange={(e) => setBodyLenCm(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Sleeve Length (cm)</label>
+              <input type="number" value={sleeveLenCm} onChange={(e) => setSleeveLenCm(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">1/2 Chest (cm)</label>
+              <input type="number" value={chestWidthCm} onChange={(e) => setChestWidthCm(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Fabric GSM</label>
+              <input type="number" value={garmentGsm} onChange={(e) => setGarmentGsm(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Wastage (%)</label>
+              <input type="number" value={wastagePct} onChange={(e) => setWastagePct(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">SMV (min)</label>
+              <input type="number" value={smv} onChange={(e) => setSmv(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Efficiency (%)</label>
+              <input type="number" value={efficiencyPct} onChange={(e) => setEfficiencyPct(Number(e.target.value) || 1)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Cost / Min ($)</label>
+              <input type="number" step="0.01" value={cmPerMinUsd} onChange={(e) => setCmPerMinUsd(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
+              <div className="text-xs text-slate-400">Fabric Consumption / Dozen</div>
+              <div className="text-xl font-bold text-cyan-300">{consKgPerDozen.toFixed(2)} kg / dz</div>
+            </div>
+            <div className="rounded-xl bg-slate-950 border border-slate-800 p-4">
+              <div className="text-xs text-slate-400">CM Cost / Dozen</div>
+              <div className="text-xl font-bold text-emerald-400">${cmPerDozenUsd.toFixed(2)} / dz</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "ttqc" && (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
+          <h2 className="text-base font-semibold text-white">TTQC Dimensional Stability (Shrinkage %)</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Before Wash (cm)</label>
+              <input type="number" step="0.1" value={beforeWashCm} onChange={(e) => setBeforeWashCm(Number(e.target.value) || 0.1)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">After Wash (cm)</label>
+              <input type="number" step="0.1" value={afterWashCm} onChange={(e) => setAfterWashCm(Number(e.target.value) || 0)} className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white" />
+            </div>
+          </div>
+          <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 flex flex-wrap items-center justify-between gap-4">
+            <Fraction
+              prefix="Shrinkage % ="
+              num={`(${afterWashCm} - ${beforeWashCm}) * 100`}
+              den={`${beforeWashCm}`}
+              suffix={`= ${shrinkagePct.toFixed(2)}%`}
+            />
+            <span className={`text-sm font-semibold ${Math.abs(shrinkagePct) <= 3 ? "text-emerald-400" : "text-amber-300"}`}>
+              {shrinkagePct < 0
+                ? "\u09b8\u0999\u09cd\u0995\u09c1\u099a\u09bf\u09a4 \u09b9\u09df\u09c7\u099b\u09c7 (Shrinkage)"
+                : "\u09aa\u09cd\u09b0\u09b8\u09be\u09b0\u09bf\u09a4 \u09b9\u09df\u09c7\u099b\u09c7 (Elongation)"}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+export default TextileToolsClient;
