@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { RotateCcw, Play, Pause, Move3d } from "lucide-react";
+import { RotateCcw, Play, Pause, Move3d, Eye, EyeOff } from "lucide-react";
 
 export type Lab3DMode = "ply" | "wrap_reel" | "beesley";
 
@@ -80,7 +80,6 @@ function buildHelicalStrand(
   parent.add(new THREE.Mesh(geo, mat));
 
   if (addFibers) {
-    // 2 fine surface twist filaments so even 1-Ply looks like spun twisted yarn
     for (let f = 0; f < 2; f++) {
       const fPts: THREE.Vector3[] = [];
       const fPhase = phase + f * Math.PI;
@@ -122,7 +121,11 @@ export default function Yarn3DLab({
   beesleyThreads,
 }: Yarn3DLabProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
+  const activeTagRef = useRef<HTMLDivElement | null>(null);
+  const refTagRef = useRef<HTMLDivElement | null>(null);
+
   const [isPlaying, setIsPlaying] = useState(true);
+  const [showRef, setShowRef] = useState(true);
   const [wrapStep, setWrapStep] = useState<1 | 2 | 3>(1);
   const [resetTick, setResetTick] = useState(0);
 
@@ -191,19 +194,27 @@ export default function Yarn3DLab({
       Math.min(0.32, (30 - beesleyThreads) * 0.014)
     );
 
+    const activeAnchor = new THREE.Object3D();
+    activeAnchor.position.set(0, showRef ? 0.85 : 0.45, 0);
+    rootGroup.add(activeAnchor);
+
+    const refAnchor = new THREE.Object3D();
+    refAnchor.position.set(0, -0.45, 0);
+    rootGroup.add(refAnchor);
+
     if (mode === "ply") {
       const clampedPly = Math.max(1, Math.min(4, plyCount));
       const strandRadius = Math.max(0.06, Math.min(0.26, 0.05 + Math.sqrt(Math.max(1, singleTex)) * 0.022));
       const helixRadius =
         clampedPly === 1 ? 0 : strandRadius * (clampedPly === 2 ? 1.05 : clampedPly === 3 ? 1.24 : 1.4);
       const length = 4.6;
+      const activeY = showRef ? 0.45 : 0.0;
 
-      // Active Yarn (top)
       for (let p = 0; p < clampedPly; p++) {
         const phase = (p * Math.PI * 2) / clampedPly;
         const colorHex = PLY_COLORS[p % PLY_COLORS.length] ?? 0x22d3ee;
         buildHelicalStrand(rootGroup, {
-          yOffset: 0.42,
+          yOffset: activeY,
           length,
           strandRadius,
           helixRadius,
@@ -214,19 +225,20 @@ export default function Yarn3DLab({
         });
       }
 
-      // Reference 30 Ne (19.68 Tex, 1-Ply) Yarn (bottom) for instant visual thickness comparison
-      const refRadius = 0.05 + Math.sqrt(19.68) * 0.022;
-      buildHelicalStrand(rootGroup, {
-        yOffset: -0.78,
-        length,
-        strandRadius: refRadius,
-        helixRadius: 0,
-        turns: 3.4,
-        phase: 0,
-        colorHex: 0x64748b,
-        opacity: 0.65,
-        addFibers: true,
-      });
+      if (showRef) {
+        const refRadius = 0.05 + Math.sqrt(19.68) * 0.022;
+        buildHelicalStrand(rootGroup, {
+          yOffset: -0.78,
+          length,
+          strandRadius: refRadius,
+          helixRadius: 0,
+          turns: 3.4,
+          phase: 0,
+          colorHex: 0x64748b,
+          opacity: 0.65,
+          addFibers: true,
+        });
+      }
     } else if (mode === "wrap_reel") {
       const coneGroup = new THREE.Group();
       coneGroup.position.set(-2.6, -1.0, 0);
@@ -429,6 +441,7 @@ export default function Yarn3DLab({
     });
     resizeObserver.observe(container);
 
+    const projVec = new THREE.Vector3();
     let rafId = 0;
     const animate = () => {
       rafId = requestAnimationFrame(animate);
@@ -455,6 +468,27 @@ export default function Yarn3DLab({
       rootGroup.rotation.y = stateRef.current.rotY;
       camera.position.z = baseZ / stateRef.current.zoom;
       renderer.render(scene, camera);
+
+      if (mode === "ply") {
+        const w = container.clientWidth || 560;
+        const h = container.clientHeight || 350;
+        rootGroup.updateMatrixWorld();
+
+        if (activeTagRef.current) {
+          activeAnchor.getWorldPosition(projVec);
+          projVec.project(camera);
+          const sx = (projVec.x * 0.5 + 0.5) * w;
+          const sy = (-projVec.y * 0.5 + 0.5) * h;
+          activeTagRef.current.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -100%)`;
+        }
+        if (refTagRef.current && showRef) {
+          refAnchor.getWorldPosition(projVec);
+          projVec.project(camera);
+          const rx = (projVec.x * 0.5 + 0.5) * w;
+          const ry = (-projVec.y * 0.5 + 0.5) * h;
+          refTagRef.current.style.transform = `translate(${rx}px, ${ry}px) translate(-50%, -100%)`;
+        }
+      }
     };
     animate();
 
@@ -468,7 +502,7 @@ export default function Yarn3DLab({
       disposeObject3D(scene);
       renderer.dispose();
     };
-  }, [mode, plyCount, singleTex, wrapTurns, beesleyThreads, resetTick]);
+  }, [mode, plyCount, singleTex, wrapTurns, beesleyThreads, showRef, resetTick]);
 
   const handleReset = () => {
     stateRef.current.rotX = 0.18;
@@ -489,6 +523,20 @@ export default function Yarn3DLab({
           </span>
         </div>
         <div className="flex items-center gap-1.5">
+          {mode === "ply" && (
+            <button
+              type="button"
+              onClick={() => setShowRef((r) => !r)}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border transition ${
+                showRef
+                  ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-300"
+                  : "bg-slate-800 border-slate-700 text-slate-400"
+              }`}
+            >
+              {showRef ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+              <span>{showRef ? "Ref: ON" : "Ref: OFF"}</span>
+            </button>
+          )}
           {mode === "wrap_reel" && (
             <div className="flex items-center gap-1 mr-2">
               {([1, 2, 3] as const).map((s) => (
@@ -526,42 +574,51 @@ export default function Yarn3DLab({
         </div>
       </div>
 
-      {/* 3D Canvas + Live HUD Overlay */}
-      <div className="relative">
+      <div className="relative overflow-hidden">
         <div ref={mountRef} className="w-full h-[320px] sm:h-[360px] cursor-grab active:cursor-grabbing" />
+
+        {/* Pinned 3D Floating Tags for Active vs Reference Yarn */}
+        {mode === "ply" && (
+          <>
+            <div
+              ref={activeTagRef}
+              className="pointer-events-none absolute top-0 left-0 px-2.5 py-1 rounded-full bg-cyan-950/90 border border-cyan-400/60 text-[11px] font-semibold text-cyan-200 shadow-lg whitespace-nowrap"
+            >
+              {"\u09a4\u09cb\u09ae\u09be\u09b0 \u09b8\u09c1\u09a4\u09be (New)"} • {resultantTex.toFixed(1)} Tex
+            </div>
+            {showRef && (
+              <div
+                ref={refTagRef}
+                className="pointer-events-none absolute top-0 left-0 px-2.5 py-1 rounded-full bg-slate-900/90 border border-slate-500/60 text-[11px] font-medium text-slate-300 shadow-lg whitespace-nowrap"
+              >
+                {"\u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8 (30 Ne)"} • 19.7 Tex
+              </div>
+            )}
+          </>
+        )}
 
         <div className="pointer-events-none absolute top-3 left-3 right-3 flex flex-wrap items-start justify-between gap-2">
           {mode === "ply" && (
-            <>
-              <div className="rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-3 py-2 text-[11px] space-y-0.5">
-                <div className="text-cyan-300 font-semibold">
-                  {"\u0989\u09aa\u09b0\u09c7\u09b0 \u09b0\u0999\u09bf\u09a8 \u09b8\u09c1\u09a4\u09be = \u09a4\u09cb\u09ae\u09be\u09b0 \u0987\u09a8\u09aa\u09c1\u099f"} ({plyCount}-Ply, {resultantTex.toFixed(1)} Tex)
-                </div>
-                <div className="text-slate-400">
-                  {"\u09a8\u09bf\u099a\u09c7\u09b0 \u09a7\u09c2\u09b8\u09b0 \u09b8\u09c1\u09a4\u09be = 30 Ne (19.7 Tex) \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8"}
-                </div>
+            <div className="ml-auto rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-3 py-2 text-[11px] text-right">
+              <div className="text-slate-200 font-mono">
+                {"\u0986\u09a8\u09c1\u09ae\u09be\u09a8\u09bf\u0995 \u09ac\u09cd\u09af\u09be\u09b8"}: ~{approxDiameterMm.toFixed(2)} mm
               </div>
-              <div className="rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-3 py-2 text-[11px] text-right">
-                <div className="text-slate-200 font-mono">
-                  {"\u0986\u09a8\u09c1\u09ae\u09be\u09a8\u09bf\u0995 \u09ac\u09cd\u09af\u09be\u09b8"}: ~{approxDiameterMm.toFixed(2)} mm
-                </div>
-                <div
-                  className={
-                    resultantTex > 22
-                      ? "text-amber-300 font-medium"
-                      : resultantTex < 17
-                      ? "text-cyan-300 font-medium"
-                      : "text-emerald-400 font-medium"
-                  }
-                >
-                  {resultantTex > 22
-                    ? "30 Ne \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u099a\u09c7\u09df\u09c7 \u09ae\u09cb\u099f\u09be"
+              <div
+                className={
+                  resultantTex > 22
+                    ? "text-amber-300 font-medium"
                     : resultantTex < 17
-                    ? "30 Ne \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u099a\u09c7\u09df\u09c7 \u099a\u09bf\u0995\u09a8"
-                    : "\u09aa\u09cd\u09b0\u09be\u09df 30 Ne \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u09b8\u09ae\u09be\u09a8"}
-                </div>
+                    ? "text-cyan-300 font-medium"
+                    : "text-emerald-400 font-medium"
+                }
+              >
+                {resultantTex > 22
+                  ? "30 Ne \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u099a\u09c7\u09df\u09c7 \u09ae\u09cb\u099f\u09be"
+                  : resultantTex < 17
+                  ? "30 Ne \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u099a\u09c7\u09df\u09c7 \u099a\u09bf\u0995\u09a8"
+                  : "\u09aa\u09cd\u09b0\u09be\u09df 30 Ne \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u09b8\u09ae\u09be\u09a8"}
               </div>
-            </>
+            </div>
           )}
 
           {mode === "wrap_reel" && (
