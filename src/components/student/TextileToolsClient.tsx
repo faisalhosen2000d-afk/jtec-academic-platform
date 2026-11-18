@@ -11,6 +11,7 @@ import {
   Scissors,
   Sparkles,
   XCircle,
+  BookOpen,
 } from "lucide-react";
 
 type ToolTab = "yarn" | "fabric" | "dyeing" | "garment" | "ttqc";
@@ -107,6 +108,116 @@ export function TextileToolsClient() {
   );
   const ttqcPass =
     Math.abs(warpShrinkPct) <= maxShrinkLimit && Math.abs(weftShrinkPct) <= maxShrinkLimit;
+
+  const guideByTab: Record<
+    ToolTab,
+    {
+      title: string;
+      howTo: string[];
+      terms: Array<{ name: string; desc: string }>;
+      formulas: Array<{ label: string; expr: string }>;
+    }
+  > = {
+    yarn: {
+      title: "Yarn & Spinning Guide (YE)",
+      howTo: [
+        "1. Slide English Cotton Count (Ne) from 6s (coarse denim) to 80s (fine shirting) and watch the yarn diameter shrink live.",
+        "2. Enter Twist Multiplier (TM) and Lea Strength (lbs) from your spinning lab sheet to check yarn strength grade (CSP).",
+      ],
+      terms: [
+        { name: "Ne (English Count)", desc: "Indirect system: number of 840-yard hanks per 1 lb. Higher Ne means finer (thinner) yarn." },
+        { name: "Tex & Denier", desc: "Direct systems: weight in grams per 1,000m (Tex) or 9,000m (Denier). Higher Tex/Denier means thicker yarn." },
+        { name: "TM & TPI", desc: "Turns Per Inch (TPI) controls yarn twist tightness; higher TPI increases strength up to an optimum point." },
+        { name: "CSP", desc: "Count Strength Product (Ne x Lea Strength in lbs). 2200+ indicates high-strength combed yarn." },
+      ],
+      formulas: [
+        { label: "Tex", expr: `590.5 / ${ne} Ne = ${tex.toFixed(2)} Tex` },
+        { label: "Denier", expr: `${tex.toFixed(2)} Tex x 9 = ${denier.toFixed(1)} Denier` },
+        { label: "TPI", expr: `${tm} x sqrt(${ne}) = ${tpi.toFixed(2)} TPI` },
+        { label: "CSP", expr: `${ne} Ne x ${leaLbs} lbs = ${Math.round(csp)}` },
+      ],
+    },
+    fabric: {
+      title: "Fabric & Weaving Guide (FE)",
+      howTo: [
+        "1. Enter Warp/Weft Ne, EPI, PPI, and Crimp % from your fabric swatch analysis.",
+        "2. Watch the Weave Density Grid tighten or loosen and check whether Cloth Cover % is balanced (55-80%) or tight (80%+).",
+      ],
+      terms: [
+        { name: "EPI & PPI", desc: "Ends Per Inch (warp threads) and Picks Per Inch (weft threads) counted using a Pick Glass." },
+        { name: "Crimp (%)", desc: "Extra waviness of yarn inside woven cloth due to interlacement; increases fabric GSM." },
+        { name: "Fabric GSM", desc: "Grams per Square Meter — standard measure of fabric weight." },
+        { name: "Cover Factor (Kc)", desc: "Fraction of fabric area covered by yarns (max 28 = 100% theoretical full cover)." },
+      ],
+      formulas: [
+        {
+          label: "Fabric GSM",
+          expr: `23.25 x [(${epi}x${(1 + warpCrimp / 100).toFixed(2)})/${warpNe} + (${ppi}x${(1 + weftCrimp / 100).toFixed(2)})/${weftNe}] = ${fabricGsm.toFixed(1)} g/m2`,
+        },
+        { label: "Warp Cover (K1)", expr: `${epi} / sqrt(${warpNe}) = ${coverFactor.k1.toFixed(2)}` },
+        { label: "Weft Cover (K2)", expr: `${ppi} / sqrt(${weftNe}) = ${coverFactor.k2.toFixed(2)}` },
+        { label: "Cloth Cover (Kc)", expr: `K1 + K2 - (K1 x K2)/28 = ${coverFactor.kc.toFixed(2)} (${coverFactor.pct.toFixed(0)}%)` },
+      ],
+    },
+    dyeing: {
+      title: "Exhaust Dyeing Recipe Guide (WPE)",
+      howTo: [
+        "1. Set total Fabric Weight (kg) and Machine Liquor Ratio (1:M, e.g., 1:8 for modern jet dyeing).",
+        "2. Adjust Shade % (owf) and Salt/Soda Ash (g/L) to see bath depth, color intensity, and exact chemical batch weights.",
+      ],
+      terms: [
+        { name: "Liquor Ratio (M:L)", desc: "Ratio of fabric weight (kg) to total water volume (L). Lower ratio (1:6-1:8) saves water & energy." },
+        { name: "Shade % (owf)", desc: "On Weight of Fabric: dye mass calculated as a percentage of dry fabric weight." },
+        { name: "g/L (Grams/Liter)", desc: "Concentration of auxiliaries (Glauber Salt / Soda Ash) calculated based on total water volume." },
+      ],
+      formulas: [
+        { label: "Total Water", expr: `${fabricKg} kg x ${liquorRatio} = ${totalWaterL.toFixed(0)} Liters` },
+        { label: "Dye Weight", expr: `(${fabricKg} kg x ${shadePct}%) / 100 = ${totalDyeKg.toFixed(2)} kg` },
+        { label: "Salt Weight", expr: `(${totalWaterL.toFixed(0)} L x ${saltGl} g/L) / 1000 = ${totalSaltKg.toFixed(1)} kg` },
+        { label: "Soda Ash", expr: `(${totalWaterL.toFixed(0)} L x ${sodaGl} g/L) / 1000 = ${totalSodaKg.toFixed(1)} kg` },
+      ],
+    },
+    garment: {
+      title: "Garment Consumption & CM Guide (AE)",
+      howTo: [
+        "1. Enter T-Shirt spec measurements (Length, Sleeve, 1/2 Chest, Seam Allowance) and Fabric GSM.",
+        "2. Enter SMV, factory Cost Per Minute (CPM), and Line Efficiency % to calculate fabric kg/dozen and CM costing.",
+      ],
+      terms: [
+        { name: "Consumption (kg/dz)", desc: "Total knit fabric needed for 12 garments including cutting/marker wastage %." },
+        { name: "SMV", desc: "Standard Minute Value: total standard minutes required to sew one garment including allowances." },
+        { name: "CPM", desc: "Cost Per Minute: monthly factory labor + overhead cost divided by total available operator minutes." },
+        { name: "CM Cost", desc: "Cost of Making per piece or per dozen; core pricing metric in apparel merchandising." },
+      ],
+      formulas: [
+        {
+          label: "Fabric / Dozen",
+          expr: `[((${bodyLen}+${sleeveLen}+${allowance}) x (${halfChest}+${allowance}) x 2 x ${garmentGsm} x 12) / 10^7] x ${(1 + wastagePct / 100).toFixed(2)} = ${consPerDozenKg.toFixed(2)} kg`,
+        },
+        { label: "CM / Piece", expr: `(${smv} min x $${cpm}) / (${lineEff}% / 100) = $${cmPerPiece.toFixed(2)}` },
+        { label: "CM / Dozen", expr: `$${cmPerPiece.toFixed(2)} x 12 = $${(cmPerPiece * 12).toFixed(2)}` },
+      ],
+    },
+    ttqc: {
+      title: "TTQC Shrinkage Lab Guide (ISO 3759 / AATCC 135)",
+      howTo: [
+        "1. Mark a 350mm x 350mm benchmark square on the fabric before washing, then measure after washing & drying.",
+        "2. Check the overlay blueprint: if both Warp and Weft shrinkage stay within the buyer limit (usually <= 5%), the lot passes.",
+      ],
+      terms: [
+        { name: "Before Wash (L0)", desc: "Original benchmark distance marked on the fabric template (typically 350mm or 500mm)." },
+        { name: "After Wash (L1)", desc: "Measured distance after standardized laundering and drying." },
+        { name: "Shrinkage (%)", desc: "Positive % means fabric shrank; negative % means fabric stretched/elongated." },
+      ],
+      formulas: [
+        { label: "Warp Shrinkage", expr: `((${beforeWarp} - ${afterWarp}) / ${beforeWarp}) x 100 = ${warpShrinkPct.toFixed(2)}%` },
+        { label: "Weft Shrinkage", expr: `((${beforeWeft} - ${afterWeft}) / ${beforeWeft}) x 100 = ${weftShrinkPct.toFixed(2)}%` },
+        { label: "Status Check", expr: `Max(|${warpShrinkPct.toFixed(2)}%|, |${weftShrinkPct.toFixed(2)}%|) <= ${maxShrinkLimit}% -> ${ttqcPass ? "PASS" : "FAIL"}` },
+      ],
+    },
+  };
+
+  const activeGuide = guideByTab[tab];
 
   const tabs: Array<{ id: ToolTab; label: string; sub: string; icon: typeof Layers }> = [
     { id: "yarn", label: "Yarn & Spinning", sub: "YE", icon: Layers },
@@ -604,6 +715,48 @@ export function TextileToolsClient() {
           </div>
         </div>
       )}
+      {/* Engineering Guide & Live Formula Breakdown */}
+      <section className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-5 space-y-4">
+        <div className="flex items-center gap-2 border-b border-slate-800/80 pb-3">
+          <BookOpen className="h-4 w-4 text-cyan-400" />
+          <h3 className="text-sm font-bold text-white">{activeGuide.title} — How It Works &amp; Live Formulas</h3>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="rounded-xl border border-slate-800 bg-[#060A12] p-4 space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-300">How to Use &amp; Check</h4>
+            <ul className="space-y-2 text-xs leading-relaxed text-slate-300">
+              {activeGuide.howTo.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-[#060A12] p-4 space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-violet-300">Module &amp; Term Glossary</h4>
+            <dl className="space-y-2 text-xs">
+              {activeGuide.terms.map((t) => (
+                <div key={t.name}>
+                  <dt className="font-semibold text-slate-100">{t.name}</dt>
+                  <dd className="text-slate-400">{t.desc}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-[#060A12] p-4 space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-300">Live Calculation Steps</h4>
+            <div className="space-y-2">
+              {activeGuide.formulas.map((f) => (
+                <div key={f.label} className="rounded-lg border border-slate-800/80 bg-[#0A1020] px-3 py-2">
+                  <div className="text-[10.5px] font-semibold uppercase text-slate-400">{f.label}</div>
+                  <div className="mt-0.5 font-mono text-[11px] text-emerald-300 break-all">{f.expr}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
