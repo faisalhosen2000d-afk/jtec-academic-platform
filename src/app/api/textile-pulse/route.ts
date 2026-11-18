@@ -166,12 +166,12 @@ export async function GET(request: Request) {
             {
               text: `You are the Textile Industry Editor for JTEC (Jhenaidah Textile Engineering College).
 Below are live RSS headlines from Bangladesh and Global sources. Filter STRICTLY for Textile, Apparel, RMG, BGMEA/BKMEA, Fiber, Spinning, Weaving, Dyeing/Finishing, Sustainability, or Textile Tech news (ignore unrelated general/political/sports news).
-Select up to 8 top stories for "bangladesh" and up to 8 top stories for "global", and translate/summarize them into natural, clean Bengali (বাংলা).
+Select up to 4 top stories for "bangladesh" and up to 4 top stories for "global", and translate/summarize them into natural, clean Bengali (বাংলা).
 
 Headlines:
 ${headlineList}
 
-Return strictly valid JSON object with key "items" (array of 8-16 objects):
+Return strictly valid JSON object with key "items" (array of 4-8 objects):
 - "index": integer matching [i] above
 - "region": strictly "bangladesh" or "global"
 - "category": strictly one of "Bangladesh RMG", "Innovation & Tech", "Sustainability", "Fiber & Market"
@@ -197,7 +197,7 @@ Return strictly valid JSON object with key "items" (array of 8-16 objects):
         const baseIdx = items.length;
         const newItems = (parsed.items || [])
           .filter((p) => rawHeadlines[p.index])
-          .slice(0, 16)
+          .slice(0, 8)
           .map((p, idx) => {
             const src = rawHeadlines[p.index]!;
             return {
