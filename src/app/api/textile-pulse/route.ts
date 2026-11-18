@@ -84,7 +84,7 @@ async function fetchLiveTextileHeadlines(): Promise<RawRssItem[]> {
     feeds.map(async (f) => {
       const res = await fetch(f.url, {
         headers: { "User-Agent": "Mozilla/5.0 (compatible; JTECPlatform/1.0)" },
-        signal: AbortSignal.timeout(6500),
+        signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) return [];
       const xml = await res.text();
@@ -174,7 +174,7 @@ Return strictly valid JSON object with key "items" (array of 4-8 objects):
 - "student_takeaway_bn": 1 short sentence in Bengali explaining why this matters for textile engineering students (max 140 chars)`,
             },
           ],
-          { jsonMode: true, timeoutMs: 20000 }
+          { jsonMode: true, timeoutMs: 42000 }
         );
 
         const parsed = JSON.parse(rawJson) as {
