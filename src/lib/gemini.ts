@@ -9,8 +9,8 @@ const MODEL_CANDIDATES = [
 ] as const;
 
 const GROQ_MODELS = [
-  "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
+  "openai/gpt-oss-120b",
 ] as const;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -75,7 +75,8 @@ async function callGroqText(
           body: JSON.stringify({
             model,
             temperature: 0.25,
-            max_tokens: 2400,
+            max_tokens: 4096,
+            reasoning_effort: "low",
             messages: [
               ...(options?.jsonMode
                 ? [{ role: "system", content: "Return ONLY a valid JSON object. No markdown, no extra text." }]
