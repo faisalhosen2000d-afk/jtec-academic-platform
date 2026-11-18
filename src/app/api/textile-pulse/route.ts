@@ -7,6 +7,7 @@ export const maxDuration = 60;
 
 export interface TextileBriefItem {
   id: string;
+  region: "bangladesh" | "global";
   category: "Bangladesh RMG" | "Innovation & Tech" | "Sustainability" | "Fiber & Market";
   title_bn: string;
   summary_bn: string;
@@ -21,6 +22,7 @@ interface RawRssItem {
   url: string;
   source: string;
   pubDate: string;
+  hintRegion: "bangladesh" | "global";
 }
 
 function decodeXml(str: string): string {
@@ -36,10 +38,10 @@ function decodeXml(str: string): string {
     .trim();
 }
 
-function parseRssXml(xml: string, fallbackSource: string): RawRssItem[] {
+function parseRssXml(xml: string, fallbackSource: string, hintRegion: "bangladesh" | "global"): RawRssItem[] {
   const items: RawRssItem[] = [];
   const itemMatches = xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
-  for (const block of itemMatches.slice(0, 12)) {
+  for (const block of itemMatches.slice(0, 10)) {
     const titleRaw = block.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || "";
     const linkRaw = block.match(/<link>([\s\S]*?)<\/link>/i)?.[1] || "";
     const sourceRaw = block.match(/<source[^>]*>([\s\S]*?)<\/source>/i)?.[1] || fallbackSource;
@@ -52,6 +54,7 @@ function parseRssXml(xml: string, fallbackSource: string): RawRssItem[] {
         url,
         source: decodeXml(sourceRaw) || fallbackSource,
         pubDate: decodeXml(pubRaw),
+        hintRegion,
       });
     }
   }
@@ -59,14 +62,21 @@ function parseRssXml(xml: string, fallbackSource: string): RawRssItem[] {
 }
 
 async function fetchLiveTextileHeadlines(): Promise<RawRssItem[]> {
-  const feeds = [
+  const feeds: Array<{ url: string; source: string; hintRegion: "bangladesh" | "global" }> = [
     {
-      url: "https://news.google.com/rss/search?q=(textile+OR+RMG+OR+%22garment+industry%22+OR+%22textile+innovation%22+OR+%22apparel+export%22)+when:7d&hl=en-US&gl=US&ceid=US:en",
-      source: "Global Textile News",
+      url: "https://news.google.com/rss/search?q=(Bangladesh+RMG+OR+Bangladesh+textile+OR+%22garment+factory%22+Bangladesh+OR+BGMEA+OR+BKMEA+OR+BTMA)+when:7d&hl=en-US&gl=BD&ceid=BD:en",
+      source: "Bangladesh RMG News",
+      hintRegion: "bangladesh",
     },
     {
       url: "https://www.textiletoday.com.bd/feed/",
       source: "Textile Today",
+      hintRegion: "bangladesh",
+    },
+    {
+      url: "https://news.google.com/rss/search?q=(%22textile+innovation%22+OR+%22smart+textile%22+OR+%22sustainable+textile%22+OR+%22textile+technology%22+OR+%22apparel+industry%22)+when:7d&hl=en-US&gl=US&ceid=US:en",
+      source: "Global Textile Tech",
+      hintRegion: "global",
     },
   ];
 
@@ -78,23 +88,26 @@ async function fetchLiveTextileHeadlines(): Promise<RawRssItem[]> {
       });
       if (!res.ok) return [];
       const xml = await res.text();
-      return parseRssXml(xml, f.source);
+      return parseRssXml(xml, f.source, f.hintRegion);
     })
   );
 
-  const merged: RawRssItem[] = [];
+  const bdItems: RawRssItem[] = [];
+  const globalItems: RawRssItem[] = [];
   const seenUrls = new Set<string>();
+
   for (const r of results) {
     if (r.status === "fulfilled") {
       for (const item of r.value) {
         if (!seenUrls.has(item.url)) {
           seenUrls.add(item.url);
-          merged.push(item);
+          if (item.hintRegion === "bangladesh") bdItems.push(item);
+          else globalItems.push(item);
         }
       }
     }
   }
-  return merged.slice(0, 14);
+  return [...bdItems.slice(0, 9), ...globalItems.slice(0, 9)];
 }
 
 export async function GET(request: Request) {
@@ -126,7 +139,7 @@ export async function GET(request: Request) {
         .maybeSingle();
 
       const existingRow = existing as { items?: TextileBriefItem[] } | null;
-      if (existingRow?.items && existingRow.items.length > 0) {
+      if (existingRow?.items && existingRow.items.length > 0 && existingRow.items[0]?.region) {
         items = existingRow.items;
       }
     }
@@ -135,21 +148,22 @@ export async function GET(request: Request) {
       const rawHeadlines = await fetchLiveTextileHeadlines();
       if (rawHeadlines.length > 0) {
         const headlineList = rawHeadlines
-          .map((h, i) => `[${i}] Title: ${h.title} | Source: ${h.source} | Date: ${h.pubDate}`)
+          .map((h, i) => `[${i}] (${h.hintRegion}) Title: ${h.title} | Source: ${h.source} | Date: ${h.pubDate}`)
           .join("\n");
 
         const rawJson = await callGemini(
           [
             {
               text: `You are the Textile Industry Editor for JTEC (Jhenaidah Textile Engineering College).
-Below are live RSS headlines. Filter STRICTLY for Textile, Apparel, RMG, Fiber, Spinning, Weaving, Dyeing/Finishing, Sustainability, or Textile Tech innovations (ignore unrelated general/political/sports news).
-Select the best 6 stories and translate/summarize them into natural, clean Bengali (বাংলা).
+Below are live RSS headlines from Bangladesh and Global sources. Filter STRICTLY for Textile, Apparel, RMG, BGMEA/BKMEA, Fiber, Spinning, Weaving, Dyeing/Finishing, Sustainability, or Textile Tech news (ignore unrelated general/political/sports news).
+Select up to 4 top stories for "bangladesh" and up to 4 top stories for "global", and translate/summarize them into natural, clean Bengali (বাংলা).
 
 Headlines:
 ${headlineList}
 
-Return strictly valid JSON object with key "items" (array of 4-6 objects):
+Return strictly valid JSON object with key "items" (array of 4-8 objects):
 - "index": integer matching [i] above
+- "region": strictly "bangladesh" or "global"
 - "category": strictly one of "Bangladesh RMG", "Innovation & Tech", "Sustainability", "Fiber & Market"
 - "title_bn": clear Bengali headline (max 95 chars; NEVER mix Bengali & English letters inside one word)
 - "summary_bn": concise 2-sentence Bengali summary (max 220 chars)
@@ -162,6 +176,7 @@ Return strictly valid JSON object with key "items" (array of 4-6 objects):
         const parsed = JSON.parse(rawJson) as {
           items?: Array<{
             index: number;
+            region: "bangladesh" | "global";
             category: TextileBriefItem["category"];
             title_bn: string;
             summary_bn: string;
@@ -171,11 +186,12 @@ Return strictly valid JSON object with key "items" (array of 4-6 objects):
 
         items = (parsed.items || [])
           .filter((p) => rawHeadlines[p.index])
-          .slice(0, 7)
+          .slice(0, 8)
           .map((p, idx) => {
             const src = rawHeadlines[p.index]!;
             return {
               id: `${todayDhaka}-${idx}`,
+              region: p.region === "bangladesh" || p.region === "global" ? p.region : src.hintRegion,
               category: p.category || "Innovation & Tech",
               title_bn: p.title_bn,
               summary_bn: p.summary_bn,
