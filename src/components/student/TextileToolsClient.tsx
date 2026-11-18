@@ -296,7 +296,7 @@ export function TextileToolsClient() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 sm:pb-6">
       <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950/30 p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -337,12 +337,12 @@ export function TextileToolsClient() {
       </div>
 
       {activeTab === "yarn" && (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-20 sm:pb-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
             <div className="lg:col-span-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-base font-semibold text-white">Yarn A: 10-System Count &amp; Ply Converter</h2>
-                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-cyan-300 border border-slate-700">
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-cyan-300 border border-slate-700 whitespace-nowrap shrink-0">
                   {fromMeta.type} {"->"} {toMeta.type}
                 </span>
               </div>
@@ -857,7 +857,7 @@ export function TextileToolsClient() {
               <ArrowRightLeft className="w-4 h-4 text-cyan-400" />
               <span>{"Length Unit Conversion (\u09a6\u09c8\u09b0\u09cd\u0998\u09cd\u09af)"}</span>
             </h2>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <input
                 type="number"
                 value={lenVal}
@@ -907,7 +907,7 @@ export function TextileToolsClient() {
               <Scale className="w-4 h-4 text-emerald-400" />
               <span>{"Weight & Fabric GSM Conversion (\u0993\u099c\u09a8)"}</span>
             </h2>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <input
                 type="number"
                 value={wtVal}
@@ -947,7 +947,7 @@ export function TextileToolsClient() {
               <li>1 kg = 2.2046 lb | 1 ton = 2204.6 lb ({"\u09aa\u09cd\u09b0\u09be\u09df"} 2204 lb) = 1000 kg</li>
             </ul>
 
-            <div className="border-t border-slate-800 pt-3 grid grid-cols-2 gap-3">
+            <div className="border-t border-slate-800 pt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-slate-400 mb-1">GSM (g/m2)</label>
                 <input
