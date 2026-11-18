@@ -4,9 +4,9 @@ export type GeminiPart =
 
 const MODEL_CANDIDATES = [
   "gemini-2.5-flash-lite",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
   "gemini-flash-latest",
-  "gemini-3.5-flash-lite",
-  "gemini-3.8-flash",
 ] as const;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -32,10 +32,18 @@ export async function callGemini(
 
   let lastError = "AI service is temporarily unavailable.";
   const startKeyIdx = Math.floor(Math.random() * keys.length);
+  const perAttemptMs = options?.timeoutMs ?? 12000;
+  const deadline = Date.now() + 45000;
+  const maxKeysPerModel = Math.min(keys.length, 3);
 
   for (let m = 0; m < MODEL_CANDIDATES.length; m++) {
     const model = MODEL_CANDIDATES[m];
-    for (let k = 0; k < keys.length; k++) {
+    for (let k = 0; k < maxKeysPerModel; k++) {
+      const remainingMs = deadline - Date.now();
+      if (remainingMs < 3500) {
+        throw new Error("AI request took too long. Please try again.");
+      }
+
       const apiKey = keys[(startKeyIdx + k) % keys.length];
       if (!apiKey) continue;
 
@@ -48,7 +56,7 @@ export async function callGemini(
               "x-goog-api-key": apiKey,
               "Content-Type": "application/json",
             },
-            signal: AbortSignal.timeout(options?.timeoutMs ?? 14000),
+            signal: AbortSignal.timeout(Math.min(perAttemptMs, remainingMs - 1000)),
             body: JSON.stringify({
               contents: [{ parts }],
               generationConfig: {
@@ -64,7 +72,7 @@ export async function callGemini(
             response.status === 429
               ? "AI is experiencing high traffic right now. Please try again in a few seconds."
               : `Model ${model} temporarily unavailable (503).`;
-          await sleep(250);
+          await sleep(150);
           continue;
         }
 
