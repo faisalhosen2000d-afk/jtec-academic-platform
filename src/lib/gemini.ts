@@ -62,6 +62,7 @@ export async function callGemini(
               generationConfig: {
                 temperature: 0.35,
                 ...(options?.jsonMode ? { responseMimeType: "application/json" } : {}),
+                ...(model?.startsWith("gemini-2.5") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
               },
             }),
           }

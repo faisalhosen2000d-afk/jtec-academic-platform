@@ -180,7 +180,7 @@ Return strictly valid JSON object with key "items" (array of 8-16 objects):
 - "student_takeaway_bn": 1 short sentence in Bengali explaining why this matters for textile engineering students (max 140 chars)`,
             },
           ],
-          { jsonMode: true, timeoutMs: 18000 }
+          { jsonMode: true, timeoutMs: 30000 }
         );
 
         const parsed = JSON.parse(rawJson) as {
