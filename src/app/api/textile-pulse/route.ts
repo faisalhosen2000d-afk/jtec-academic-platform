@@ -107,7 +107,9 @@ async function fetchLiveTextileHeadlines(): Promise<RawRssItem[]> {
       }
     }
   }
-  return [...bdItems.slice(0, 9), ...globalItems.slice(0, 9)];
+  const sortNewest = (arr: RawRssItem[]) =>
+    arr.sort((a, b) => (Date.parse(b.pubDate) || 0) - (Date.parse(a.pubDate) || 0));
+  return [...sortNewest(bdItems).slice(0, 9), ...sortNewest(globalItems).slice(0, 9)];
 }
 
 export async function GET(request: Request) {
@@ -128,6 +130,8 @@ export async function GET(request: Request) {
     const todayDhaka = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dhaka" }).format(new Date());
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get("refresh") === "true";
+    const requestedDate = searchParams.get("date");
+    const targetDate = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : todayDhaka;
 
     let items: TextileBriefItem[] = [];
 
@@ -135,7 +139,7 @@ export async function GET(request: Request) {
       const { data: existing } = await serviceSupabase
         .from("textile_briefs")
         .select("items")
-        .eq("brief_date", todayDhaka)
+        .eq("brief_date", targetDate)
         .maybeSingle();
 
       const existingRow = existing as { items?: TextileBriefItem[] } | null;
@@ -144,7 +148,7 @@ export async function GET(request: Request) {
       }
     }
 
-    if (items.length === 0) {
+    if (items.length === 0 && targetDate === todayDhaka) {
       const rawHeadlines = await fetchLiveTextileHeadlines();
       if (rawHeadlines.length > 0) {
         const headlineList = rawHeadlines
@@ -238,7 +242,17 @@ Return strictly valid JSON object with key "items" (array of 4-8 objects):
       }
     }
 
-    return NextResponse.json({ success: true, briefDate: todayDhaka, items });
+    items.sort((a, b) => (Date.parse(b.published_at) || 0) - (Date.parse(a.published_at) || 0));
+
+    const { data: dateRows } = await serviceSupabase
+      .from("textile_briefs")
+      .select("brief_date")
+      .order("brief_date", { ascending: false })
+      .limit(15);
+
+    const availableDates = ((dateRows || []) as Array<{ brief_date: string }>).map((d) => d.brief_date);
+
+    return NextResponse.json({ success: true, briefDate: targetDate, todayDate: todayDhaka, availableDates, items });
   } catch (err) {
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : "Failed to load Textile Pulse." },

@@ -18,26 +18,30 @@ interface TextileBriefItem {
 export function TextilePulseClient() {
   const [items, setItems] = useState<TextileBriefItem[]>([]);
   const [briefDate, setBriefDate] = useState<string>("");
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [regionTab, setRegionTab] = useState<"all" | "bangladesh" | "global">("all");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadBrief = async (refresh = false) => {
+  const loadBrief = async (refresh = false, dateStr?: string) => {
     if (refresh) setRefreshing(true);
     else setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/textile-pulse${refresh ? "?refresh=true" : ""}`);
+      const qs = refresh ? "?refresh=true" : dateStr ? `?date=${encodeURIComponent(dateStr)}` : "";
+      const res = await fetch(`/api/textile-pulse${qs}`);
       const data = (await res.json()) as {
         success?: boolean;
         briefDate?: string;
         items?: TextileBriefItem[];
+        availableDates?: string[];
         error?: string;
       };
       if (!res.ok || !data.success) throw new Error(data.error || "Could not load Textile Pulse.");
       setItems(data.items || []);
       setBriefDate(data.briefDate || "");
+      if (data.availableDates) setAvailableDates(data.availableDates);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load Textile Pulse.");
     } finally {
@@ -102,7 +106,7 @@ export function TextilePulseClient() {
               <Newspaper className="h-3.5 w-3.5" />
               Daily AI Textile Pulse
             </span>
-            <h1 className="mt-2.5 font-serif text-2xl font-bold text-white sm:text-3xl">
+            <h1 className="mt-2.5 font-sans text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
               {"\u099F\u09C7\u0995\u09CD\u09B8\u099F\u09BE\u0987\u09B2 \u0987\u09A8\u09CB\u09AD\u09C7\u09B6\u09A8 \u0993 \u0987\u09A8\u09CD\u09A1\u09BE\u09B8\u09CD\u099F\u09CD\u09B0\u09BF \u09AC\u09CD\u09B0\u09BF\u09AB"}
             </h1>
             <p className="mt-1 text-xs text-slate-400">
@@ -110,15 +114,32 @@ export function TextilePulseClient() {
               Bangladesh RMG &amp; Global Textile Tech Updates in Bengali
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => loadBrief(true)}
-            disabled={loading || refreshing}
-            className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-cyan-500/35 bg-cyan-500/15 px-3.5 py-2 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-500/25 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh Today
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {availableDates.length > 0 && (
+              <select
+                value={briefDate}
+                onChange={(e) => loadBrief(false, e.target.value)}
+                disabled={loading || refreshing}
+                className="rounded-xl border border-slate-700/80 bg-[#060A12] px-3 py-2 text-xs font-semibold text-slate-200 outline-none focus:border-cyan-500/50"
+                aria-label="Select Brief Date"
+              >
+                {availableDates.map((d, idx) => (
+                  <option key={d} value={d}>
+                    {idx === 0 ? `Latest (${d})` : d}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              type="button"
+              onClick={() => loadBrief(true)}
+              disabled={loading || refreshing}
+              className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-cyan-500/35 bg-cyan-500/15 px-3.5 py-2 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-500/25 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+              Refresh Today
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
