@@ -1,6 +1,20 @@
 import type { Metadata, Viewport } from "next";
+import { Inter, Hind_Siliguri } from "next/font/google";
 import "./globals.css";
 import { TopProgressBar } from "@/components/ui/TopProgressBar";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const hindSiliguri = Hind_Siliguri({
+  subsets: ["bengali", "latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-hind-siliguri",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: {
@@ -8,7 +22,7 @@ export const metadata: Metadata = {
     template: "%s | JTEC Academic Platform",
   },
   description:
-    "The academic platform for Jhenaidah Textile Engineering College — materials, notices, results, and rankings in one place.",
+    "The academic platform for Jhenaidah Textile Engineering College - materials, notices, results, and rankings in one place.",
   icons: {
     icon: "/icon-192.png",
     apple: "/icon-192.png",
@@ -30,7 +44,11 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="dark bg-[#060A12]" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`dark bg-[#060A12] ${inter.variable} ${hindSiliguri.variable}`}
+      suppressHydrationWarning
+    >
       <body className="min-h-screen bg-[#060A12] text-slate-100 antialiased">
         <TopProgressBar />
         {children}
