@@ -1,7 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ExternalLink, Globe, Loader2, MapPin, Newspaper, RefreshCw, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Noto_Sans_Bengali } from "next/font/google";
+import {
+  Calendar,
+  Check,
+  ChevronDown,
+  ExternalLink,
+  Globe,
+  Loader2,
+  MapPin,
+  Newspaper,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
+
+const notoBengali = Noto_Sans_Bengali({
+  subsets: ["bengali"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
 
 interface TextileBriefItem {
   id: string;
@@ -19,10 +37,12 @@ export function TextilePulseClient() {
   const [items, setItems] = useState<TextileBriefItem[]>([]);
   const [briefDate, setBriefDate] = useState<string>("");
   const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [dateMenuOpen, setDateMenuOpen] = useState(false);
   const [regionTab, setRegionTab] = useState<"all" | "bangladesh" | "global">("all");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dateMenuRef = useRef<HTMLDivElement | null>(null);
 
   const loadBrief = async (refresh = false, dateStr?: string) => {
     if (refresh) setRefreshing(true);
@@ -34,8 +54,8 @@ export function TextilePulseClient() {
       const data = (await res.json()) as {
         success?: boolean;
         briefDate?: string;
-        items?: TextileBriefItem[];
         availableDates?: string[];
+        items?: TextileBriefItem[];
         error?: string;
       };
       if (!res.ok || !data.success) throw new Error(data.error || "Could not load Textile Pulse.");
@@ -52,6 +72,16 @@ export function TextilePulseClient() {
 
   useEffect(() => {
     loadBrief(false);
+  }, []);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (dateMenuRef.current && !dateMenuRef.current.contains(e.target as Node)) {
+        setDateMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
   const bdItems = items.filter((i) => i.region === "bangladesh");
@@ -72,7 +102,7 @@ export function TextilePulseClient() {
           </span>
         </div>
 
-        <h3 className="text-base font-bold leading-snug text-white">{item.title_bn}</h3>
+        <h3 className="text-base font-bold leading-relaxed text-white">{item.title_bn}</h3>
         <p className="text-xs leading-relaxed text-slate-300">{item.summary_bn}</p>
 
         <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-[11.5px] leading-relaxed text-cyan-200">
@@ -98,7 +128,7 @@ export function TextilePulseClient() {
   );
 
   return (
-    <div className="space-y-5">
+    <div className={`${notoBengali.className} space-y-5`}>
       <section className="rounded-2xl border border-cyan-500/25 bg-gradient-to-br from-[#091822] via-[#0B1222] to-[#0E1326] p-5 sm:p-6 shadow-xl">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -106,7 +136,7 @@ export function TextilePulseClient() {
               <Newspaper className="h-3.5 w-3.5" />
               Daily AI Textile Pulse
             </span>
-            <h1 className="mt-2.5 font-sans text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+            <h1 className="mt-2.5 text-2xl font-bold leading-snug tracking-normal text-white sm:text-3xl">
               {"\u099F\u09C7\u0995\u09CD\u09B8\u099F\u09BE\u0987\u09B2 \u0987\u09A8\u09CB\u09AD\u09C7\u09B6\u09A8 \u0993 \u0987\u09A8\u09CD\u09A1\u09BE\u09B8\u09CD\u099F\u09CD\u09B0\u09BF \u09AC\u09CD\u09B0\u09BF\u09AB"}
             </h1>
             <p className="mt-1 text-xs text-slate-400">
@@ -114,22 +144,46 @@ export function TextilePulseClient() {
               Bangladesh RMG &amp; Global Textile Tech Updates in Bengali
             </p>
           </div>
+
           <div className="flex flex-wrap items-center gap-2">
             {availableDates.length > 0 && (
-              <select
-                value={briefDate}
-                onChange={(e) => loadBrief(false, e.target.value)}
-                disabled={loading || refreshing}
-                className="rounded-xl border border-slate-700/80 bg-[#060A12] px-3 py-2 text-xs font-semibold text-slate-200 outline-none focus:border-cyan-500/50"
-                aria-label="Select Brief Date"
-              >
-                {availableDates.map((d, idx) => (
-                  <option key={d} value={d}>
-                    {idx === 0 ? `Latest (${d})` : d}
-                  </option>
-                ))}
-              </select>
+              <div ref={dateMenuRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setDateMenuOpen((o) => !o)}
+                  disabled={loading || refreshing}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700/80 bg-[#060A12] px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-cyan-500/40"
+                >
+                  <Calendar className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>{availableDates[0] === briefDate ? `Latest (${briefDate})` : briefDate}</span>
+                  <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition ${dateMenuOpen ? "rotate-180" : ""}`} />
+                </button>
+                {dateMenuOpen && (
+                  <div className="absolute right-0 z-30 mt-1.5 min-w-[180px] overflow-hidden rounded-xl border border-slate-700/80 bg-[#0B1222] p-1 shadow-2xl">
+                    {availableDates.map((d, idx) => {
+                      const active = d === briefDate;
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => {
+                            setDateMenuOpen(false);
+                            loadBrief(false, d);
+                          }}
+                          className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${
+                            active ? "bg-cyan-500/15 font-semibold text-cyan-200" : "text-slate-300 hover:bg-slate-800"
+                          }`}
+                        >
+                          <span>{idx === 0 ? `Latest (${d})` : d}</span>
+                          {active && <Check className="h-3.5 w-3.5 text-cyan-400" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
+
             <button
               type="button"
               onClick={() => loadBrief(true)}
