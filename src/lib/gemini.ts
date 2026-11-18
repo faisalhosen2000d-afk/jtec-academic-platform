@@ -6,7 +6,6 @@ const MODEL_CANDIDATES = [
   "gemini-2.5-flash-lite",
   "gemini-2.5-flash",
   "gemini-2.0-flash",
-  "gemini-flash-latest",
 ] as const;
 
 const GROQ_MODELS = [
@@ -36,14 +35,29 @@ function getGroqApiKeys(): string[] {
   return Array.from(new Set(all));
 }
 
+function cleanJsonString(raw: string): string {
+  const trimmed = raw.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) return fenced[1].trim();
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    return trimmed.slice(firstBrace, lastBrace + 1);
+  }
+  return trimmed;
+}
+
 async function callGroqText(
   promptText: string,
   options?: { jsonMode?: boolean; timeoutMs?: number }
-): Promise<string | null> {
+): Promise<{ text: string | null; error?: string }> {
   const groqKeys = getGroqApiKeys();
-  if (groqKeys.length === 0 || !promptText.trim()) return null;
+  if (groqKeys.length === 0) return { text: null, error: "GROQ_API_KEY missing" };
+  if (!promptText.trim()) return { text: null };
 
   const startIdx = Math.floor(Math.random() * groqKeys.length);
+  let lastErr = "";
+
   for (let m = 0; m < GROQ_MODELS.length; m++) {
     const model = GROQ_MODELS[m];
     if (!model) continue;
@@ -57,32 +71,40 @@ async function callGroqText(
             Authorization: `Bearer ${apiKey}`,
             "Content-Type": "application/json",
           },
-          signal: AbortSignal.timeout(Math.min(options?.timeoutMs ?? 15000, 20000)),
+          signal: AbortSignal.timeout(Math.min(options?.timeoutMs ?? 12000, 14000)),
           body: JSON.stringify({
             model,
-            temperature: 0.3,
-            messages: [{ role: "user", content: promptText }],
-            ...(options?.jsonMode ? { response_format: { type: "json_object" } } : {}),
+            temperature: 0.25,
+            max_tokens: 2400,
+            messages: [
+              ...(options?.jsonMode
+                ? [{ role: "system", content: "Return ONLY a valid JSON object. No markdown, no extra text." }]
+                : []),
+              { role: "user", content: promptText },
+            ],
           }),
         });
-        if (!res.ok) {
-          if (res.status === 429 || res.status === 503) {
-            await sleep(120);
-            continue;
-          }
-          continue;
-        }
         const data = (await res.json().catch(() => null)) as {
           choices?: Array<{ message?: { content?: string } }>;
+          error?: { message?: string };
         } | null;
+
+        if (!res.ok) {
+          lastErr = `Groq(${model} ${res.status}): ${data?.error?.message || "request failed"}`;
+          if (res.status === 429 || res.status === 503) await sleep(120);
+          continue;
+        }
         const content = data?.choices?.[0]?.message?.content?.trim();
-        if (content) return content;
-      } catch {
+        if (content) {
+          return { text: options?.jsonMode ? cleanJsonString(content) : content };
+        }
+      } catch (err) {
+        lastErr = err instanceof Error ? `Groq(${model}): ${err.message}` : "Groq timeout";
         continue;
       }
     }
   }
-  return null;
+  return { text: null, error: lastErr };
 }
 
 export async function callGemini(
@@ -90,33 +112,35 @@ export async function callGemini(
   options?: { jsonMode?: boolean; timeoutMs?: number }
 ): Promise<string> {
   const hasBinary = parts.some((p) => "inlineData" in p);
+  let groqErr = "";
 
   if (!hasBinary) {
     const combinedText = parts
       .map((p) => ("text" in p ? p.text : ""))
       .filter(Boolean)
       .join("\n\n");
-    const groqResult = await callGroqText(combinedText, options);
-    if (groqResult) return groqResult;
+    const groqRes = await callGroqText(combinedText, options);
+    if (groqRes.text) return groqRes.text;
+    groqErr = groqRes.error || "";
   }
 
   const keys = getGeminiApiKeys();
   if (keys.length === 0) {
-    throw new Error("AI API key is not configured on the server.");
+    throw new Error(groqErr || "AI API key is not configured on the server.");
   }
 
-  let lastError = "AI service is temporarily unavailable.";
+  let lastError = groqErr || "AI service is temporarily unavailable.";
   const startKeyIdx = Math.floor(Math.random() * keys.length);
-  const perAttemptMs = options?.timeoutMs ?? 12000;
-  const deadline = Date.now() + 45000;
-  const maxKeysPerModel = Math.min(keys.length, 3);
+  const perAttemptMs = Math.min(options?.timeoutMs ?? 10000, 12000);
+  const deadline = Date.now() + 32000;
+  const maxKeysPerModel = Math.min(keys.length, 2);
 
   for (let m = 0; m < MODEL_CANDIDATES.length; m++) {
     const model = MODEL_CANDIDATES[m];
     for (let k = 0; k < maxKeysPerModel; k++) {
       const remainingMs = deadline - Date.now();
       if (remainingMs < 3500) {
-        throw new Error("AI request took too long. Please try again.");
+        throw new Error(lastError);
       }
 
       const apiKey = keys[(startKeyIdx + k) % keys.length];
@@ -144,16 +168,12 @@ export async function callGemini(
         );
 
         if (response.status === 429 || response.status === 503) {
-          lastError =
-            response.status === 429
-              ? "AI is experiencing high traffic right now. Please try again in a few seconds."
-              : `Model ${model} temporarily unavailable (503).`;
+          lastError = `Gemini(${model} ${response.status})`;
           await sleep(150);
           continue;
         }
 
         if (response.status === 404) {
-          lastError = `Model ${model} unavailable (404).`;
           break;
         }
 
@@ -170,7 +190,7 @@ export async function callGemini(
           .trim();
 
         if (text) {
-          return text;
+          return options?.jsonMode ? cleanJsonString(text) : text;
         }
       } catch (err) {
         lastError = err instanceof Error ? err.message : "AI request timed out.";
@@ -179,5 +199,5 @@ export async function callGemini(
     }
   }
 
-  throw new Error(lastError);
+  throw new Error(groqErr ? `${groqErr} | ${lastError}` : lastError);
 }
