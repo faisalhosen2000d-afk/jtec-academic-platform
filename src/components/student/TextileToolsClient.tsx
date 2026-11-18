@@ -1,5 +1,7 @@
 "use client";
 
+import { Noto_Sans_Bengali } from "next/font/google";
+
 import { useMemo, useState } from "react";
 import {
   CheckCircle2,
@@ -15,6 +17,8 @@ import {
 } from "lucide-react";
 
 type ToolTab = "yarn" | "fabric" | "dyeing" | "garment" | "ttqc";
+
+const notoBengali = Noto_Sans_Bengali({ subsets: ["bengali"], weight: ["400", "500", "600", "700"], display: "swap" });
 
 export function TextileToolsClient() {
   const [tab, setTab] = useState<ToolTab>("yarn");
@@ -113,106 +117,112 @@ export function TextileToolsClient() {
     ToolTab,
     {
       title: string;
+      purpose: string;
       howTo: string[];
       terms: Array<{ name: string; desc: string }>;
       formulas: Array<{ label: string; expr: string }>;
     }
   > = {
     yarn: {
-      title: "Yarn & Spinning Guide (YE)",
+      title: "সুতা ও স্পিনিং নির্দেশিকা (Yarn & Spinning - YE)",
+      purpose: "এখানে আমরা পরীক্ষা করছি সুতার কাউন্ট (Ne) বদলালে সুতার আসল ব্যাস (মোটা/চিকন), ওজন (Tex/Denier), পাক (TPI) এবং শক্তি (CSP) কীভাবে বদলায়।",
       howTo: [
-        "1. Slide English Cotton Count (Ne) from 6s (coarse denim) to 80s (fine shirting) and watch the yarn diameter shrink live.",
-        "2. Enter Twist Multiplier (TM) and Lea Strength (lbs) from your spinning lab sheet to check yarn strength grade (CSP).",
+        "ধাপ ১: English Cotton Count (Ne) স্লাইডারটি 6s (মোটা ডেনিম সুতা) থেকে 80s (চিকন শার্টের সুতা) পর্যন্ত সরান এবং ডান পাশের ভিজুয়ালে দেখুন Ne বাড়লে সুতা চিকন হয়ে যাচ্ছে।",
+        "ধাপ ২: স্পিনিং ল্যাবের Twist Multiplier (TM) ও Lea Strength (lbs) বসিয়ে দেখুন সুতার পাকের রেখাগুলো কীভাবে ঘন হয় এবং CSP শক্তি Low/Standard/High দেখায়।",
       ],
       terms: [
-        { name: "Ne (English Count)", desc: "Indirect system: number of 840-yard hanks per 1 lb. Higher Ne means finer (thinner) yarn." },
-        { name: "Tex & Denier", desc: "Direct systems: weight in grams per 1,000m (Tex) or 9,000m (Denier). Higher Tex/Denier means thicker yarn." },
-        { name: "TM & TPI", desc: "Turns Per Inch (TPI) controls yarn twist tightness; higher TPI increases strength up to an optimum point." },
-        { name: "CSP", desc: "Count Strength Product (Ne x Lea Strength in lbs). 2200+ indicates high-strength combed yarn." },
+        { name: "Ne (English Cotton Count)", desc: "Indirect পদ্ধতি: ১ পাউন্ড সুতায় ৮৪০ গজের কয়টি হ্যাংক আছে। Ne যত বেশি, সুতা তত চিকন।" },
+        { name: "Tex ও Denier", desc: "Direct পদ্ধতি: ১,০০০ মিটার (Tex) বা ৯,০০০ মিটার (Denier) সুতার ওজন (গ্রামে)। মান বাড়লে সুতা মোটা হয়।" },
+        { name: "TM (Twist Multiplier) ও TPI (Turns Per Inch)", desc: "প্রতি ইঞ্চি সুতায় কয়টি পাক আছে। TPI বাড়লে সুতার দৃঢ়তা বাড়ে।" },
+        { name: "CSP (Count Strength Product)", desc: "সুতার কাউন্ট × লি স্ট্রেংথ (পাউন্ড)। ২২০০+ হলে উচ্চমানের Combed সুতা।" },
       ],
       formulas: [
-        { label: "Tex", expr: `590.5 / ${ne} Ne = ${tex.toFixed(2)} Tex` },
-        { label: "Denier", expr: `${tex.toFixed(2)} Tex x 9 = ${denier.toFixed(1)} Denier` },
-        { label: "TPI", expr: `${tm} x sqrt(${ne}) = ${tpi.toFixed(2)} TPI` },
-        { label: "CSP", expr: `${ne} Ne x ${leaLbs} lbs = ${Math.round(csp)}` },
+        { label: "Tex (টেক্স)", expr: `590.5 ÷ ${ne} Ne = ${tex.toFixed(2)} Tex` },
+        { label: "Denier (ডেনিয়ার)", expr: `${tex.toFixed(2)} Tex × 9 = ${denier.toFixed(1)} Denier` },
+        { label: "TPI (প্রতি ইঞ্চি পাক)", expr: `${tm} × √${ne} = ${tpi.toFixed(2)} TPI` },
+        { label: "CSP (শক্তি সূচক)", expr: `${ne} Ne × ${leaLbs} lbs = ${Math.round(csp)}` },
       ],
     },
     fabric: {
-      title: "Fabric & Weaving Guide (FE)",
+      title: "কাপড় ও ওয়েভিং নির্দেশিকা (Fabric & Weaving - FE)",
+      purpose: "এখানে আমরা পরীক্ষা করছি সুতার কাউন্ট ও ঘনত্ব (EPI/PPI) বদলালে কাপড়ের ওজন (GSM) এবং বুননের জালি (Cover Factor) কতটা ঘন বা পাতলা হয়।",
       howTo: [
-        "1. Enter Warp/Weft Ne, EPI, PPI, and Crimp % from your fabric swatch analysis.",
-        "2. Watch the Weave Density Grid tighten or loosen and check whether Cloth Cover % is balanced (55-80%) or tight (80%+).",
+        "ধাপ ১: কাপড়ের নমুনা থেকে Warp/Weft Ne, EPI, PPI এবং Crimp % ইনপুট দিন।",
+        "ধাপ ২: ডান পাশের লাইভ Weave Grid-এ লক্ষ্য করুন—EPI/PPI বাড়ালে নীল (Warp) ও বেগুনি (Weft) সুতার ফাঁকা জায়গা কমে বুনন ঘন হচ্ছে।",
       ],
       terms: [
-        { name: "EPI & PPI", desc: "Ends Per Inch (warp threads) and Picks Per Inch (weft threads) counted using a Pick Glass." },
-        { name: "Crimp (%)", desc: "Extra waviness of yarn inside woven cloth due to interlacement; increases fabric GSM." },
-        { name: "Fabric GSM", desc: "Grams per Square Meter — standard measure of fabric weight." },
-        { name: "Cover Factor (Kc)", desc: "Fraction of fabric area covered by yarns (max 28 = 100% theoretical full cover)." },
+        { name: "EPI (Ends Per Inch) ও PPI (Picks Per Inch)", desc: "Pick Glass দিয়ে মাপা প্রতি ইঞ্চি কাপড়ে Warp ও Weft সুতার সংখ্যা।" },
+        { name: "Crimp % (ক্রিম্প)", desc: "বুননের কারণে কাপড়ের ভেতর সুতার ঢেউখেলানো অতিরিক্ত দৈর্ঘ্য; এটি বাড়লে GSM বাড়ে।" },
+        { name: "GSM (Grams per Square Meter)", desc: "১ বর্গমিটার কাপড়ের ওজন (গ্রামে)—কাপড় কতটা ভারী বা হালকা তা বোঝায়।" },
+        { name: "Cover Factor (Kc)", desc: "কাপড়ের কত % জায়গা সুতা দিয়ে ঢাকা আছে (৫৫-৮০% হলে ব্যালেন্সড, ৮০%+ হলে খুব টাইট)।" },
       ],
       formulas: [
         {
           label: "Fabric GSM",
-          expr: `23.25 x [(${epi}x${(1 + warpCrimp / 100).toFixed(2)})/${warpNe} + (${ppi}x${(1 + weftCrimp / 100).toFixed(2)})/${weftNe}] = ${fabricGsm.toFixed(1)} g/m2`,
+          expr: `23.25 × [(${epi}×${(1 + warpCrimp / 100).toFixed(2)})÷${warpNe} + (${ppi}×${(1 + weftCrimp / 100).toFixed(2)})÷${weftNe}] = ${fabricGsm.toFixed(1)} g/m²`,
         },
-        { label: "Warp Cover (K1)", expr: `${epi} / sqrt(${warpNe}) = ${coverFactor.k1.toFixed(2)}` },
-        { label: "Weft Cover (K2)", expr: `${ppi} / sqrt(${weftNe}) = ${coverFactor.k2.toFixed(2)}` },
-        { label: "Cloth Cover (Kc)", expr: `K1 + K2 - (K1 x K2)/28 = ${coverFactor.kc.toFixed(2)} (${coverFactor.pct.toFixed(0)}%)` },
+        { label: "Warp Cover (K1)", expr: `${epi} ÷ √${warpNe} = ${coverFactor.k1.toFixed(2)}` },
+        { label: "Weft Cover (K2)", expr: `${ppi} ÷ √${weftNe} = ${coverFactor.k2.toFixed(2)}` },
+        { label: "Cloth Cover (Kc)", expr: `K1 + K2 - (K1×K2)÷28 = ${coverFactor.kc.toFixed(2)} (${coverFactor.pct.toFixed(0)}%)` },
       ],
     },
     dyeing: {
-      title: "Exhaust Dyeing Recipe Guide (WPE)",
+      title: "ডাইং রেসিপি নির্দেশিকা (Exhaust Dyeing - WPE)",
+      purpose: "এখানে আমরা পরীক্ষা করছি কাপড়ের ওজন, পানির অনুপাত (M:L) ও শেড % অনুযায়ী ডাই-বাথে কতটুকু পানি, রঙ ও কেমিক্যাল লাগবে।",
       howTo: [
-        "1. Set total Fabric Weight (kg) and Machine Liquor Ratio (1:M, e.g., 1:8 for modern jet dyeing).",
-        "2. Adjust Shade % (owf) and Salt/Soda Ash (g/L) to see bath depth, color intensity, and exact chemical batch weights.",
+        "ধাপ ১: মোট কাপড়ের ওজন (kg) এবং মেশিনের Liquor Ratio (যেমন 1:8) বসান।",
+        "ধাপ ২: ডান পাশের ভার্চুয়াল ডাই-বাথ ট্যাংকে দেখুন—M:L বাড়ালে পানির লেভেল বাড়বে, আর Shade % বাড়ালে রঙের গাঢ়ত্ব গাঢ় হবে।",
       ],
       terms: [
-        { name: "Liquor Ratio (M:L)", desc: "Ratio of fabric weight (kg) to total water volume (L). Lower ratio (1:6-1:8) saves water & energy." },
-        { name: "Shade % (owf)", desc: "On Weight of Fabric: dye mass calculated as a percentage of dry fabric weight." },
-        { name: "g/L (Grams/Liter)", desc: "Concentration of auxiliaries (Glauber Salt / Soda Ash) calculated based on total water volume." },
+        { name: "Liquor Ratio (M:L - Material to Liquor)", desc: "কাপড়ের ওজন ও পানির অনুপাত (১:৮ মানে ১ কেজি কাপড়ে ৮ লিটার পানি)।" },
+        { name: "Shade % (owf - On Weight of Fabric)", desc: "শুকনো কাপড়ের ওজনের শতকরা কত ভাগ ডাই/রঙ লাগবে।" },
+        { name: "g/L (Grams per Liter)", desc: "মোট পানির আয়তন অনুযায়ী প্রতি লিটারে কত গ্রাম Salt বা Soda Ash লাগবে।" },
       ],
       formulas: [
-        { label: "Total Water", expr: `${fabricKg} kg x ${liquorRatio} = ${totalWaterL.toFixed(0)} Liters` },
-        { label: "Dye Weight", expr: `(${fabricKg} kg x ${shadePct}%) / 100 = ${totalDyeKg.toFixed(2)} kg` },
-        { label: "Salt Weight", expr: `(${totalWaterL.toFixed(0)} L x ${saltGl} g/L) / 1000 = ${totalSaltKg.toFixed(1)} kg` },
-        { label: "Soda Ash", expr: `(${totalWaterL.toFixed(0)} L x ${sodaGl} g/L) / 1000 = ${totalSodaKg.toFixed(1)} kg` },
+        { label: "মোট পানি (Liters)", expr: `${fabricKg} kg × ${liquorRatio} = ${totalWaterL.toFixed(0)} Liters` },
+        { label: "ডাই / রঙ (kg)", expr: `(${fabricKg} kg × ${shadePct}%) ÷ 100 = ${totalDyeKg.toFixed(2)} kg` },
+        { label: "Salt (লবণ)", expr: `(${totalWaterL.toFixed(0)} L × ${saltGl} g/L) ÷ 1000 = ${totalSaltKg.toFixed(1)} kg` },
+        { label: "Soda Ash (সোডা অ্যাশ)", expr: `(${totalWaterL.toFixed(0)} L × ${sodaGl} g/L) ÷ 1000 = ${totalSodaKg.toFixed(1)} kg` },
       ],
     },
     garment: {
-      title: "Garment Consumption & CM Guide (AE)",
+      title: "গার্মেন্টস কনজাম্পশন ও কস্টিং নির্দেশিকা (Garment & IE - AE)",
+      purpose: "এখানে আমরা পরীক্ষা করছি টি-শার্টের মাপ, GSM ও Wastage% অনুযায়ী ১ ডজনে কত কেজি কাপড় লাগে এবং SMV ও Efficiency অনুযায়ী তৈরি খরচ (CM) কত পড়ে।",
       howTo: [
-        "1. Enter T-Shirt spec measurements (Length, Sleeve, 1/2 Chest, Seam Allowance) and Fabric GSM.",
-        "2. Enter SMV, factory Cost Per Minute (CPM), and Line Efficiency % to calculate fabric kg/dozen and CM costing.",
+        "ধাপ ১: Body Length, Sleeve, 1/2 Chest, Allowance ও Fabric GSM বসান এবং টি-শার্টের ডায়াগ্রামে মাপগুলো মিলিয়ে দেখুন।",
+        "ধাপ ২: Wastage %, SMV, CPM ও Line Efficiency % বসিয়ে দেখুন প্রতি পিস ও প্রতি ডজন CM খরচ এবং Usable vs Wastage বার কীভাবে বদলায়।",
       ],
       terms: [
-        { name: "Consumption (kg/dz)", desc: "Total knit fabric needed for 12 garments including cutting/marker wastage %." },
-        { name: "SMV", desc: "Standard Minute Value: total standard minutes required to sew one garment including allowances." },
-        { name: "CPM", desc: "Cost Per Minute: monthly factory labor + overhead cost divided by total available operator minutes." },
-        { name: "CM Cost", desc: "Cost of Making per piece or per dozen; core pricing metric in apparel merchandising." },
+        { name: "Fabric Consumption (kg/dz)", desc: "কাটিং ওয়েস্টেজসহ ১২ পিস (১ ডজন) গার্মেন্টস বানাতে মোট কত কেজি কাপড় লাগবে।" },
+        { name: "SMV (Standard Minute Value)", desc: "অ্যালাউন্সসহ ১টি গার্মেন্টস সেলাই করতে স্ট্যান্ডার্ড কত মিনিট সময় লাগে।" },
+        { name: "CPM (Cost Per Minute)", desc: "ফ্যাক্টরির প্রতি মিনিট উৎপাদন ও শ্রম খরচ (ডলারে)।" },
+        { name: "CM (Cost of Making)", desc: "শুধু গার্মেন্টস কাটিং-সুইং-ফিনিশিং তৈরির খরচ (প্রতি পিস বা প্রতি ডজন)।" },
       ],
       formulas: [
         {
-          label: "Fabric / Dozen",
-          expr: `[((${bodyLen}+${sleeveLen}+${allowance}) x (${halfChest}+${allowance}) x 2 x ${garmentGsm} x 12) / 10^7] x ${(1 + wastagePct / 100).toFixed(2)} = ${consPerDozenKg.toFixed(2)} kg`,
+          label: "কাপড় / ডজন (kg)",
+          expr: `[((${bodyLen}+${sleeveLen}+${allowance}) × (${halfChest}+${allowance}) × 2 × ${garmentGsm} × 12) ÷ 10⁷] × ${(1 + wastagePct / 100).toFixed(2)} = ${consPerDozenKg.toFixed(2)} kg`,
         },
-        { label: "CM / Piece", expr: `(${smv} min x $${cpm}) / (${lineEff}% / 100) = $${cmPerPiece.toFixed(2)}` },
-        { label: "CM / Dozen", expr: `$${cmPerPiece.toFixed(2)} x 12 = $${(cmPerPiece * 12).toFixed(2)}` },
+        { label: "CM / পিস ($)", expr: `(${smv} min × ${cpm}) ÷ (${lineEff}% ÷ 100) = ${cmPerPiece.toFixed(2)}` },
+        { label: "CM / ডজন ($)", expr: `${cmPerPiece.toFixed(2)} × 12 = ${(cmPerPiece * 12).toFixed(2)}` },
       ],
     },
     ttqc: {
-      title: "TTQC Shrinkage Lab Guide (ISO 3759 / AATCC 135)",
+      title: "TTQC শ্রিঙ্কেজ ল্যাব নির্দেশিকা (ISO 3759 / AATCC TM135)",
+      purpose: "এখানে আমরা পরীক্ষা করছি ধোয়ার পর (After Wash) কাপড় দৈর্ঘ্যে ও প্রস্থে কত % সংকুচিত (Shrink) হয়েছে এবং বায়ারের লিমিটের ভেতর PASS করেছে কি না।",
       howTo: [
-        "1. Mark a 350mm x 350mm benchmark square on the fabric before washing, then measure after washing & drying.",
-        "2. Check the overlay blueprint: if both Warp and Weft shrinkage stay within the buyer limit (usually <= 5%), the lot passes.",
+        "ধাপ ১: কাপড়ে ৩৫০ মিমি × ৩৫০ মিমি বেঞ্চমার্ক দাগ দিয়ে ধোয়ার ও শুকানোর পর Warp ও Weft দিকের নতুন মাপ বসান।",
+        "ধাপ ২: ডান পাশের ওভারলে বক্সে দেখুন—মূল ড্যাশড বক্সের তুলনায় কাপড় কতটুকু ছোট হলো এবং অটোমেটিক PASS নাকি FAIL দেখায়।",
       ],
       terms: [
-        { name: "Before Wash (L0)", desc: "Original benchmark distance marked on the fabric template (typically 350mm or 500mm)." },
-        { name: "After Wash (L1)", desc: "Measured distance after standardized laundering and drying." },
-        { name: "Shrinkage (%)", desc: "Positive % means fabric shrank; negative % means fabric stretched/elongated." },
+        { name: "Before Wash (L0)", desc: "ধোয়ার আগে গ্লাস টেমপ্লেট দিয়ে কাপড়ে আঁকা মূল মাপ (সাধারণত ৩৫০ মিমি)।" },
+        { name: "After Wash (L1)", desc: "স্ট্যান্ডার্ড ওয়াশ ও ড্রাই করার পর পাওয়া নতুন দৈর্ঘ্য।" },
+        { name: "Shrinkage % (সংকোচন)", desc: "মান পজিটিভ হলে কাপড় ছোট হয়েছে, নেগেটিভ হলে লম্বা/স্ট্রেচ হয়েছে। সাধারণত <= ৫% গ্রহণযোগ্য।" },
       ],
       formulas: [
-        { label: "Warp Shrinkage", expr: `((${beforeWarp} - ${afterWarp}) / ${beforeWarp}) x 100 = ${warpShrinkPct.toFixed(2)}%` },
-        { label: "Weft Shrinkage", expr: `((${beforeWeft} - ${afterWeft}) / ${beforeWeft}) x 100 = ${weftShrinkPct.toFixed(2)}%` },
-        { label: "Status Check", expr: `Max(|${warpShrinkPct.toFixed(2)}%|, |${weftShrinkPct.toFixed(2)}%|) <= ${maxShrinkLimit}% -> ${ttqcPass ? "PASS" : "FAIL"}` },
+        { label: "Warp Shrinkage", expr: `((${beforeWarp} - ${afterWarp}) ÷ ${beforeWarp}) × 100 = ${warpShrinkPct.toFixed(2)}%` },
+        { label: "Weft Shrinkage", expr: `((${beforeWeft} - ${afterWeft}) ÷ ${beforeWeft}) × 100 = ${weftShrinkPct.toFixed(2)}%` },
+        { label: "ল্যাব ফলাফল", expr: `Max(|${warpShrinkPct.toFixed(2)}%|, |${weftShrinkPct.toFixed(2)}%|) <= ${maxShrinkLimit}% -> ${ttqcPass ? "PASS" : "FAIL"}` },
       ],
     },
   };
@@ -228,7 +238,7 @@ export function TextileToolsClient() {
   ];
 
   return (
-    <div className="space-y-5">
+    <div className={`${notoBengali.className} space-y-5`}>
       {/* Hero */}
       <section className="rounded-2xl border border-cyan-500/25 bg-gradient-to-br from-[#081722] via-[#0B1222] to-[#111329] p-5 sm:p-6 shadow-xl">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -717,14 +727,17 @@ export function TextileToolsClient() {
       )}
       {/* Engineering Guide & Live Formula Breakdown */}
       <section className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-5 space-y-4">
-        <div className="flex items-center gap-2 border-b border-slate-800/80 pb-3">
-          <BookOpen className="h-4 w-4 text-cyan-400" />
-          <h3 className="text-sm font-bold text-white">{activeGuide.title} — How It Works &amp; Live Formulas</h3>
+        <div className="space-y-1.5 border-b border-slate-800/80 pb-3">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-cyan-400" />
+            <h3 className="text-sm font-bold text-white">{activeGuide.title}</h3>
+          </div>
+          <p className="text-xs leading-relaxed text-cyan-200/90">{activeGuide.purpose}</p>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="rounded-xl border border-slate-800 bg-[#060A12] p-4 space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-300">How to Use &amp; Check</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-300">ধাপে ধাপে পরীক্ষা করার নিয়ম</h4>
             <ul className="space-y-2 text-xs leading-relaxed text-slate-300">
               {activeGuide.howTo.map((step) => (
                 <li key={step}>{step}</li>
@@ -733,7 +746,7 @@ export function TextileToolsClient() {
           </div>
 
           <div className="rounded-xl border border-slate-800 bg-[#060A12] p-4 space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-violet-300">Module &amp; Term Glossary</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-violet-300">টার্ম ও পূর্ণরূপ পরিচিতি</h4>
             <dl className="space-y-2 text-xs">
               {activeGuide.terms.map((t) => (
                 <div key={t.name}>
@@ -745,7 +758,7 @@ export function TextileToolsClient() {
           </div>
 
           <div className="rounded-xl border border-slate-800 bg-[#060A12] p-4 space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-300">Live Calculation Steps</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-300">লাইভ সূত্র ও হিসাব</h4>
             <div className="space-y-2">
               {activeGuide.formulas.map((f) => (
                 <div key={f.label} className="rounded-lg border border-slate-800/80 bg-[#0A1020] px-3 py-2">
