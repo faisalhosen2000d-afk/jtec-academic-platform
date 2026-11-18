@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { RotateCcw, Play, Pause, Move3d, Eye, EyeOff } from "lucide-react";
+import { RotateCcw, Play, Pause, Move3d, Eye, EyeOff, ZoomIn, ZoomOut } from "lucide-react";
 
 export type Lab3DMode = "ply" | "wrap_reel" | "beesley";
 
@@ -163,13 +163,14 @@ export default function Yarn3DLab({
     const container = mountRef.current;
     if (!container) return;
 
-    const width = container.clientWidth || 560;
-    const height = container.clientHeight || 350;
+    const width = container.clientWidth || 360;
+    const height = container.clientHeight || 300;
+    const isNarrow = width < 480;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x090d16);
 
-    const baseZ = mode === "ply" ? 4.9 : 6.4;
+    const baseZ = mode === "ply" ? (isNarrow ? 6.1 : 4.9) : isNarrow ? 7.6 : 6.4;
     const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
     camera.position.set(0, 0.75, baseZ);
 
@@ -418,41 +419,64 @@ export default function Yarn3DLab({
       rootGroup.add(swatch);
     }
 
-    let isDragging = false;
-    let prevX = 0;
-    let prevY = 0;
+    const pointers = new Map<number, { x: number; y: number }>();
+    let prevPinchDist = 0;
+
+    const getPinchDist = () => {
+      const pts = Array.from(pointers.values());
+      if (pts.length < 2) return 0;
+      const p0 = pts[0]!;
+      const p1 = pts[1]!;
+      return Math.hypot(p1.x - p0.x, p1.y - p0.y);
+    };
 
     const onPointerDown = (e: PointerEvent) => {
-      isDragging = true;
-      prevX = e.clientX;
-      prevY = e.clientY;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        prevPinchDist = getPinchDist();
+      }
     };
     const onPointerMove = (e: PointerEvent) => {
-      if (!isDragging) return;
-      const dx = e.clientX - prevX;
-      const dy = e.clientY - prevY;
-      prevX = e.clientX;
-      prevY = e.clientY;
-      stateRef.current.rotY += dx * 0.01;
-      stateRef.current.rotX = Math.max(-1.1, Math.min(1.1, stateRef.current.rotX + dy * 0.01));
+      const prev = pointers.get(e.pointerId);
+      if (!prev) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (pointers.size === 1) {
+        const dx = e.clientX - prev.x;
+        const dy = e.clientY - prev.y;
+        stateRef.current.rotY += dx * 0.012;
+        stateRef.current.rotX = Math.max(-1.1, Math.min(1.1, stateRef.current.rotX + dy * 0.012));
+      } else if (pointers.size >= 2) {
+        const dist = getPinchDist();
+        if (prevPinchDist > 0 && dist > 0) {
+          const delta = (dist - prevPinchDist) * 0.005;
+          stateRef.current.zoom = Math.max(0.6, Math.min(2.2, stateRef.current.zoom + delta));
+        }
+        prevPinchDist = dist;
+      }
     };
-    const onPointerUp = () => {
-      isDragging = false;
+    const onPointerUp = (e: PointerEvent) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) {
+        prevPinchDist = 0;
+      }
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      stateRef.current.zoom = Math.max(0.6, Math.min(2.0, stateRef.current.zoom - e.deltaY * 0.001));
+      stateRef.current.zoom = Math.max(0.6, Math.min(2.2, stateRef.current.zoom - e.deltaY * 0.001));
     };
 
     const domEl = renderer.domElement;
+    domEl.style.touchAction = "none";
     domEl.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
     domEl.addEventListener("wheel", onWheel, { passive: false });
 
     const resizeObserver = new ResizeObserver(() => {
-      const w = container.clientWidth || 560;
-      const h = container.clientHeight || 350;
+      const w = container.clientWidth || 360;
+      const h = container.clientHeight || 300;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
@@ -464,7 +488,7 @@ export default function Yarn3DLab({
     const animate = () => {
       rafId = requestAnimationFrame(animate);
 
-      if (stateRef.current.isPlaying && !isDragging && mode === "ply") {
+      if (stateRef.current.isPlaying && pointers.size === 0 && mode === "ply") {
         stateRef.current.rotY += 0.0035;
       }
 
@@ -488,22 +512,22 @@ export default function Yarn3DLab({
       renderer.render(scene, camera);
 
       if (mode === "ply") {
-        const w = container.clientWidth || 560;
-        const h = container.clientHeight || 350;
+        const w = container.clientWidth || 360;
+        const h = container.clientHeight || 300;
         rootGroup.updateMatrixWorld();
 
         if (activeTagRef.current) {
           activeAnchor.getWorldPosition(projVec);
           projVec.project(camera);
-          const sx = (projVec.x * 0.5 + 0.5) * w;
-          const sy = (-projVec.y * 0.5 + 0.5) * h;
+          const sx = Math.max(70, Math.min(w - 70, (projVec.x * 0.5 + 0.5) * w));
+          const sy = Math.max(36, Math.min(h - 20, (-projVec.y * 0.5 + 0.5) * h));
           activeTagRef.current.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -100%)`;
         }
         if (refTagRef.current && showRef) {
           refAnchor.getWorldPosition(projVec);
           projVec.project(camera);
-          const rx = (projVec.x * 0.5 + 0.5) * w;
-          const ry = (-projVec.y * 0.5 + 0.5) * h;
+          const rx = Math.max(70, Math.min(w - 70, (projVec.x * 0.5 + 0.5) * w));
+          const ry = Math.max(36, Math.min(h - 10, (-projVec.y * 0.5 + 0.5) * h));
           refTagRef.current.style.transform = `translate(${rx}px, ${ry}px) translate(-50%, -100%)`;
         }
       }
@@ -516,6 +540,7 @@ export default function Yarn3DLab({
       domEl.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
       domEl.removeEventListener("wheel", onWheel);
       disposeObject3D(scene);
       renderer.dispose();
@@ -529,25 +554,29 @@ export default function Yarn3DLab({
     setResetTick((t) => t + 1);
   };
 
+  const handleZoom = (delta: number) => {
+    stateRef.current.zoom = Math.max(0.6, Math.min(2.2, stateRef.current.zoom + delta));
+  };
+
   const diffPct = Math.abs(resultantTex - cmpResultantTex) / Math.max(0.01, cmpResultantTex);
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-950/90 overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-800 bg-slate-900/80">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 border-b border-slate-800 bg-slate-900/80">
         <div className="flex items-center gap-2 text-xs text-cyan-300 font-medium">
-          <Move3d className="w-4 h-4" />
-          <span>
-            {mode === "ply" && `3D ${plyCount}-Ply (${resultantTex.toFixed(1)} Tex) vs ${compareLabel} (${cmpResultantTex.toFixed(1)} Tex)`}
-            {mode === "wrap_reel" && `3D Wrap Reel (${wrapTurns} turns) + Balance (${wrapWeightGrains.toFixed(1)} gr)`}
-            {mode === "beesley" && `3D Beesley's Balance (${beesleyThreads} threads)`}
+          <Move3d className="w-4 h-4 shrink-0" />
+          <span className="truncate max-w-[230px] sm:max-w-none">
+            {mode === "ply" && `3D ${plyCount}P (${resultantTex.toFixed(1)} Tex) vs ${compareLabel}`}
+            {mode === "wrap_reel" && `Wrap Reel (${wrapTurns} turns) + Balance`}
+            {mode === "beesley" && `Beesley's Balance (${beesleyThreads} threads)`}
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {mode === "ply" && (
             <button
               type="button"
               onClick={() => setShowRef((r) => !r)}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border transition ${
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] sm:text-xs border transition ${
                 showRef
                   ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-300"
                   : "bg-slate-800 border-slate-700 text-slate-400"
@@ -558,7 +587,7 @@ export default function Yarn3DLab({
             </button>
           )}
           {mode === "wrap_reel" && (
-            <div className="flex items-center gap-1 mr-2">
+            <div className="flex items-center gap-1">
               {([1, 2, 3] as const).map((s) => (
                 <button
                   key={s}
@@ -570,45 +599,61 @@ export default function Yarn3DLab({
                       : "bg-slate-800 text-slate-400 hover:text-slate-200"
                   }`}
                 >
-                  {s === 1 ? "1. Wind" : s === 2 ? "2. Cut Lea" : "3. Weigh"}
+                  {s === 1 ? "1.Wind" : s === 2 ? "2.Cut" : "3.Weigh"}
                 </button>
               ))}
             </div>
           )}
           <button
             type="button"
+            onClick={() => handleZoom(0.2)}
+            aria-label="Zoom in"
+            className="inline-flex items-center justify-center p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200"
+          >
+            <ZoomIn className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => handleZoom(-0.2)}
+            aria-label="Zoom out"
+            className="inline-flex items-center justify-center p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200"
+          >
+            <ZoomOut className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
             onClick={() => setIsPlaying((p) => !p)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] sm:text-xs text-slate-200"
           >
             {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-            <span>{isPlaying ? "Pause" : "Play"}</span>
+            <span className="hidden sm:inline">{isPlaying ? "Pause" : "Play"}</span>
           </button>
           <button
             type="button"
             onClick={handleReset}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] sm:text-xs text-slate-200"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset</span>
+            <span className="hidden sm:inline">Reset</span>
           </button>
         </div>
       </div>
 
       <div className="relative overflow-hidden">
-        <div ref={mountRef} className="w-full h-[320px] sm:h-[360px] cursor-grab active:cursor-grabbing" />
+        <div ref={mountRef} className="w-full h-[300px] sm:h-[360px] touch-none cursor-grab active:cursor-grabbing" />
 
         {mode === "ply" && (
           <>
             <div
               ref={activeTagRef}
-              className="pointer-events-none absolute top-0 left-0 px-2.5 py-1 rounded-full bg-cyan-950/90 border border-cyan-400/60 text-[11px] font-semibold text-cyan-200 shadow-lg whitespace-nowrap"
+              className="pointer-events-none absolute top-0 left-0 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-cyan-950/90 border border-cyan-400/60 text-[10px] sm:text-[11px] font-semibold text-cyan-200 shadow-lg whitespace-nowrap"
             >
-              {"\u09b8\u09c1\u09a4\u09be A (\u09a4\u09cb\u09ae\u09be\u09b0 \u0987\u09a8\u09aa\u09c1\u099f)"} {activeLabel ? `(${activeLabel})` : ""} • {resultantTex.toFixed(1)} Tex
+              {"\u09b8\u09c1\u09a4\u09be A"} {activeLabel ? `(${activeLabel})` : ""} • {resultantTex.toFixed(1)} Tex
             </div>
             {showRef && (
               <div
                 ref={refTagRef}
-                className="pointer-events-none absolute top-0 left-0 px-2.5 py-1 rounded-full bg-slate-900/90 border border-indigo-400/50 text-[11px] font-medium text-indigo-200 shadow-lg whitespace-nowrap"
+                className="pointer-events-none absolute top-0 left-0 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-slate-900/90 border border-indigo-400/50 text-[10px] sm:text-[11px] font-medium text-indigo-200 shadow-lg whitespace-nowrap"
               >
                 {"\u09b8\u09c1\u09a4\u09be B"} ({compareLabel}) • {cmpResultantTex.toFixed(1)} Tex
               </div>
@@ -616,9 +661,9 @@ export default function Yarn3DLab({
           </>
         )}
 
-        <div className="pointer-events-none absolute top-3 left-3 right-3 flex flex-wrap items-start justify-between gap-2">
+        <div className="pointer-events-none absolute top-2.5 left-2.5 right-2.5 flex flex-wrap items-start justify-between gap-2">
           {mode === "ply" && (
-            <div className="ml-auto rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-3 py-2 text-[11px] text-right">
+            <div className="ml-auto rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-2.5 py-1.5 text-[10px] sm:text-[11px] text-right">
               <div className="text-slate-200 font-mono">
                 A: ~{approxDiameterMm.toFixed(2)} mm | B: ~{cmpDiameterMm.toFixed(2)} mm
               </div>
@@ -641,30 +686,30 @@ export default function Yarn3DLab({
           )}
 
           {mode === "wrap_reel" && (
-            <div className="rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-3 py-2 text-[11px] space-y-0.5">
+            <div className="rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-2.5 py-1.5 text-[10px] sm:text-[11px] space-y-0.5 max-w-full">
               <div className="text-cyan-300 font-semibold">
                 {wrapStep === 1
                   ? "\u09a7\u09be\u09aa \u09e7: \u09b0\u200d\u09cd\u09af\u09be\u09aa \u09b0\u09bf\u09b2\u09c7 \u09b8\u09c1\u09a4\u09be \u09aa\u09cd\u09af\u09be\u0981\u099a\u09be\u09a8\u09cb \u09b9\u099a\u09cd\u099b\u09c7"
                   : wrapStep === 2
                   ? "\u09a7\u09be\u09aa \u09e8: \u09b8\u09c1\u09a4\u09be \u0995\u09c7\u099f\u09c7 \u09ac\u09cd\u09af\u09be\u09b2\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u09aa\u09cd\u09af\u09be\u09a8\u09c7 \u09b0\u09be\u0996\u09be \u09b9\u09df\u09c7\u099b\u09c7"
-                  : `\u09a7\u09be\u09aa \u09e9: \u09a1\u09bf\u099c\u09bf\u099f\u09be\u09b2 \u09ac\u09cd\u09af\u09be\u09b2\u09c7\u09a8\u09cd\u09b8\u09c7 \u0993\u099c\u09a8 \u09aa\u09be\u0993\u09df\u09be \u0997\u09c7\u099b\u09c7 (${wrapWeightGrains.toFixed(1)} gr)`}
+                  : `\u09a7\u09be\u09aa \u09e9: \u09a1\u09bf\u099c\u09bf\u099f\u09be\u09b2 \u09ac\u09cd\u09af\u09be\u09b2\u09c7\u09a8\u09cd\u09b8\u09c7 \u0993\u099c\u09a8 (${wrapWeightGrains.toFixed(1)} gr)`}
               </div>
               <div className="text-slate-400">
-                {"\u09ac\u09be\u09ae\u09c7: Yarn Cone | \u09ae\u09be\u099d\u09c7: Wrap Reel (1.5 yd/turn) | \u09a1\u09be\u09a8\u09c7: Digital Balance"}
+                {"\u09ac\u09be\u09ae\u09c7: Cone | \u09ae\u09be\u099d\u09c7: Wrap Reel | \u09a1\u09be\u09a8\u09c7: Balance"}
               </div>
             </div>
           )}
 
           {mode === "beesley" && (
-            <div className="rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-3 py-2 text-[11px] text-slate-300">
-              {"\u09ac\u09be\u09ae\u09c7: \u09b9\u09c1\u0995\u09c7 \u0995\u09be\u099f\u09be \u09b8\u09c1\u09a4\u09be | \u09a1\u09be\u09a8\u09c7: \u09b8\u09ac\u09c1\u099c Datum \u09a6\u09be\u0997 (Target = 30 Ne)"}
+            <div className="rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-2.5 py-1.5 text-[10px] sm:text-[11px] text-slate-300">
+              {"\u09ac\u09be\u09ae\u09c7: \u09b9\u09c1\u0995\u09c7 \u0995\u09be\u099f\u09be \u09b8\u09c1\u09a4\u09be | \u09a1\u09be\u09a8\u09c7: \u09b8\u09ac\u09c1\u099c Datum \u09a6\u09be\u0997 (30 Ne)"}
             </div>
           )}
         </div>
       </div>
 
-      <div className="px-4 py-2 border-t border-slate-800/80 bg-slate-900/50 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
-        <span>{"\u09ae\u09be\u0989\u09b8/\u099f\u09be\u099a \u09a6\u09bf\u09df\u09c7 \u09a1\u09cd\u09b0\u09cd\u09af\u09be\u0997 \u0995\u09b0\u09c7 \u09e9\u09ec\u09e6\u00b0 \u0998\u09c1\u09b0\u09bf\u09df\u09c7 \u098f\u09ac\u0982 \u09b8\u09cd\u0995\u09cd\u09b0\u09b2 \u0995\u09b0\u09c7 \u099c\u09c1\u09ae \u0995\u09b0\u09c7 \u09a6\u09c7\u0996\u09cb"}</span>
+      <div className="px-3 sm:px-4 py-2 border-t border-slate-800/80 bg-slate-900/50 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+        <span>{"\u09ae\u09be\u0989\u09b8/\u0986\u0999\u09c1\u09b2 \u09a6\u09bf\u09df\u09c7 \u09a1\u09cd\u09b0\u09cd\u09af\u09be\u0997 \u0995\u09b0\u09c7 \u09e9\u09ec\u09e6\u00b0 \u0998\u09c1\u09b0\u09bf\u09df\u09c7 \u0993 \u09aa\u09bf\u099e\u09cd\u099a / + - \u09a6\u09bf\u09df\u09c7 \u099c\u09c1\u09ae \u0995\u09b0\u09c7 \u09a6\u09c7\u0996\u09cb"}</span>
         {mode === "beesley" && (
           <span className={Math.abs(beesleyThreads - 30) <= 1 ? "text-emerald-400 font-medium" : "text-amber-300"}>
             {Math.abs(beesleyThreads - 30) <= 1
