@@ -1,5 +1,4 @@
 "use client";
-import PremiumSelect from "../PremiumSelect";
 
 import { useMemo, useState } from "react";
 import {
@@ -179,11 +178,17 @@ const WEIGHT_TO_GM: Record<WeightUnit, number> = {
 export function TextileToolsClient() {
   const [activeTab, setActiveTab] = useState<ToolTab>("yarn");
 
+  // Yarn A (Primary Converter)
   const [fromSys, setFromSys] = useState<CountSystemId>("ne");
   const [toSys, setToSys] = useState<CountSystemId>("tex");
   const [inputCount, setInputCount] = useState<number>(30);
-  const [plyCount, setPlyCount] = useState<number>(2);
+  const [plyCount, setPlyCount] = useState<number>(1);
   const [lab3DMode, setLab3DMode] = useState<Lab3DMode>("ply");
+
+  // Yarn B (Comparison Yarn)
+  const [cmpSys, setCmpSys] = useState<CountSystemId>("tex");
+  const [cmpCount, setCmpCount] = useState<number>(30);
+  const [cmpPly, setCmpPly] = useState<number>(1);
 
   const [wrapTurns, setWrapTurns] = useState<number>(80);
   const [wrapWeightGrains, setWrapWeightGrains] = useState<number>(33.3);
@@ -224,6 +229,7 @@ export function TextileToolsClient() {
 
   const fromMeta = COUNT_SYSTEMS.find((s) => s.id === fromSys) ?? COUNT_SYSTEMS[5]!;
   const toMeta = COUNT_SYSTEMS.find((s) => s.id === toSys) ?? COUNT_SYSTEMS[0]!;
+  const cmpMeta = COUNT_SYSTEMS.find((s) => s.id === cmpSys) ?? COUNT_SYSTEMS[0]!;
 
   const singleTex = useMemo(() => {
     const safeVal = Math.max(0.001, inputCount || 0.001);
@@ -233,6 +239,19 @@ export function TextileToolsClient() {
   const resultantTex = singleTex * plyCount;
   const convertedSingle = toMeta.fromTex(singleTex);
   const convertedResultant = toMeta.fromTex(resultantTex);
+
+  const cmpSingleTex = useMemo(() => {
+    const safeVal = Math.max(0.001, cmpCount || 0.001);
+    return cmpMeta.toTex(safeVal);
+  }, [cmpMeta, cmpCount]);
+  const cmpResultantTex = cmpSingleTex * cmpPly;
+
+  const isApproxEqual = Math.abs(resultantTex - cmpResultantTex) / Math.max(0.01, cmpResultantTex) < 0.02;
+  const aIsCoarser = resultantTex > cmpResultantTex;
+  const weightRatio = aIsCoarser
+    ? resultantTex / Math.max(0.001, cmpResultantTex)
+    : cmpResultantTex / Math.max(0.001, resultantTex);
+  const diameterRatio = Math.sqrt(weightRatio);
 
   const usageBadge = useMemo(() => {
     if (resultantTex < 14) return "Fine Poplin / Dress Shirtings (\u0996\u09c1\u09ac\u0987 \u09ae\u09bf\u09b9\u09bf \u09b8\u09c1\u09a4\u09be)";
@@ -322,7 +341,7 @@ export function TextileToolsClient() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
             <div className="lg:col-span-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold text-white">10-System Yarn Count &amp; Ply Converter</h2>
+                <h2 className="text-base font-semibold text-white">Yarn A: 10-System Count &amp; Ply Converter</h2>
                 <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-cyan-300 border border-slate-700">
                   {fromMeta.type} {"->"} {toMeta.type}
                 </span>
@@ -331,7 +350,7 @@ export function TextileToolsClient() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">{"From System (\u0989\u09ce\u09b8 \u09b8\u09bf\u09b8\u09cd\u099f\u09c7\u09ae)"}</label>
-                  <PremiumSelect
+                  <select
                     value={fromSys}
                     onChange={(e) => setFromSys(e.target.value as CountSystemId)}
                     className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
@@ -341,12 +360,12 @@ export function TextileToolsClient() {
                         {s.label} ({s.type})
                       </option>
                     ))}
-                  </PremiumSelect>
+                  </select>
                 </div>
 
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">{"To System (\u09b2\u0995\u09cd\u09b7\u09cd\u09af \u09b8\u09bf\u09b8\u09cd\u099f\u09c7\u09ae)"}</label>
-                  <PremiumSelect
+                  <select
                     value={toSys}
                     onChange={(e) => setToSys(e.target.value as CountSystemId)}
                     className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
@@ -356,7 +375,7 @@ export function TextileToolsClient() {
                         {s.label} ({s.type})
                       </option>
                     ))}
-                  </PremiumSelect>
+                  </select>
                 </div>
               </div>
 
@@ -510,7 +529,7 @@ export function TextileToolsClient() {
                       : "bg-slate-950 text-slate-300 border-slate-700 hover:text-white"
                   }`}
                 >
-                  1. 3D Multi-Ply Yarn
+                  1. Yarn A vs B (3D)
                 </button>
                 <button
                   type="button"
@@ -537,14 +556,167 @@ export function TextileToolsClient() {
               </div>
             </div>
 
+            {lab3DMode === "ply" && (
+              <div className="rounded-xl bg-slate-950/80 border border-slate-800 p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs font-semibold text-indigo-300">
+                    {"Yarn B (\u09a4\u09c1\u09b2\u09a8\u09be\u09ae\u09c2\u09b2\u0995 \u09b8\u09c1\u09a4\u09be) \u2014 \u0995\u09cb\u09a8\u099f\u09bf \u09ac\u09c7\u09b6\u09bf \u09ae\u09cb\u099f\u09be?"}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] text-slate-400 mr-1">
+                      {"\u09aa\u09b0\u09c0\u0995\u09cd\u09b7\u09be\u09b0 \u0995\u09ae\u09a8 \u09a4\u09c1\u09b2\u09a8\u09be (\u09e7-\u0995\u09cd\u09b2\u09bf\u0995):"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFromSys("ne");
+                        setInputCount(30);
+                        setPlyCount(1);
+                        setCmpSys("tex");
+                        setCmpCount(30);
+                        setCmpPly(1);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-cyan-300 border border-slate-700"
+                    >
+                      30 Ne vs 30 Tex
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFromSys("tex");
+                        setInputCount(30);
+                        setPlyCount(1);
+                        setCmpSys("denier");
+                        setCmpCount(30);
+                        setCmpPly(1);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-amber-300 border border-slate-700"
+                    >
+                      30 Tex vs 30 Denier
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFromSys("ne");
+                        setInputCount(20);
+                        setPlyCount(1);
+                        setCmpSys("nm");
+                        setCmpCount(20);
+                        setCmpPly(1);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-emerald-300 border border-slate-700"
+                    >
+                      20 Ne vs 20 Nm
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Yarn B System</label>
+                    <select
+                      value={cmpSys}
+                      onChange={(e) => setCmpSys(e.target.value as CountSystemId)}
+                      className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs sm:text-sm text-white"
+                    >
+                      {COUNT_SYSTEMS.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.label} ({s.type})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Yarn B Count ({cmpMeta.short})</label>
+                    <input
+                      type="number"
+                      min={0.1}
+                      step="0.5"
+                      value={cmpCount}
+                      onChange={(e) => setCmpCount(Number(e.target.value) || 0)}
+                      className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs sm:text-sm text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Yarn B Ply</label>
+                    <div className="grid grid-cols-4 gap-1">
+                      {[1, 2, 3, 4].map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setCmpPly(p)}
+                          className={`py-1.5 rounded-lg text-xs font-semibold border transition ${
+                            cmpPly === p
+                              ? "bg-indigo-500/20 border-indigo-400 text-indigo-200"
+                              : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          {p}P
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <Yarn3DLab
               mode={lab3DMode}
               plyCount={plyCount}
               singleTex={singleTex}
+              activeLabel={`${inputCount} ${fromMeta.short}, ${plyCount}-Ply`}
+              compareLabel={`${cmpCount} ${cmpMeta.short}, ${cmpPly}-Ply`}
+              compareSingleTex={cmpSingleTex}
+              comparePly={cmpPly}
               wrapTurns={wrapTurns}
               wrapWeightGrains={wrapWeightGrains}
               beesleyThreads={beesleyThreads}
             />
+
+            {lab3DMode === "ply" && (
+              <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-white">
+                    {"\u0997\u09be\u09a3\u09bf\u09a4\u09bf\u0995 \u09b0\u09be\u09df (Tex \u09a4\u09c1\u09b2\u09a8\u09be)"}
+                  </span>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                      isApproxEqual
+                        ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
+                        : aIsCoarser
+                        ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-300"
+                        : "bg-indigo-500/15 border-indigo-500/40 text-indigo-300"
+                    }`}
+                  >
+                    {isApproxEqual
+                      ? "\u09a6\u09c1\u099f\u09cb \u09b8\u09c1\u09a4\u09be \u09aa\u09cd\u09b0\u09be\u09df \u09b8\u09ae\u09be\u09a8 \u09ae\u09cb\u099f\u09be"
+                      : aIsCoarser
+                      ? `\u09b8\u09c1\u09a4\u09be A (${inputCount} ${fromMeta.short}, ${plyCount}-Ply) \u09ac\u09c7\u09b6\u09bf \u09ae\u09cb\u099f\u09be`
+                      : `\u09b8\u09c1\u09a4\u09be B (${cmpCount} ${cmpMeta.short}, ${cmpPly}-Ply) \u09ac\u09c7\u09b6\u09bf \u09ae\u09cb\u099f\u09be`}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                  <div className="rounded-lg bg-slate-900 px-3 py-2 border border-slate-800 text-cyan-300">
+                    Yarn A ({inputCount} {fromMeta.short}, {plyCount}P) = <span className="font-bold text-white">{resultantTex.toFixed(2)} Tex</span>
+                  </div>
+                  <div className="rounded-lg bg-slate-900 px-3 py-2 border border-slate-800 text-indigo-300">
+                    Yarn B ({cmpCount} {cmpMeta.short}, {cmpPly}P) = <span className="font-bold text-white">{cmpResultantTex.toFixed(2)} Tex</span>
+                  </div>
+                </div>
+
+                {!isApproxEqual && (
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {aIsCoarser ? "Yarn A" : "Yarn B"}, {aIsCoarser ? "Yarn B" : "Yarn A"}-{"\u098f\u09b0 \u099a\u09c7\u09df\u09c7 \u0993\u099c\u09a8\u09c7"}{" "}
+                    <span className="text-amber-300 font-semibold">{weightRatio.toFixed(2)} {"\u0997\u09c1\u09a3 \u09ad\u09be\u09b0\u09c0 \u0993 \u09ac\u09cd\u09af\u09be\u09b8"}</span>{" "}
+                    <span className="text-emerald-300 font-semibold">{diameterRatio.toFixed(2)} {"\u0997\u09c1\u09a3 \u09ac\u09c7\u09b6\u09bf \u09ae\u09cb\u099f\u09be"}</span>।{" "}
+                    <span className="text-slate-400">{"\u09a8\u09bf\u09df\u09ae: \u09af\u09c7\u0995\u09cb\u09a8\u09cb \u09b8\u09bf\u09b8\u09cd\u099f\u09c7\u09ae\u09c7\u09b0 \u09b8\u09c1\u09a4\u09be\u0995\u09c7 Tex-\u098f \u0986\u09a8\u09b2\u09c7 \u09af\u09be\u09b0 Tex \u09af\u09a4 \u09ac\u09c7\u09b6\u09bf, \u09b8\u09c7\u0987 \u09b8\u09c1\u09a4\u09be \u09a4\u09a4 \u09ac\u09c7\u09b6\u09bf \u09ae\u09cb\u099f\u09be\u0964"}</span>
+                  </p>
+                )}
+              </div>
+            )}
 
             {lab3DMode === "wrap_reel" && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
@@ -692,7 +864,7 @@ export function TextileToolsClient() {
                 onChange={(e) => setLenVal(Number(e.target.value) || 0)}
                 className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
               />
-              <PremiumSelect
+              <select
                 value={lenFrom}
                 onChange={(e) => setLenFrom(e.target.value as LengthUnit)}
                 className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
@@ -704,8 +876,8 @@ export function TextileToolsClient() {
                 <option value="m">Meter (m)</option>
                 <option value="cm">Centimeter (cm)</option>
                 <option value="spyndle">Spyndle (14400 yd)</option>
-              </PremiumSelect>
-              <PremiumSelect
+              </select>
+              <select
                 value={lenTo}
                 onChange={(e) => setLenTo(e.target.value as LengthUnit)}
                 className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
@@ -717,7 +889,7 @@ export function TextileToolsClient() {
                 <option value="m">Meter (m)</option>
                 <option value="cm">Centimeter (cm)</option>
                 <option value="spyndle">Spyndle (14400 yd)</option>
-              </PremiumSelect>
+              </select>
             </div>
             <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 font-mono text-lg text-cyan-300 font-bold">
               {lenVal} {lenFrom} = {lenConverted.toFixed(4)} {lenTo}
@@ -742,7 +914,7 @@ export function TextileToolsClient() {
                 onChange={(e) => setWtVal(Number(e.target.value) || 0)}
                 className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
               />
-              <PremiumSelect
+              <select
                 value={wtFrom}
                 onChange={(e) => setWtFrom(e.target.value as WeightUnit)}
                 className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
@@ -753,8 +925,8 @@ export function TextileToolsClient() {
                 <option value="grain">Grain</option>
                 <option value="kg">Kilogram (kg)</option>
                 <option value="ton">Metric Ton</option>
-              </PremiumSelect>
-              <PremiumSelect
+              </select>
+              <select
                 value={wtTo}
                 onChange={(e) => setWtTo(e.target.value as WeightUnit)}
                 className="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"
@@ -765,7 +937,7 @@ export function TextileToolsClient() {
                 <option value="lb">Pound (lb)</option>
                 <option value="kg">Kilogram (kg)</option>
                 <option value="ton">Metric Ton</option>
-              </PremiumSelect>
+              </select>
             </div>
             <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 font-mono text-lg text-emerald-400 font-bold">
               {wtVal} {wtFrom} = {wtConverted.toFixed(4)} {wtTo}

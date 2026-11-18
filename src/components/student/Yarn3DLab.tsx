@@ -10,12 +10,17 @@ interface Yarn3DLabProps {
   mode: Lab3DMode;
   plyCount: number;
   singleTex: number;
+  activeLabel?: string;
+  compareLabel?: string;
+  compareSingleTex?: number;
+  comparePly?: number;
   wrapTurns: number;
   wrapWeightGrains: number;
   beesleyThreads: number;
 }
 
 const PLY_COLORS = [0x22d3ee, 0xfbbf24, 0x34d399, 0xf472b6];
+const CMP_COLORS = [0x94a3b8, 0x818cf8, 0xa78bfa, 0x64748b];
 
 function disposeObject3D(root: THREE.Object3D): void {
   root.traverse((obj) => {
@@ -116,6 +121,10 @@ export default function Yarn3DLab({
   mode,
   plyCount,
   singleTex,
+  activeLabel = "",
+  compareLabel = "30 Ne (1-Ply)",
+  compareSingleTex = 19.68,
+  comparePly = 1,
   wrapTurns,
   wrapWeightGrains,
   beesleyThreads,
@@ -146,7 +155,9 @@ export default function Yarn3DLab({
   }, [wrapStep]);
 
   const resultantTex = singleTex * Math.max(1, Math.min(4, plyCount));
-  const approxDiameterMm = 0.036 * Math.sqrt(Math.max(1, resultantTex));
+  const cmpResultantTex = compareSingleTex * Math.max(1, Math.min(4, comparePly));
+  const approxDiameterMm = 0.036 * Math.sqrt(Math.max(0.1, resultantTex));
+  const cmpDiameterMm = 0.036 * Math.sqrt(Math.max(0.1, cmpResultantTex));
 
   useEffect(() => {
     const container = mountRef.current;
@@ -204,7 +215,7 @@ export default function Yarn3DLab({
 
     if (mode === "ply") {
       const clampedPly = Math.max(1, Math.min(4, plyCount));
-      const strandRadius = Math.max(0.06, Math.min(0.26, 0.05 + Math.sqrt(Math.max(1, singleTex)) * 0.022));
+      const strandRadius = Math.max(0.038, Math.min(0.28, 0.032 + Math.sqrt(Math.max(0.5, singleTex)) * 0.023));
       const helixRadius =
         clampedPly === 1 ? 0 : strandRadius * (clampedPly === 2 ? 1.05 : clampedPly === 3 ? 1.24 : 1.4);
       const length = 4.6;
@@ -226,18 +237,25 @@ export default function Yarn3DLab({
       }
 
       if (showRef) {
-        const refRadius = 0.05 + Math.sqrt(19.68) * 0.022;
-        buildHelicalStrand(rootGroup, {
-          yOffset: -0.78,
-          length,
-          strandRadius: refRadius,
-          helixRadius: 0,
-          turns: 3.4,
-          phase: 0,
-          colorHex: 0x64748b,
-          opacity: 0.65,
-          addFibers: true,
-        });
+        const clampedCmpPly = Math.max(1, Math.min(4, comparePly));
+        const cmpRadius = Math.max(0.038, Math.min(0.28, 0.032 + Math.sqrt(Math.max(0.5, compareSingleTex)) * 0.023));
+        const cmpHelixRadius =
+          clampedCmpPly === 1 ? 0 : cmpRadius * (clampedCmpPly === 2 ? 1.05 : clampedCmpPly === 3 ? 1.24 : 1.4);
+        for (let p = 0; p < clampedCmpPly; p++) {
+          const phase = (p * Math.PI * 2) / clampedCmpPly;
+          const colorHex = CMP_COLORS[p % CMP_COLORS.length] ?? 0x94a3b8;
+          buildHelicalStrand(rootGroup, {
+            yOffset: -0.78,
+            length,
+            strandRadius: cmpRadius,
+            helixRadius: cmpHelixRadius,
+            turns: 3.4,
+            phase,
+            colorHex,
+            opacity: 0.85,
+            addFibers: true,
+          });
+        }
       }
     } else if (mode === "wrap_reel") {
       const coneGroup = new THREE.Group();
@@ -502,7 +520,7 @@ export default function Yarn3DLab({
       disposeObject3D(scene);
       renderer.dispose();
     };
-  }, [mode, plyCount, singleTex, wrapTurns, beesleyThreads, showRef, resetTick]);
+  }, [mode, plyCount, singleTex, compareSingleTex, comparePly, wrapTurns, beesleyThreads, showRef, resetTick]);
 
   const handleReset = () => {
     stateRef.current.rotX = 0.18;
@@ -511,13 +529,15 @@ export default function Yarn3DLab({
     setResetTick((t) => t + 1);
   };
 
+  const diffPct = Math.abs(resultantTex - cmpResultantTex) / Math.max(0.01, cmpResultantTex);
+
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-950/90 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-800 bg-slate-900/80">
         <div className="flex items-center gap-2 text-xs text-cyan-300 font-medium">
           <Move3d className="w-4 h-4" />
           <span>
-            {mode === "ply" && `3D ${plyCount}-Ply Helical Yarn (${singleTex.toFixed(1)} Tex/ply)`}
+            {mode === "ply" && `3D ${plyCount}-Ply (${resultantTex.toFixed(1)} Tex) vs ${compareLabel} (${cmpResultantTex.toFixed(1)} Tex)`}
             {mode === "wrap_reel" && `3D Wrap Reel (${wrapTurns} turns) + Balance (${wrapWeightGrains.toFixed(1)} gr)`}
             {mode === "beesley" && `3D Beesley's Balance (${beesleyThreads} threads)`}
           </span>
@@ -534,7 +554,7 @@ export default function Yarn3DLab({
               }`}
             >
               {showRef ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-              <span>{showRef ? "Ref: ON" : "Ref: OFF"}</span>
+              <span>{showRef ? "Yarn B: ON" : "Yarn B: OFF"}</span>
             </button>
           )}
           {mode === "wrap_reel" && (
@@ -577,21 +597,20 @@ export default function Yarn3DLab({
       <div className="relative overflow-hidden">
         <div ref={mountRef} className="w-full h-[320px] sm:h-[360px] cursor-grab active:cursor-grabbing" />
 
-        {/* Pinned 3D Floating Tags for Active vs Reference Yarn */}
         {mode === "ply" && (
           <>
             <div
               ref={activeTagRef}
               className="pointer-events-none absolute top-0 left-0 px-2.5 py-1 rounded-full bg-cyan-950/90 border border-cyan-400/60 text-[11px] font-semibold text-cyan-200 shadow-lg whitespace-nowrap"
             >
-              {"\u09a4\u09cb\u09ae\u09be\u09b0 \u09b8\u09c1\u09a4\u09be (New)"} • {resultantTex.toFixed(1)} Tex
+              {"\u09b8\u09c1\u09a4\u09be A (\u09a4\u09cb\u09ae\u09be\u09b0 \u0987\u09a8\u09aa\u09c1\u099f)"} {activeLabel ? `(${activeLabel})` : ""} • {resultantTex.toFixed(1)} Tex
             </div>
             {showRef && (
               <div
                 ref={refTagRef}
-                className="pointer-events-none absolute top-0 left-0 px-2.5 py-1 rounded-full bg-slate-900/90 border border-slate-500/60 text-[11px] font-medium text-slate-300 shadow-lg whitespace-nowrap"
+                className="pointer-events-none absolute top-0 left-0 px-2.5 py-1 rounded-full bg-slate-900/90 border border-indigo-400/50 text-[11px] font-medium text-indigo-200 shadow-lg whitespace-nowrap"
               >
-                {"\u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8 (30 Ne)"} • 19.7 Tex
+                {"\u09b8\u09c1\u09a4\u09be B"} ({compareLabel}) • {cmpResultantTex.toFixed(1)} Tex
               </div>
             )}
           </>
@@ -601,22 +620,22 @@ export default function Yarn3DLab({
           {mode === "ply" && (
             <div className="ml-auto rounded-xl bg-slate-900/85 backdrop-blur-sm border border-slate-700/70 px-3 py-2 text-[11px] text-right">
               <div className="text-slate-200 font-mono">
-                {"\u0986\u09a8\u09c1\u09ae\u09be\u09a8\u09bf\u0995 \u09ac\u09cd\u09af\u09be\u09b8"}: ~{approxDiameterMm.toFixed(2)} mm
+                A: ~{approxDiameterMm.toFixed(2)} mm | B: ~{cmpDiameterMm.toFixed(2)} mm
               </div>
               <div
                 className={
-                  resultantTex > 22
+                  diffPct < 0.03
+                    ? "text-emerald-400 font-medium"
+                    : resultantTex > cmpResultantTex
                     ? "text-amber-300 font-medium"
-                    : resultantTex < 17
-                    ? "text-cyan-300 font-medium"
-                    : "text-emerald-400 font-medium"
+                    : "text-indigo-300 font-medium"
                 }
               >
-                {resultantTex > 22
-                  ? "30 Ne \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u099a\u09c7\u09df\u09c7 \u09ae\u09cb\u099f\u09be"
-                  : resultantTex < 17
-                  ? "30 Ne \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u099a\u09c7\u09df\u09c7 \u099a\u09bf\u0995\u09a8"
-                  : "\u09aa\u09cd\u09b0\u09be\u09df 30 Ne \u09b0\u09c7\u09ab\u09be\u09b0\u09c7\u09a8\u09cd\u09b8\u09c7\u09b0 \u09b8\u09ae\u09be\u09a8"}
+                {diffPct < 0.03
+                  ? "\u09a6\u09c1\u099f\u09cb \u09b8\u09c1\u09a4\u09be \u09aa\u09cd\u09b0\u09be\u09df \u09b8\u09ae\u09be\u09a8 \u09ae\u09cb\u099f\u09be"
+                  : resultantTex > cmpResultantTex
+                  ? "\u09b8\u09c1\u09a4\u09be A \u09ac\u09c7\u09b6\u09bf \u09ae\u09cb\u099f\u09be"
+                  : "\u09b8\u09c1\u09a4\u09be B \u09ac\u09c7\u09b6\u09bf \u09ae\u09cb\u099f\u09be"}
               </div>
             </div>
           )}
