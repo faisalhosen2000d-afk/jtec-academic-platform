@@ -41,8 +41,24 @@ export function TextilePulseClient() {
   const [regionTab, setRegionTab] = useState<"all" | "bangladesh" | "global">("all");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dateMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const loadMoreNews = async () => {
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/textile-pulse?date=${encodeURIComponent(briefDate)}&more=1`);
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Could not load more news.");
+      setItems(data.items || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load more news.");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const loadBrief = async (refresh = false, dateStr?: string) => {
     if (refresh) setRefreshing(true);
@@ -253,6 +269,18 @@ export function TextilePulseClient() {
               </div>
               <div className="grid gap-4 md:grid-cols-2">{globalItems.map(renderCard)}</div>
             </section>
+          )}
+          {(!availableDates[0] || briefDate === availableDates[0]) && items.length > 0 && items.length < 24 && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={loadMoreNews}
+                disabled={loadingMore}
+                className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/15 px-5 py-2.5 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/25 disabled:opacity-50 transition"
+              >
+                {loadingMore ? "Loading more news..." : "See More (+8 News)"}
+              </button>
+            </div>
           )}
         </div>
       )}

@@ -130,6 +130,7 @@ export async function GET(request: Request) {
     const todayDhaka = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dhaka" }).format(new Date());
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get("refresh") === "true";
+    const loadMore = searchParams.get("more") === "1";
     const requestedDate = searchParams.get("date");
     const targetDate = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : todayDhaka;
 
@@ -148,8 +149,9 @@ export async function GET(request: Request) {
       }
     }
 
-    if (items.length === 0 && targetDate === todayDhaka) {
-      const rawHeadlines = await fetchLiveTextileHeadlines();
+    if ((items.length === 0 || loadMore) && targetDate === todayDhaka) {
+      const existingUrls = new Set(items.map((it) => it.url));
+      const rawHeadlines = (await fetchLiveTextileHeadlines()).filter((h) => !existingUrls.has(h.url));
       if (rawHeadlines.length > 0) {
         const headlineList = rawHeadlines
           .map((h, i) => `[${i}] (${h.hintRegion}) Title: ${h.title} | Source: ${h.source} | Date: ${h.pubDate}`)
@@ -188,13 +190,14 @@ Return strictly valid JSON object with key "items" (array of 4-8 objects):
           }>;
         };
 
-        items = (parsed.items || [])
+        const baseIdx = items.length;
+        const newItems = (parsed.items || [])
           .filter((p) => rawHeadlines[p.index])
           .slice(0, 8)
           .map((p, idx) => {
             const src = rawHeadlines[p.index]!;
             return {
-              id: `${todayDhaka}-${idx}`,
+              id: `${todayDhaka}-${baseIdx + idx}`,
               region: p.region === "bangladesh" || p.region === "global" ? p.region : src.hintRegion,
               category: p.category || "Innovation & Tech",
               title_bn: p.title_bn,
@@ -205,6 +208,10 @@ Return strictly valid JSON object with key "items" (array of 4-8 objects):
               published_at: src.pubDate || todayDhaka,
             };
           });
+
+        if (newItems.length > 0) {
+          items = loadMore ? [...items, ...newItems] : newItems;
+        }
 
         if (items.length > 0) {
           await serviceSupabase
