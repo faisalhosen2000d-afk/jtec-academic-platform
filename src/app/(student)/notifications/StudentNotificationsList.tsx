@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
   Bell,
@@ -67,6 +67,10 @@ export default function StudentNotificationsList({
 }: StudentNotificationsListProps) {
   const router = useRouter();
   const [notifications, setNotifications] = useState(initialNotifications);
+
+  useEffect(() => {
+    setNotifications(initialNotifications);
+  }, [initialNotifications]);
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [readingId, setReadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
