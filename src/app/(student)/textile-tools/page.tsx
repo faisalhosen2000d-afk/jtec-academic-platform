@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { TextileToolsClient } from "@/components/student/TextileToolsClient";
+import VirtualLabHub from "@/components/student/VirtualLabHub";
 
 export const dynamic = "force-dynamic";
 
@@ -13,9 +13,9 @@ export default async function TextileToolsPage() {
 
   return (
     <div className="min-h-full bg-[#060A12] text-slate-100">
-      <main className="p-5 sm:p-6">
+      <main className="p-4 sm:p-6">
         <div className="mx-auto w-full max-w-6xl">
-          <TextileToolsClient />
+          <VirtualLabHub />
         </div>
       </main>
     </div>
