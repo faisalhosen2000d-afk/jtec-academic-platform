@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   GraduationCap,
   Camera,
+  Eye,
 } from "lucide-react";
 
 type PickingType = "shuttle" | "rapier" | "projectile" | "airjet";
@@ -36,7 +37,8 @@ type LoomPartId =
   | "reed_sley"
   | "woven_cloth"
   | "breast_beam"
-  | "cloth_roller";
+  | "cloth_roller"
+  | "modern_creel_hmi";
 
 interface PartMeta {
   id: LoomPartId;
@@ -60,7 +62,7 @@ const LOOM_PARTS: Record<LoomPartId, PartMeta> = {
     id: "tappets_treadles",
     name: "Bottom Shaft, Tappets (Cams) & Treadles",
     motion: "Shedding Drive Mechanism",
-    role: "Eccentric tappet cams mounted on the Bottom Shaft press anti-friction bowls on the Treadle Levers, pulling the Heald Frames down while Top Reversing Rollers lift the opposite frames.",
+    role: "Eccentric tappet cams on the Bottom Shaft press anti-friction bowls on Treadle Levers, pulling Heald Frames down while Top Reversing Rollers lift opposing frames.",
     defect: "Worn tappet nose or loose treadle bowl reduces shed height, causing warp rubbing and shuttle trapping.",
     vivaTip: "In negative tappet shedding, cams pull frames DOWN while top reversing rollers/springs pull opposing frames UP.",
   },
@@ -100,7 +102,7 @@ const LOOM_PARTS: Record<LoomPartId, PartMeta> = {
     id: "heald_frames",
     name: "Heald Frames & Top Reversing Arch",
     motion: "Primary Motion (Shedding)",
-    role: "Suspended from top reversing rollers on the loom arch and linked to bottom treadles; raises/lowers warp groups to open the Shed.",
+    role: "Raises and lowers selected warp groups according to the lifting plan to open the V-shaped Shed passage.",
     defect: "Wrong drawing-in or broken heald eye causes 'Wrong Draft' or stitching faults.",
     vivaTip: "Tappet handles up to 8 shafts, Dobby up to 24-32 shafts, Jacquard controls every individual warp end.",
   },
@@ -110,7 +112,7 @@ const LOOM_PARTS: Record<LoomPartId, PartMeta> = {
     motion: "Primary Motion (Picking)",
     role: "Launches weft yarn across the open shed (110-245 deg) via picking stick & shuttle, twin rapier wheels, torsion projectile, or compressed air-jet nozzles.",
     defect: "Mistimed picking causes 'Broken Pick', 'Double Pick', or shuttle fly-out.",
-    vivaTip: "Shuttle looms max out near 200 PPM due to high inertia; Air-Jet looms achieve 900-1200+ PPM.",
+    vivaTip: "Conventional shuttle looms max out near 200 PPM; modern Air-Jet looms achieve 900-1200+ PPM.",
   },
   reed_sley: {
     id: "reed_sley",
@@ -130,9 +132,9 @@ const LOOM_PARTS: Record<LoomPartId, PartMeta> = {
   },
   breast_beam: {
     id: "breast_beam",
-    name: "Breast Beam (Front Rest)",
+    name: "Breast Beam & Front Control Cover",
     motion: "Fabric Support Guide",
-    role: "Smooth front cast-iron/steel guide beam deflecting freshly woven fabric cleanly downward to the take-up roller.",
+    role: "Smooth front guide beam (enclosed under a protective cobalt-blue cover with Run/Stop buttons on modern looms) deflecting fabric downward to take-up.",
     defect: "Scratches or burrs snag delicate yarns and cause pulled loops on the cloth surface.",
     vivaTip: "Horizontal warp line runs: Back Rest -> Heald Eyes -> Fell of Cloth -> Breast Beam.",
   },
@@ -142,7 +144,15 @@ const LOOM_PARTS: Record<LoomPartId, PartMeta> = {
     motion: "Secondary Motion (Take-up)",
     role: "High-friction emery roller advances woven cloth by an exact step per pick (setting PPI) and winds finished fabric onto the cloth roller.",
     defect: "Cloth slippage on the emery roller produces 'Thick Places' (bunched picks) and uneven GSM.",
-    vivaTip: "PPI is controlled directly by the change-wheel gear train driving the take-up roller.",
+    vivaTip: "PPI is controlled by change-wheel gears (conventional) or electronic servo motor (modern looms).",
+  },
+  modern_creel_hmi: {
+    id: "modern_creel_hmi",
+    name: "Weft Cone Creel, Accumulators, HMI & Signal Tower",
+    motion: "Modern Factory Automation",
+    role: "Shuttleless looms draw weft continuously from stationary cones on a side Creel Stand via electronic Weft Accumulators, controlled by a Touchscreen HMI with an Andon Signal Tower.",
+    defect: "Accumulator tension spikes cause weft breaks and uneven selvedge loops; signal tower flashes amber/red on loom stop.",
+    vivaTip: "Because weft comes from large stationary cones (not tiny shuttle pirns), shuttleless looms run non-stop at 3x-5x speed.",
   },
 };
 
@@ -150,10 +160,10 @@ const CAMERA_PRESETS: Record<
   CameraPresetId,
   { label: string; theta: number; phi: number; radius: number; target: [number, number, number] }
 > = {
-  full: { label: "Full Loom", theta: 0.62, phi: 1.12, radius: 12.2, target: [0.2, -0.25, 0] },
+  full: { label: "Full Loom", theta: 0.62, phi: 1.12, radius: 13.0, target: [0.2, -0.25, 0] },
   shedding: { label: "Shedding & Cams", theta: 0.95, phi: 1.24, radius: 6.8, target: [-0.85, -0.35, 0.2] },
   beatup: { label: "Beat-up & Gears", theta: -0.78, phi: 1.18, radius: 7.4, target: [0.25, -0.85, -1.6] },
-  picking: { label: "Picking & Shed", theta: 0.35, phi: 1.05, radius: 7.0, target: [0.9, 0.05, 0] },
+  picking: { label: "Picking & Shed", theta: 0.35, phi: 1.05, radius: 7.2, target: [0.9, 0.05, 0] },
   cloth: { label: "Woven Cloth", theta: 0.42, phi: 0.62, radius: 6.4, target: [2.85, 0.05, 0] },
 };
 
@@ -272,27 +282,31 @@ const WEAVE_CONFIG: Record<
 
 const PICKING_INFO: Record<
   PickingType,
-  { label: string; ppm: string; desc: string }
+  { label: string; era: string; ppm: string; desc: string }
 > = {
   shuttle: {
-    label: "Shuttle",
+    label: "Shuttle (Lab Loom)",
+    era: "Conventional Motor-Driven",
     ppm: "160-220 PPM",
-    desc: "Shuttle boxes & swinging picking sticks launch wooden shuttle with pirn.",
+    desc: "Open mechanical lab power loom with overhead arch, 1:2 gears & picking sticks.",
   },
   rapier: {
-    label: "Rapier",
+    label: "Rapier (Modern)",
+    era: "Modern Industrial Factory",
     ppm: "450-650 PPM",
-    desc: "Side drive wheels extend twin rapiers to transfer weft at shed center.",
+    desc: "Picanol-style factory cabinet, weft cone creel, HMI screen & twin rapiers.",
   },
   projectile: {
-    label: "Projectile",
+    label: "Projectile (Modern)",
+    era: "Modern Industrial Factory",
     ppm: "350-450 PPM",
-    desc: "Torsion-bar picking head fires compact steel gripper across wide looms.",
+    desc: "Factory enclosure with weft creel, HMI panel & torsion-bar gripper projectile.",
   },
   airjet: {
-    label: "Air-Jet",
+    label: "Air-Jet (Modern)",
+    era: "Modern Industrial Factory",
     ppm: "850-1200+ PPM",
-    desc: "Main nozzle & relay manifold jets propel weft yarn with compressed air.",
+    desc: "Toyota-style factory loom with weft accumulators, air manifold & relay nozzles.",
   },
 };
 
@@ -351,6 +365,7 @@ export default function Loom3DSimulator() {
   const [weaveType, setWeaveType] = useState<WeaveType>("denim31");
   const [selectedPart, setSelectedPart] = useState<LoomPartId>("heald_frames");
   const [cameraPreset, setCameraPreset] = useState<CameraPresetId>("full");
+  const [xRayMode, setXRayMode] = useState(false);
   const [activeStepIdx, setActiveStepIdx] = useState<number | null>(null);
   const [picksWoven, setPicksWoven] = useState(18);
 
@@ -362,6 +377,7 @@ export default function Loom3DSimulator() {
     shedType,
     weaveType,
     selectedPart,
+    xRayMode,
     pickIndex: 18,
   });
 
@@ -372,7 +388,8 @@ export default function Loom3DSimulator() {
     stateRef.current.shedType = shedType;
     stateRef.current.weaveType = weaveType;
     stateRef.current.selectedPart = selectedPart;
-  }, [isPlaying, speed, pickingType, shedType, weaveType, selectedPart]);
+    stateRef.current.xRayMode = xRayMode;
+  }, [isPlaying, speed, pickingType, shedType, weaveType, selectedPart, xRayMode]);
 
   const cameraControlsRef = useRef<{
     zoom: (delta: number) => void;
@@ -392,6 +409,9 @@ export default function Loom3DSimulator() {
     setCrankAngle(step.angle);
     stateRef.current.crankAngle = step.angle;
     setSelectedPart(step.part);
+    if (pickingType !== "shuttle" && (step.part === "motor_gears" || step.part === "tappets_treadles")) {
+      setXRayMode(true);
+    }
     selectPreset(step.camera);
   };
 
@@ -413,28 +433,26 @@ export default function Loom3DSimulator() {
     container.appendChild(renderer.domElement);
 
     // Bright Industrial Studio Lighting
-    const hemi = new THREE.HemisphereLight(0xf1f5f9, 0x1e293b, 1.15);
+    const hemi = new THREE.HemisphereLight(0xf8fafc, 0x1e293b, 1.25);
     scene.add(hemi);
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.55);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
     keyLight.position.set(8, 12, 10);
     scene.add(keyLight);
     const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.85);
     rimLight.position.set(-9, 6, -8);
     scene.add(rimLight);
-    const frontFill = new THREE.DirectionalLight(0xfde68a, 0.42);
-    frontFill.position.set(5, 3, -9);
+    const frontFill = new THREE.DirectionalLight(0xfde68a, 0.45);
+    frontFill.position.set(6, 4, -9);
     scene.add(frontFill);
 
-    // Workshop floor grid
-    const floorGrid = new THREE.GridHelper(22, 28, 0x334155, 0x162236);
+    const floorGrid = new THREE.GridHelper(24, 30, 0x334155, 0x162236);
     floorGrid.position.y = -2.28;
     scene.add(floorGrid);
 
-    // Smooth camera orbit state
     const isNarrow = width < 520;
     let theta = CAMERA_PRESETS.full.theta;
     let phi = CAMERA_PRESETS.full.phi;
-    let radius = isNarrow ? 15.2 : CAMERA_PRESETS.full.radius;
+    let radius = isNarrow ? 15.8 : CAMERA_PRESETS.full.radius;
     const target = new THREE.Vector3(...CAMERA_PRESETS.full.target);
 
     let desiredTheta = theta;
@@ -454,7 +472,7 @@ export default function Loom3DSimulator() {
     cameraControlsRef.current = {
       zoom: (delta: number) => {
         isLerping = false;
-        radius = Math.min(22, Math.max(4.5, radius + delta));
+        radius = Math.min(23, Math.max(4.5, radius + delta));
         desiredRadius = radius;
         updateCamera();
       },
@@ -481,6 +499,7 @@ export default function Loom3DSimulator() {
       woven_cloth: [],
       breast_beam: [],
       cloth_roller: [],
+      modern_creel_hmi: [],
     };
     const allClickable: THREE.Mesh[] = [];
 
@@ -498,7 +517,6 @@ export default function Loom3DSimulator() {
       });
     };
 
-    // === INDUSTRIAL CAST-IRON LOOM FRAME & TOP ARCH ===
     const castIronMat = new THREE.MeshStandardMaterial({
       color: 0x264653,
       metalness: 0.58,
@@ -520,8 +538,9 @@ export default function Loom3DSimulator() {
       roughness: 0.18,
     });
 
+    // === CONVENTIONAL CAST-IRON FRAME & TOP ARCH ===
+    const conventionalArchGroup = new THREE.Group();
     for (const zSide of [-2.42, 2.42]) {
-      // Heavy cast-iron base rail + bolted feet
       const baseBeam = new THREE.Mesh(new THREE.BoxGeometry(10.2, 0.34, 0.28), castIronMat);
       baseBeam.position.set(0.15, -2.08, zSide);
       scene.add(baseBeam);
@@ -532,20 +551,18 @@ export default function Loom3DSimulator() {
         scene.add(foot);
       }
 
-      // Contoured side frame pillars (Back, Mid-Arch, Front)
       const backPillar = new THREE.Mesh(new THREE.BoxGeometry(0.32, 2.5, 0.26), castIronMat);
       backPillar.position.set(-4.2, -0.82, zSide);
       scene.add(backPillar);
 
       const midArchCol = new THREE.Mesh(new THREE.BoxGeometry(0.34, 4.25, 0.28), castIronMat);
       midArchCol.position.set(-0.78, -0.02, zSide);
-      scene.add(midArchCol);
+      conventionalArchGroup.add(midArchCol);
 
       const frontPillar = new THREE.Mesh(new THREE.BoxGeometry(0.32, 2.45, 0.26), castIronMat);
       frontPillar.position.set(4.35, -0.84, zSide);
       scene.add(frontPillar);
 
-      // Horizontal structural side tie-bars
       const midTie = new THREE.Mesh(new THREE.BoxGeometry(8.8, 0.24, 0.22), castIronMat);
       midTie.position.set(0.1, -0.78, zSide);
       scene.add(midTie);
@@ -554,7 +571,6 @@ export default function Loom3DSimulator() {
       upperTie.position.set(0.1, 0.32, zSide);
       scene.add(upperTie);
 
-      // Brass pillow-block bearings for Crank Shaft & Bottom Shaft
       const crankBearing = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.34, 16), brassMat);
       crankBearing.rotation.x = Math.PI / 2;
       crankBearing.position.set(0.15, -0.78, zSide);
@@ -566,17 +582,16 @@ export default function Loom3DSimulator() {
       scene.add(bottomBearing);
     }
 
-    // Overhead Castle / Top Arch + Top Reversing Rollers
     const archBeam = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.24, 5.25), castIronMat);
     archBeam.position.set(-0.78, 2.12, 0);
     registerMesh(archBeam, "heald_frames");
-    scene.add(archBeam);
+    conventionalArchGroup.add(archBeam);
 
     const topRollerShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.9, 16), chromeMat);
     topRollerShaft.rotation.x = Math.PI / 2;
     topRollerShaft.position.set(-0.78, 1.82, 0);
     registerMesh(topRollerShaft, "heald_frames");
-    scene.add(topRollerShaft);
+    conventionalArchGroup.add(topRollerShaft);
 
     const topRollers: THREE.Mesh[] = [];
     for (const zR of [-1.45, 1.45]) {
@@ -584,9 +599,148 @@ export default function Loom3DSimulator() {
       roller.rotation.x = Math.PI / 2;
       roller.position.set(-0.78, 1.82, zR);
       registerMesh(roller, "heald_frames");
-      scene.add(roller);
+      conventionalArchGroup.add(roller);
       topRollers.push(roller);
     }
+    scene.add(conventionalArchGroup);
+
+    // === MODERN FACTORY ENCLOSURE (PICANOL / TOYOTA STYLE) ===
+    const modernFactoryGroup = new THREE.Group();
+    const cabinetMat = new THREE.MeshStandardMaterial({
+      color: 0xdbe4ee,
+      metalness: 0.28,
+      roughness: 0.42,
+      transparent: true,
+      opacity: 0.96,
+    });
+    const cobaltMat = new THREE.MeshStandardMaterial({
+      color: 0x1d4ed8,
+      metalness: 0.35,
+      roughness: 0.32,
+      transparent: true,
+      opacity: 0.96,
+    });
+    const screenMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a,
+      emissive: 0x0ea5e9,
+      emissiveIntensity: 0.45,
+      roughness: 0.15,
+    });
+
+    // Left & Right Silver-Grey Side Drive Cabinets (become translucent in X-Ray mode!)
+    const leftCabinet = new THREE.Mesh(new THREE.BoxGeometry(5.6, 2.55, 1.15), cabinetMat);
+    leftCabinet.position.set(0.7, -0.92, -3.05);
+    registerMesh(leftCabinet, "modern_creel_hmi");
+    modernFactoryGroup.add(leftCabinet);
+
+    const leftTopBlue = new THREE.Mesh(new THREE.BoxGeometry(5.65, 0.32, 1.2), cobaltMat);
+    leftTopBlue.position.set(0.7, 0.46, -3.05);
+    registerMesh(leftTopBlue, "modern_creel_hmi");
+    modernFactoryGroup.add(leftTopBlue);
+
+    const rightCabinet = new THREE.Mesh(new THREE.BoxGeometry(5.8, 2.65, 1.45), cabinetMat);
+    rightCabinet.position.set(0.65, -0.88, 3.22);
+    registerMesh(rightCabinet, "modern_creel_hmi");
+    modernFactoryGroup.add(rightCabinet);
+
+    const rightTopBlue = new THREE.Mesh(new THREE.BoxGeometry(5.85, 0.36, 1.5), cobaltMat);
+    rightTopBlue.position.set(0.65, 0.56, 3.22);
+    registerMesh(rightTopBlue, "modern_creel_hmi");
+    modernFactoryGroup.add(rightTopBlue);
+
+    // Sleek Cobalt-Blue Front Breast Beam Cover + Control Buttons
+    const frontBlueCover = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.46, 5.1), cobaltMat);
+    frontBlueCover.position.set(4.38, 0.14, 0);
+    registerMesh(frontBlueCover, "breast_beam");
+    modernFactoryGroup.add(frontBlueCover);
+
+    for (const [bz, col] of [
+      [-1.7, 0x22c55e],
+      [-1.45, 0xef4444],
+      [1.45, 0x22c55e],
+      [1.7, 0xf59e0b],
+    ] as const) {
+      const btn = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.06, 0.06, 0.06, 12),
+        new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.35 }),
+      );
+      btn.position.set(4.52, 0.39, bz);
+      registerMesh(btn, "breast_beam");
+      modernFactoryGroup.add(btn);
+    }
+
+    // Slanted Touchscreen HMI Pedestal (Left-Front)
+    const hmiPost = new THREE.Mesh(new THREE.BoxGeometry(0.24, 2.35, 0.36), cobaltMat);
+    hmiPost.position.set(3.95, -1.05, -3.55);
+    registerMesh(hmiPost, "modern_creel_hmi");
+    modernFactoryGroup.add(hmiPost);
+
+    const hmiHead = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.12, 1.15), darkSteelMat);
+    hmiHead.position.set(4.05, 0.25, -3.55);
+    hmiHead.rotation.z = -0.35;
+    registerMesh(hmiHead, "modern_creel_hmi");
+    modernFactoryGroup.add(hmiHead);
+
+    const hmiDisplay = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.03, 0.96), screenMat);
+    hmiDisplay.position.set(4.08, 0.31, -3.55);
+    hmiDisplay.rotation.z = -0.35;
+    registerMesh(hmiDisplay, "modern_creel_hmi");
+    modernFactoryGroup.add(hmiDisplay);
+
+    // Andon Signal Tower Light on Right Drive Cabinet
+    const towerPole = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.55, 12), chromeMat);
+    towerPole.position.set(1.2, 1.5, 3.25);
+    registerMesh(towerPole, "modern_creel_hmi");
+    modernFactoryGroup.add(towerPole);
+
+    const signalLightMat = new THREE.MeshStandardMaterial({
+      color: 0x22c55e,
+      emissive: 0x22c55e,
+      emissiveIntensity: 0.9,
+    });
+    const signalLamp = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.42, 16), signalLightMat);
+    signalLamp.position.set(1.2, 2.35, 3.25);
+    registerMesh(signalLamp, "modern_creel_hmi");
+    modernFactoryGroup.add(signalLamp);
+
+    // Weft Yarn Cone Creel Stand + 4 White Cones + 2 Electronic Weft Accumulators (Far Left)
+    const creelGroup = new THREE.Group();
+    creelGroup.position.set(1.4, -2.25, -4.95);
+    for (const cx of [-0.55, 0.55]) {
+      const upright = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3.6, 10), chromeMat);
+      upright.position.set(cx, 1.8, 0);
+      creelGroup.add(upright);
+    }
+    const creelBase = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.1, 0.95), darkSteelMat);
+    creelBase.position.y = 0.05;
+    creelGroup.add(creelBase);
+
+    const coneYarnMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.72 });
+    for (let cy = 0; cy < 4; cy++) {
+      const shelf = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.04, 0.18), darkSteelMat);
+      shelf.position.set(0, 0.75 + cy * 0.78, 0);
+      creelGroup.add(shelf);
+
+      const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.24, 0.52, 18), coneYarnMat);
+      cone.rotation.x = Math.PI / 2;
+      cone.position.set(0, 0.95 + cy * 0.78, 0.28);
+      creelGroup.add(cone);
+    }
+
+    // 2 Cylindrical Electronic Weft Accumulators mounted between creel and loom
+    for (const ax of [-0.35, 0.35]) {
+      const acc = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.19, 0.19, 0.48, 18),
+        new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.3 }),
+      );
+      acc.rotation.x = Math.PI / 2;
+      acc.position.set(ax, 2.75, 1.15);
+      creelGroup.add(acc);
+    }
+    registerGroupMeshes(creelGroup, "modern_creel_hmi");
+    modernFactoryGroup.add(creelGroup);
+
+    scene.add(modernFactoryGroup);
 
     // === 1. ELECTRIC MOTOR, FLYWHEEL, CRANK SHAFT & 1:2 SPUR GEARS ===
     const motorGroup = new THREE.Group();
@@ -604,7 +758,6 @@ export default function Loom3DSimulator() {
     registerGroupMeshes(motorGroup, "motor_gears");
     scene.add(motorGroup);
 
-    // V-Belt connecting motor pulley to flywheel
     const beltMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
     for (const xOff of [-0.14, 0.14]) {
       const belt = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.95, 0.08), beltMat);
@@ -613,7 +766,6 @@ export default function Loom3DSimulator() {
       scene.add(belt);
     }
 
-    // Crank Shaft assembly (x = 0.15, y = -0.78) with forged crank throws + Flywheel + Pinion Gear
     const crankShaftGroup = new THREE.Group();
     crankShaftGroup.position.set(0.15, -0.78, 0);
 
@@ -621,7 +773,6 @@ export default function Loom3DSimulator() {
     crankMainBar.rotation.x = Math.PI / 2;
     crankShaftGroup.add(crankMainBar);
 
-    // Crank throws on left & right (offset radius = 0.38)
     const crankRadius = 0.38;
     for (const zCrank of [-2.05, 2.05]) {
       const web1 = new THREE.Mesh(new THREE.BoxGeometry(crankRadius + 0.14, 0.16, 0.08), darkSteelMat);
@@ -636,7 +787,6 @@ export default function Loom3DSimulator() {
       crankShaftGroup.add(pin);
     }
 
-    // Spoked Flywheel on right end (z = 2.75)
     const flywheelRim = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.075, 12, 28), darkSteelMat);
     flywheelRim.position.z = 2.75;
     crankShaftGroup.add(flywheelRim);
@@ -647,7 +797,6 @@ export default function Loom3DSimulator() {
       crankShaftGroup.add(spoke);
     }
 
-    // 1:2 Crank Pinion Gear on left end (z = -2.72)
     const crankPinion = buildSpurGear(0.36, 0.16, 12, 0xf59e0b);
     crankPinion.position.z = -2.72;
     crankShaftGroup.add(crankPinion);
@@ -655,7 +804,7 @@ export default function Loom3DSimulator() {
     registerGroupMeshes(crankShaftGroup, "motor_gears");
     scene.add(crankShaftGroup);
 
-    // === 2. BOTTOM SHAFT (1:2 GEAR) + TAPPETS (CAMS) + TREADLE LEVERS ===
+    // === 2. BOTTOM SHAFT (1:2 GEAR) + TAPPETS + TREADLES ===
     const bottomShaftGroup = new THREE.Group();
     bottomShaftGroup.position.set(-0.78, -1.46, 0);
 
@@ -663,13 +812,11 @@ export default function Loom3DSimulator() {
     bottomBar.rotation.x = Math.PI / 2;
     bottomShaftGroup.add(bottomBar);
 
-    // Large 24-tooth Bottom Shaft Gear meshing with Crank Pinion at z = -2.72
     const bottomGear = buildSpurGear(0.68, 0.16, 24, 0x38bdf8);
     bottomGear.position.z = -2.72;
     registerGroupMeshes(bottomGear, "motor_gears");
     bottomShaftGroup.add(bottomGear);
 
-    // 4 Eccentric Tappet Cams on the Bottom Shaft
     const camColors = [0x38bdf8, 0x818cf8, 0x34d399, 0xf472b6];
     for (let c = 0; c < 4; c++) {
       const cam = new THREE.Mesh(
@@ -689,12 +836,11 @@ export default function Loom3DSimulator() {
     registerGroupMeshes(bottomShaftGroup, "tappets_treadles");
     scene.add(bottomShaftGroup);
 
-    // 4 Pivoting Treadle Levers beneath the Bottom Shaft
     const treadleLevers: THREE.Group[] = [];
     for (let t = 0; t < 4; t++) {
       const leverGrp = new THREE.Group();
       const zLev = -0.9 + t * 0.6;
-      leverGrp.position.set(-2.35, -1.86, zLev); // rear pivot fulcrum
+      leverGrp.position.set(-2.35, -1.86, zLev);
       const bar = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.09, 0.1), darkSteelMat);
       bar.position.x = 1.07;
       leverGrp.add(bar);
@@ -761,7 +907,7 @@ export default function Loom3DSimulator() {
     }
     scene.add(dropGroup);
 
-    // === 4. HEALD FRAMES (PHYSICALLY LINKED TO TOP ROLLERS & BOTTOM TREADLES) ===
+    // === 4. HEALD FRAMES ===
     const healdXPositions = [-1.24, -0.94, -0.64, -0.34];
     const healdFrames: THREE.Group[] = [];
     const topStraps: THREE.Mesh[][] = [];
@@ -806,18 +952,16 @@ export default function Loom3DSimulator() {
       scene.add(frame);
       healdFrames.push(frame);
 
-      // Vertical suspension straps from top reversing rollers down to frame top bar
       const sPair: THREE.Mesh[] = [];
       for (const zS of [-1.45, 1.45]) {
         const strap = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1, 8), strapMat);
         strap.position.set(xPos, 1.4, zS);
         registerMesh(strap, "heald_frames");
-        scene.add(strap);
+        conventionalArchGroup.add(strap);
         sPair.push(strap);
       }
       topStraps.push(sPair);
 
-      // Bottom treadle pull-cord linking frame bottom bar down to treadle lever
       const bStrap = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1, 8), strapMat);
       bStrap.position.set(xPos, -1.4, -0.9 + s * 0.6);
       registerMesh(bStrap, "tappets_treadles");
@@ -832,12 +976,10 @@ export default function Loom3DSimulator() {
     registerMesh(rockingShaft, "reed_sley");
     scene.add(rockingShaft);
 
-    // Sley Assembly pivoting from Rocking Shaft (x = 1.04, y = -1.88)
     const sleyPivot = new THREE.Group();
     sleyPivot.position.set(1.04, -1.88, 0);
 
     const sleyMat = new THREE.MeshStandardMaterial({ color: 0xe11d48, metalness: 0.45, roughness: 0.35 });
-    // Heavy Sley Swords on left & right
     for (const zSw of [-2.05, 2.05]) {
       const sword = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.1, 0.14), castIronMat);
       sword.position.set(0, 1.05, zSw);
@@ -845,7 +987,6 @@ export default function Loom3DSimulator() {
       sleyPivot.add(sword);
     }
 
-    // Sley Race Board & Cap
     const sleyRace = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.15, 5.4), sleyMat);
     sleyRace.position.set(0, 1.38, 0);
     registerMesh(sleyRace, "reed_sley");
@@ -856,7 +997,6 @@ export default function Loom3DSimulator() {
     registerMesh(sleyCap, "reed_sley");
     sleyPivot.add(sleyCap);
 
-    // Metallic Reed Dents
     for (let d = 0; d < 34; d++) {
       const zD = -1.96 + (d / 33) * 3.92;
       const dent = new THREE.Mesh(new THREE.BoxGeometry(0.035, 1.24, 0.016), chromeMat);
@@ -865,7 +1005,6 @@ export default function Loom3DSimulator() {
       sleyPivot.add(dent);
     }
 
-    // Shuttle Boxes & Picking Sticks (mounted on sley ends, visible in Shuttle mode)
     const shuttleBoxGroup = new THREE.Group();
     const woodMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.55, metalness: 0.1 });
     for (const zBox of [-2.38, 2.38]) {
@@ -884,7 +1023,6 @@ export default function Loom3DSimulator() {
     registerGroupMeshes(shuttleBoxGroup, "picking_unit");
     sleyPivot.add(shuttleBoxGroup);
 
-    // Air-Jet Relay Manifold along sley (visible in Air-Jet mode)
     const airManifoldGroup = new THREE.Group();
     const pipe = new THREE.Mesh(
       new THREE.CylinderGeometry(0.055, 0.055, 4.1, 14),
@@ -903,7 +1041,6 @@ export default function Loom3DSimulator() {
 
     scene.add(sleyPivot);
 
-    // Connecting Crank Arms (dynamically span from Crank Shaft Pins to Sley Swords!)
     const crankArms: THREE.Mesh[] = [];
     for (const zArm of [-2.05, 2.05]) {
       const arm = new THREE.Mesh(new THREE.BoxGeometry(1, 0.11, 0.09), brassMat);
@@ -913,7 +1050,7 @@ export default function Loom3DSimulator() {
       crankArms.push(arm);
     }
 
-    // === 6. PICKING CARRIERS (SHUTTLE / RAPIER + WHEELS / PROJECTILE / AIR-JET) ===
+    // === 6. PICKING CARRIERS ===
     const shuttleMesh = new THREE.Mesh(
       new THREE.CapsuleGeometry(0.14, 0.68, 8, 16),
       new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.35, metalness: 0.2 }),
@@ -944,10 +1081,7 @@ export default function Loom3DSimulator() {
     registerGroupMeshes(rapierWheelRight, "picking_unit");
     scene.add(rapierWheelRight);
 
-    const projectileMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.13, 0.08, 0.36),
-      chromeMat,
-    );
+    const projectileMesh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.08, 0.36), chromeMat);
     projectileMesh.position.set(1.05, 0, -2.25);
     registerMesh(projectileMesh, "picking_unit");
     scene.add(projectileMesh);
@@ -994,7 +1128,7 @@ export default function Loom3DSimulator() {
       warpLines.push(line);
     }
 
-    // === 8. LIVE WOVEN CLOTH (18 PICKS x 20 WARP ENDS) + RING TEMPLES ===
+    // === 8. LIVE WOVEN CLOTH + TEMPLES ===
     const clothGroup = new THREE.Group();
     const clothRows = 18;
     const clothCols = 20;
@@ -1028,7 +1162,6 @@ export default function Loom3DSimulator() {
       clothCells.push(rowArr);
     }
 
-    // Ring Temples holding left & right selvedges near Fell of Cloth
     for (const zT of [-1.96, 1.96]) {
       const temple = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.36, 14), brassMat);
       temple.rotation.x = Math.PI / 2;
@@ -1038,7 +1171,7 @@ export default function Loom3DSimulator() {
     }
     scene.add(clothGroup);
 
-    // === 9. BREAST BEAM, EMERY TAKE-UP ROLLER & CLOTH ROLLER ===
+    // === 9. BREAST BEAM, EMERY ROLLER & CLOTH ROLLER ===
     const breastBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 4.65, 20), chromeMat);
     breastBeam.rotation.x = Math.PI / 2;
     breastBeam.position.set(4.35, 0.06, 0);
@@ -1048,7 +1181,7 @@ export default function Loom3DSimulator() {
     const clothRollerGroup = new THREE.Group();
     clothRollerGroup.position.set(4.18, -1.05, 0);
     const clothRollMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.48, 0.48, 4.1, 24),
+      new THREE.CylinderGeometry(0.52, 0.52, 4.1, 24),
       new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.6 }),
     );
     clothRollMesh.rotation.x = Math.PI / 2;
@@ -1111,7 +1244,15 @@ export default function Loom3DSimulator() {
           -((e.clientY - rect.top) / rect.height) * 2 + 1,
         );
         raycaster.setFromCamera(ndc, camera);
-        const hits = raycaster.intersectObjects(allClickable, false);
+        const visibleClickables = allClickable.filter((m) => {
+          let cur: THREE.Object3D | null = m;
+          while (cur) {
+            if (!cur.visible) return false;
+            cur = cur.parent;
+          }
+          return true;
+        });
+        const hits = raycaster.intersectObjects(visibleClickables, false);
         const hit = hits[0];
         if (hit && typeof hit.object.userData.partId === "string") {
           setSelectedPart(hit.object.userData.partId as LoomPartId);
@@ -1122,7 +1263,7 @@ export default function Loom3DSimulator() {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       isLerping = false;
-      radius = Math.min(22, Math.max(4.5, radius + e.deltaY * 0.006));
+      radius = Math.min(23, Math.max(4.5, radius + e.deltaY * 0.006));
       desiredRadius = radius;
       updateCamera();
     };
@@ -1146,7 +1287,7 @@ export default function Loom3DSimulator() {
           const newDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
           const diff = pinchDist - newDist;
           pinchDist = newDist;
-          radius = Math.min(22, Math.max(4.5, radius + diff * 0.025));
+          radius = Math.min(23, Math.max(4.5, radius + diff * 0.025));
           desiredRadius = radius;
           updateCamera();
         }
@@ -1171,7 +1312,7 @@ export default function Loom3DSimulator() {
     };
     window.addEventListener("resize", onResize);
 
-    // === ANIMATION LOOP WITH TRUE MECHANICAL KINEMATICS ===
+    // === ANIMATION LOOP ===
     let rafId = 0;
     let lastTime = performance.now();
     let uiSyncAccum = 0;
@@ -1181,7 +1322,6 @@ export default function Loom3DSimulator() {
       const dt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
 
-      // Smooth camera preset transition
       if (isLerping) {
         const alpha = Math.min(1, dt * 6);
         theta += (desiredTheta - theta) * alpha;
@@ -1200,6 +1340,21 @@ export default function Loom3DSimulator() {
       }
 
       const st = stateRef.current;
+      const isModern = st.pickingType !== "shuttle";
+
+      // Switch between Conventional Lab Power Loom & Modern Industrial Factory Loom
+      conventionalArchGroup.visible = !isModern;
+      modernFactoryGroup.visible = isModern;
+      cabinetMat.opacity = st.xRayMode ? 0.16 : 0.96;
+      cabinetMat.depthWrite = !st.xRayMode;
+      cobaltMat.opacity = st.xRayMode ? 0.25 : 0.96;
+      cobaltMat.depthWrite = !st.xRayMode;
+
+      // Signal Tower Lamp: Green when running, Amber when paused
+      const lampHex = st.isPlaying ? 0x22c55e : 0xf59e0b;
+      signalLightMat.color.setHex(lampHex);
+      signalLightMat.emissive.setHex(lampHex);
+
       if (st.isPlaying) {
         const prevAngle = st.crankAngle;
         const degPerSec = 115 * st.speed;
@@ -1226,12 +1381,10 @@ export default function Loom3DSimulator() {
       activeWeftMat.color.setHex(weave.weftColor);
       (clothRollMesh.material as THREE.MeshStandardMaterial).color.setHex(weave.warpColor);
 
-      // Rotate Crank Shaft (1 rev/pick) & Bottom Shaft (1:2 opposite gear ratio!)
       crankShaftGroup.rotation.z = -totalRad;
       bottomShaftGroup.rotation.z = totalRad * 0.5;
       motorPulley.rotation.z = -totalRad * 2.2;
 
-      // Shedding envelope
       let shedOpen = 0;
       if (deg < 100) {
         shedOpen = Math.sin((deg / 100) * (Math.PI / 2));
@@ -1263,7 +1416,6 @@ export default function Loom3DSimulator() {
         const hf = healdFrames[s];
         if (hf) hf.position.y = yVal;
 
-        // Update Top Suspension Straps (roller y = 1.82 -> frame top = yVal + 0.96)
         const pair = topStraps[s];
         if (pair) {
           const topY = 1.82;
@@ -1275,11 +1427,9 @@ export default function Loom3DSimulator() {
           }
         }
 
-        // Update Treadle Lever tilt + Bottom Pull Strap
         const lever = treadleLevers[s];
-        if (lever) {
-          lever.rotation.z = yVal * 0.14;
-        }
+        if (lever) lever.rotation.z = yVal * 0.14;
+
         const bStrap = botStraps[s];
         if (bStrap) {
           const topY = yVal - 0.96;
@@ -1290,31 +1440,22 @@ export default function Loom3DSimulator() {
         }
       }
 
-      // Rotate top reversing rollers in sync with shaft 0
       const revAng = (shaftY[0] ?? 0) * 1.6;
-      for (const r of topRollers) {
-        r.rotation.y = revAng;
-      }
+      for (const r of topRollers) r.rotation.y = revAng;
 
-      // Update 20 Live Warp Threads
       for (let i = 0; i < warpCount; i++) {
         const line = warpLines[i];
         if (!line) continue;
         const posAttr = line.geometry.getAttribute("position") as THREE.BufferAttribute;
-        const yShaft = shaftY[i % 4] ?? 0;
-        posAttr.setY(4, yShaft);
+        posAttr.setY(4, shaftY[i % 4] ?? 0);
         posAttr.needsUpdate = true;
       }
 
-      // True Crank-Rocker Beat-up Linkage:
-      // Crank Pin world position around (0.15, -0.78)
       const pinX = 0.15 + crankRadius * Math.cos(-rad);
       const pinY = -0.78 + crankRadius * Math.sin(-rad);
-      // Sley swings about Rocking Shaft (1.04, -1.88)
-      const sleyTilt = -0.29 * Math.cos(rad); // Forward (+x) at 0 deg (Beat-up!)
+      const sleyTilt = -0.29 * Math.cos(rad);
       sleyPivot.rotation.z = sleyTilt;
 
-      // Sley Sword attachment point at local (0, 1.1, z)
       const attachX = 1.04 - 1.1 * Math.sin(sleyTilt);
       const attachY = -1.88 + 1.1 * Math.cos(sleyTilt);
       const armDx = attachX - pinX;
@@ -1329,10 +1470,8 @@ export default function Loom3DSimulator() {
         arm.rotation.z = armAngle;
       }
 
-      // Reed top world X for weft sweep
       const reedWorldX = 1.04 - 1.95 * Math.sin(sleyTilt);
 
-      // Picking motion (110 deg -> 245 deg)
       const inPick = deg >= 110 && deg <= 245;
       const pickProgress = inPick ? (deg - 110) / 135 : 0;
       const dirLeftToRight = st.pickIndex % 2 === 0;
@@ -1352,7 +1491,6 @@ export default function Loom3DSimulator() {
 
       if (st.pickingType === "shuttle") {
         shuttleMesh.position.z = inPick ? carrierZ : dirLeftToRight ? -2.35 : 2.35;
-        // Kick picking stick right at launch (110-135 deg)
         const kick = deg >= 105 && deg <= 140 ? Math.sin(((deg - 105) / 35) * Math.PI) : 0;
         leftPickStick.rotation.x = dirLeftToRight ? kick * 0.45 : 0;
         rightPickStick.rotation.x = !dirLeftToRight ? -kick * 0.45 : 0;
@@ -1384,13 +1522,11 @@ export default function Loom3DSimulator() {
         activeWeftMesh.visible = false;
       }
 
-      // Let-off & Take-up rotation
       const rollAngle = (st.pickIndex * 360 + deg) * 0.0025;
       beamGroup.rotation.z = -rollAngle;
       clothRollMesh.rotation.y = rollAngle * 1.2;
       takeUpGear.rotation.z = -rollAngle * 2.4;
 
-      // Update Live Woven Cloth (18 picks x 20 warp ends)
       for (let r = 0; r < clothRows; r++) {
         const rowMeshes = clothCells[r];
         if (!rowMeshes) continue;
@@ -1406,17 +1542,17 @@ export default function Loom3DSimulator() {
         }
       }
 
-      // Selected Part Highlight Pulse
-      const pulse = 0.3 + 0.16 * Math.sin(now * 0.006);
+      const pulse = 0.28 + 0.14 * Math.sin(now * 0.006);
       for (const partKey of Object.keys(partMeshes) as LoomPartId[]) {
         const isSel = partKey === st.selectedPart;
         for (const m of partMeshes[partKey]) {
+          if (m === airJetBeam || m === signalLamp || m === hmiDisplay) continue;
           const mat = m.material as THREE.MeshStandardMaterial;
           if (mat && "emissive" in mat) {
             if (isSel) {
               mat.emissive.setHex(0x38bdf8);
               mat.emissiveIntensity = pulse;
-            } else if (m !== airJetBeam) {
+            } else {
               mat.emissive.setHex(0x000000);
               mat.emissiveIntensity = 0;
             }
@@ -1434,6 +1570,7 @@ export default function Loom3DSimulator() {
       domEl.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
+      domEl.addEventListener("wheel", onWheel);
       domEl.removeEventListener("wheel", onWheel);
       domEl.removeEventListener("touchstart", onTouchStart);
       domEl.removeEventListener("touchmove", onTouchMove);
@@ -1446,6 +1583,7 @@ export default function Loom3DSimulator() {
   const selectedMeta = LOOM_PARTS[selectedPart];
   const weaveMeta = WEAVE_CONFIG[weaveType];
   const pickMeta = PICKING_INFO[pickingType];
+  const isModernLoom = pickingType !== "shuttle";
 
   const needleRad = ((crankAngle - 90) * Math.PI) / 180;
   const nx = 60 + 44 * Math.cos(needleRad);
@@ -1453,7 +1591,6 @@ export default function Loom3DSimulator() {
 
   return (
     <div className="space-y-4">
-      {/* Top 3 Interactive Configuration Cards */}
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-2xl border border-slate-800/80 bg-[#0B1220] p-3.5">
           <div className="mb-2 flex items-center justify-between">
@@ -1484,7 +1621,7 @@ export default function Loom3DSimulator() {
         <div className="rounded-2xl border border-slate-800/80 bg-[#0B1220] p-3.5">
           <div className="mb-2 flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              2. Picking System
+              2. Machine Type &amp; Picking
             </span>
             <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
               {pickMeta.ppm}
@@ -1496,7 +1633,7 @@ export default function Loom3DSimulator() {
                 key={p}
                 type="button"
                 onClick={() => setPickingType(p)}
-                className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+                className={`rounded-lg px-2 py-1.5 text-xs font-medium transition ${
                   pickingType === p
                     ? "bg-amber-500/20 text-amber-200 ring-1 ring-amber-400/50"
                     : "bg-slate-900/80 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
@@ -1541,26 +1678,43 @@ export default function Loom3DSimulator() {
         </div>
       </div>
 
-      {/* Camera Focus Strip */}
-      <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-slate-800/80 bg-[#0B1220] px-3.5 py-2.5">
-        <span className="mr-1 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-          <Camera className="h-3.5 w-3.5 text-cyan-400" />
-          Camera Focus:
-        </span>
-        {(Object.keys(CAMERA_PRESETS) as CameraPresetId[]).map((cid) => (
+      {/* Camera Focus + X-Ray Cutaway Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-800/80 bg-[#0B1220] px-3.5 py-2.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <Camera className="h-3.5 w-3.5 text-cyan-400" />
+            Camera Focus:
+          </span>
+          {(Object.keys(CAMERA_PRESETS) as CameraPresetId[]).map((cid) => (
+            <button
+              key={cid}
+              type="button"
+              onClick={() => selectPreset(cid)}
+              className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
+                cameraPreset === cid
+                  ? "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-400/50"
+                  : "bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+              }`}
+            >
+              {CAMERA_PRESETS[cid].label}
+            </button>
+          ))}
+        </div>
+
+        {isModernLoom && (
           <button
-            key={cid}
             type="button"
-            onClick={() => selectPreset(cid)}
-            className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
-              cameraPreset === cid
-                ? "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-400/50"
-                : "bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+            onClick={() => setXRayMode((x) => !x)}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition ${
+              xRayMode
+                ? "bg-violet-500/25 text-violet-200 ring-1 ring-violet-400/60"
+                : "bg-slate-900 text-slate-300 ring-1 ring-slate-700 hover:bg-slate-800"
             }`}
           >
-            {CAMERA_PRESETS[cid].label}
+            <Eye className="h-3.5 w-3.5" />
+            {xRayMode ? "X-Ray Cutaway: ON" : "X-Ray Inside Machine"}
           </button>
-        ))}
+        )}
       </div>
 
       {/* Main 3D Viewport + Side Timing & Inspector */}
@@ -1578,7 +1732,8 @@ export default function Loom3DSimulator() {
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-950/80 px-3 py-1.5 text-[11px] text-slate-300 backdrop-blur">
-                <span>Picks Woven:</span>
+                <span className="text-slate-400">{pickMeta.era} &middot;</span>
+                <span>Picks:</span>
                 <span className="font-bold text-cyan-300">{picksWoven}</span>
               </div>
             </div>
@@ -1616,7 +1771,7 @@ export default function Loom3DSimulator() {
             </div>
 
             <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-lg bg-slate-950/75 px-2.5 py-1 text-[10px] text-slate-400 backdrop-blur">
-              Drag to orbit &middot; Pinch/Scroll to zoom &middot; Click any gear, cam, or part to inspect
+              Drag to orbit &middot; Pinch/Scroll to zoom &middot; Click any part to inspect
             </div>
           </div>
 
@@ -1807,10 +1962,9 @@ export default function Loom3DSimulator() {
         </div>
       </div>
 
-      {/* 12 Clickable Machine Parts Selector Strip */}
       <div className="rounded-2xl border border-slate-800/80 bg-[#0B1220] p-3.5">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-          Inspect All 12 Industrial Loom Parts (Click below or directly in 3D)
+          Inspect Machine Parts (Click below or directly in 3D)
         </p>
         <div className="flex flex-wrap gap-1.5">
           {(Object.keys(LOOM_PARTS) as LoomPartId[]).map((partId) => (
