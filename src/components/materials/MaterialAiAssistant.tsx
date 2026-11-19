@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { PDFDocument } from "pdf-lib";
 import { Sparkles, BookOpen, Languages, HelpCircle, Send, ChevronDown, Trash2, MessageSquare, X } from "lucide-react";
 
 type PracticeQuestion = {
@@ -23,6 +24,80 @@ type MaterialAiAssistantProps = {
   initialQuestions: PracticeQuestion[] | null;
 };
 
+async function sampleLargePdfInBrowser(signedUrl: string): Promise<string | null> {
+  try {
+    const fileRes = await fetch(signedUrl);
+    if (!fileRes.ok) return null;
+    const arrayBuf = await fileRes.arrayBuffer();
+    const srcDoc = await PDFDocument.load(arrayBuf, { ignoreEncryption: true });
+    const totalPages = srcDoc.getPageCount();
+    const indices =
+      totalPages <= 6
+        ? Array.from({ length: totalPages }, (_, i) => i)
+        : Array.from(
+            new Set(
+              Array.from({ length: 6 }, (_, i) =>
+                Math.min(totalPages - 1, Math.floor((i * (totalPages - 1)) / 5))
+              )
+            )
+          );
+    const outDoc = await PDFDocument.create();
+    const copied = await outDoc.copyPages(srcDoc, indices);
+    copied.forEach((p) => outDoc.addPage(p));
+    let bytes = await outDoc.save();
+    if (bytes.length > 2.2 * 1024 * 1024 && totalPages > 3) {
+      const tinyDoc = await PDFDocument.create();
+      const tinyIdx = Array.from(new Set([0, Math.floor(totalPages / 2), totalPages - 1]));
+      const tinyCopied = await tinyDoc.copyPages(srcDoc, tinyIdx);
+      tinyCopied.forEach((p) => tinyDoc.addPage(p));
+      bytes = await tinyDoc.save();
+    }
+    if (bytes.length > 2.5 * 1024 * 1024) return null;
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+  } catch {
+    return null;
+  }
+}
+
+async function postAiAssistant(payload: Record<string, unknown>) {
+  const res = await fetch("/api/materials/ai-assistant", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const text = await res.text();
+  let data: Record<string, unknown> = {};
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error("Server took too long. Please try again.");
+  }
+  if (res.ok && data.needsClientSample && typeof data.signedUrl === "string") {
+    const sampledPdfBase64 = await sampleLargePdfInBrowser(data.signedUrl);
+    const retryRes = await fetch("/api/materials/ai-assistant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...payload,
+        ...(sampledPdfBase64 ? { sampledPdfBase64 } : { skipClientSample: true }),
+      }),
+    });
+    const retryText = await retryRes.text();
+    let retryData: Record<string, unknown> = {};
+    try {
+      retryData = JSON.parse(retryText);
+    } catch {
+      throw new Error("Server took too long. Please try again.");
+    }
+    return { ok: retryRes.ok, data: retryData };
+  }
+  return { ok: res.ok, data };
+}
 const QUICK_PROMPTS = [
   "Explain simply",
   "Important formulas?",
@@ -287,17 +362,14 @@ export default function MaterialAiAssistant({
 
     setLoadingTab(mode);
     try {
-      const res = await fetch("/api/materials/ai-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ materialId, mode }),
-      });
-      const data = await res.json();
+      const { ok, data: rawData } = await postAiAssistant({ materialId, mode });
+      const res = { ok };
+      const data = rawData as { success?: boolean; content?: string; questions?: PracticeQuestion[]; error?: string };
       if (!res.ok || !data.success) {
         throw new Error(data?.error || "Could not generate AI study notes.");
       }
-      if (mode === "summary_en") setSummaryEn(data.content);
-      if (mode === "summary_bn") setSummaryBn(data.content);
+      if (mode === "summary_en") setSummaryEn(data.content ?? null);
+      if (mode === "summary_bn") setSummaryBn(data.content ?? null);
       if (mode === "questions") setQuestions(data.questions || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI request failed.");
@@ -324,12 +396,9 @@ export default function MaterialAiAssistant({
     ]);
 
     try {
-      const res = await fetch("/api/materials/ai-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ materialId, mode: "ask", question: trimmed }),
-      });
-      const data = await res.json();
+      const { ok, data: rawData } = await postAiAssistant({ materialId, mode: "ask", question: trimmed });
+      const res = { ok };
+      const data = rawData as { success?: boolean; answer?: string; error?: string };
       if (!res.ok || !data.success) {
         throw new Error(data?.error || "Could not get an answer.");
       }

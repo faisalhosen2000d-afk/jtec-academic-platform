@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     const materialId = String(body?.materialId ?? "").trim();
     const mode = body?.mode as AiMode;
     const question = String(body?.question ?? "").trim();
+    const sampledPdfBase64 = typeof body?.sampledPdfBase64 === "string" ? body.sampledPdfBase64.trim() : "";
 
     if (!materialId || !["summary_en", "summary_bn", "questions", "ask"].includes(mode)) {
       return NextResponse.json({ success: false, error: "Invalid AI request." }, { status: 400 });
@@ -104,7 +105,26 @@ export async function POST(request: Request) {
       material.file_size_bytes <= 25 * 1024 * 1024 &&
       (ft.includes("pdf") || ft.includes("image") || ft.includes("text/plain"));
 
-    if (canAttachInline) {
+    if (sampledPdfBase64 && sampledPdfBase64.length <= 3_500_000) {
+      parts.push({
+        inlineData: {
+          mimeType: "application/pdf",
+          data: sampledPdfBase64,
+        },
+      });
+    } else if (material.file_path && ft.includes("pdf") && material.file_size_bytes > 25 * 1024 * 1024 && !body?.skipClientSample) {
+      const normalizedPath = material.file_path.replace(/^\/+/, "").replace(/^academic-materials\//, "");
+      const { data: signed } = await serviceSupabase.storage
+        .from("academic-materials")
+        .createSignedUrl(normalizedPath, 120);
+      if (signed?.signedUrl) {
+        return NextResponse.json({
+          success: true,
+          needsClientSample: true,
+          signedUrl: signed.signedUrl,
+        });
+      }
+    } else if (canAttachInline) {
       const normalizedPath = material.file_path.replace(/^\/+/, "").replace(/^academic-materials\//, "");
       const { data: fileBlob } = await serviceSupabase.storage.from("academic-materials").download(normalizedPath);
       if (fileBlob) {
