@@ -101,7 +101,7 @@ export async function POST(request: Request) {
     const ft = (material.file_type || "").toLowerCase();
     const canAttachInline =
       material.file_path &&
-      material.file_size_bytes <= 10 * 1024 * 1024 &&
+      material.file_size_bytes <= 25 * 1024 * 1024 &&
       (ft.includes("pdf") || ft.includes("image") || ft.includes("text/plain"));
 
     if (canAttachInline) {
@@ -122,6 +122,13 @@ export async function POST(request: Request) {
               const copied = await sampledDoc.copyPages(srcDoc, uniqueIndices);
               copied.forEach((p) => sampledDoc.addPage(p));
               buffer = Buffer.from(await sampledDoc.save());
+              if (buffer.length > 2.5 * 1024 * 1024) {
+                const tinyDoc = await PDFDocument.create();
+                const tinyIndices = Array.from(new Set([0, Math.floor(totalPages / 2), totalPages - 1]));
+                const tinyCopied = await tinyDoc.copyPages(srcDoc, tinyIndices);
+                tinyCopied.forEach((p) => tinyDoc.addPage(p));
+                buffer = Buffer.from(await tinyDoc.save());
+              }
             }
           } catch {
             // fallback to original buffer if sampling fails
