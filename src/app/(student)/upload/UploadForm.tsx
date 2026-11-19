@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -658,7 +658,7 @@ export default function UploadForm({
                   {file.name}
                 </p>
                 <p className="text-[11px] text-emerald-300">
-                  {formatBytes(file.size)} Â· Ready to upload
+                  {formatBytes(file.size)} &middot; Ready to upload
                 </p>
               </div>
             </div>
@@ -713,7 +713,7 @@ export default function UploadForm({
                   Click to choose or drag &amp; drop file
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  PDF, DOCX, PPTX, XLSX, Images Â· Max {maxUploadSizeMb} MB
+                  PDF, DOCX, PPTX, XLSX, Images &middot; Max {maxUploadSizeMb} MB
                 </p>
               </div>
             </div>
