@@ -14,6 +14,11 @@ const GROQ_MODELS = [
   "openai/gpt-oss-120b",
 ] as const;
 
+const GITHUB_MODELS = [
+  "openai/gpt-4.1-mini",
+  "openai/gpt-4o-mini",
+] as const;
+
 const OPENROUTER_MODELS = [
   "openrouter/free",
   "google/gemma-3-27b-it:free",
@@ -119,6 +124,66 @@ async function callGroqText(
   return { text: null, error: lastErr };
 }
 
+async function callGitHubModelsText(
+  promptText: string,
+  options?: { jsonMode?: boolean; timeoutMs?: number }
+): Promise<{ text: string | null; error?: string }> {
+  const ghKeys = getKeys(process.env.GITHUB_MODELS_TOKENS, process.env.GITHUB_MODELS_TOKEN);
+  if (ghKeys.length === 0 || !promptText.trim()) return { text: null };
+
+  const startIdx = Math.floor(Math.random() * ghKeys.length);
+  let lastErr = "";
+
+  for (let m = 0; m < GITHUB_MODELS.length; m++) {
+    const model = GITHUB_MODELS[m];
+    if (!model) continue;
+    for (let k = 0; k < Math.min(ghKeys.length, 2); k++) {
+      const token = ghKeys[(startIdx + k) % ghKeys.length];
+      if (!token) continue;
+      try {
+        const res = await fetch("https://models.github.ai/inference/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github+json",
+            "Content-Type": "application/json",
+          },
+          signal: AbortSignal.timeout(Math.min(options?.timeoutMs ?? 12000, 14000)),
+          body: JSON.stringify({
+            model,
+            temperature: 0.25,
+            max_tokens: 3000,
+            messages: [
+              ...(options?.jsonMode
+                ? [{ role: "system", content: "Return ONLY valid JSON. No markdown, no extra text." }]
+                : []),
+              { role: "user", content: promptText },
+            ],
+          }),
+        });
+        const data = (await res.json().catch(() => null)) as {
+          choices?: Array<{ message?: { content?: string } }>;
+          error?: { message?: string };
+        } | null;
+
+        if (!res.ok) {
+          lastErr = `GitHub(${model} ${res.status}): ${data?.error?.message || "request failed"}`;
+          if (res.status === 429 || res.status === 503) await sleep(120);
+          continue;
+        }
+        const content = data?.choices?.[0]?.message?.content?.trim();
+        if (content) {
+          return { text: options?.jsonMode ? cleanJsonString(content) : content };
+        }
+      } catch (err) {
+        lastErr = err instanceof Error ? `GitHub(${model}): ${err.message}` : "GitHub Models timeout";
+        continue;
+      }
+    }
+  }
+  return { text: null, error: lastErr };
+}
+
 async function callOpenRouterText(
   promptText: string,
   options?: { jsonMode?: boolean; timeoutMs?: number }
@@ -193,13 +258,19 @@ export async function callGemini(
       .filter(Boolean)
       .join("\n\n");
 
-    const groqRes = await callGroqText(combinedText, options);
-    if (groqRes.text) return groqRes.text;
-    if (groqRes.error) fallbackErrors.push(groqRes.error);
+    const providers = [callGroqText, callGitHubModelsText, callOpenRouterText];
+    const startProvider = Math.floor(Math.random() * 2);
+    const ordered = [
+      providers[startProvider]!,
+      providers[1 - startProvider]!,
+      providers[2]!,
+    ];
 
-    const orRes = await callOpenRouterText(combinedText, options);
-    if (orRes.text) return orRes.text;
-    if (orRes.error) fallbackErrors.push(orRes.error);
+    for (const provider of ordered) {
+      const res = await provider(combinedText, options);
+      if (res.text) return res.text;
+      if (res.error) fallbackErrors.push(res.error);
+    }
   }
 
   const keys = getGeminiApiKeys();
