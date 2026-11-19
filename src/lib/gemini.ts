@@ -4,8 +4,9 @@ export type GeminiPart =
 
 const MODEL_CANDIDATES = [
   "gemini-2.5-flash-lite",
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.8-flash",
+  "gemini-flash-latest",
 ] as const;
 
 const GROQ_MODELS = [
