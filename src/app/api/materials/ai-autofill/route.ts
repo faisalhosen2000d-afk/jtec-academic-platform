@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { inflateRawSync } from "zlib";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -70,6 +70,17 @@ function extractXmlTextFromZip(buf: Buffer, entryPattern: RegExp): string {
   return texts.join("\n").slice(0, 24000);
 }
 
+function parseAutoFillJson(raw: string): { title?: string; topic?: string; description?: string } {
+  const trimmed = raw.trim();
+  try {
+    return JSON.parse(trimmed) as { title?: string; topic?: string; description?: string };
+  } catch {
+    const match = trimmed.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("AI returned an invalid response. Please try again.");
+    return JSON.parse(match[0]) as { title?: string; topic?: string; description?: string };
+  }
+}
+
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
@@ -101,6 +112,9 @@ export async function POST(request: Request) {
 
     const formData = await request.formData();
     const uploadedFile = formData.get("file");
+    const uploadedImages = formData.getAll("images");
+    const clientExtractedText = String(formData.get("extractedText") ?? "").trim().slice(0, 20000);
+    const analysisMode = String(formData.get("analysisMode") ?? "").trim();
     const fileName = String(formData.get("fileName") ?? "").trim();
     const subjectLabel = String(formData.get("subjectLabel") ?? "").trim();
     const isSampledPdf = String(formData.get("sampledPdf") ?? "") === "true";
@@ -111,7 +125,25 @@ export async function POST(request: Request) {
     let readContent = false;
     let extractedDocText = "";
 
-    if (uploadedFile instanceof File && uploadedFile.size > 0 && uploadedFile.size <= 3.8 * 1024 * 1024) {
+    if (clientExtractedText.length >= 50) {
+      extractedDocText = clientExtractedText;
+      readContent = true;
+    } else if (uploadedImages.length > 0) {
+      let totalImgBytes = 0;
+      for (const entry of uploadedImages.slice(0, 4)) {
+        if (entry instanceof File && entry.size > 0 && totalImgBytes + entry.size <= 3.5 * 1024 * 1024) {
+          const buffer = Buffer.from(await entry.arrayBuffer());
+          parts.push({
+            inlineData: {
+              mimeType: entry.type || "image/jpeg",
+              data: buffer.toString("base64"),
+            },
+          });
+          totalImgBytes += entry.size;
+          readContent = true;
+        }
+      }
+    } else if (uploadedFile instanceof File && uploadedFile.size > 0 && uploadedFile.size <= 3.8 * 1024 * 1024) {
       const ft = (uploadedFile.type || "").toLowerCase();
       const ext = uploadedFile.name.split(".").pop()?.toLowerCase() ?? "";
       const buffer = Buffer.from(await uploadedFile.arrayBuffer());
@@ -149,9 +181,14 @@ export async function POST(request: Request) {
       }
     }
 
-    const sampleNote = isSampledPdf
-      ? `Note: This PDF is ${sampledPages} evenly distributed pages sampled from the start, middle, and end of a ${totalPages}-page document.`
-      : "";
+    const sampleNote =
+      analysisMode === "text" && totalPages
+        ? `Note: The extracted outline and text below spans ${sampledPages || totalPages} pages across the full ${totalPages}-page PDF from start to end.`
+        : analysisMode === "images" && totalPages
+          ? `Note: These ${sampledPages} page images are evenly sampled from the start, middle, and end of a ${totalPages}-page scanned PDF.`
+          : isSampledPdf
+            ? `Note: This PDF is ${sampledPages} evenly distributed pages sampled from the start, middle, and end of a ${totalPages}-page document.`
+            : "";
 
     const promptContext = [
       fileName ? `Filename: ${fileName}` : "",
@@ -168,7 +205,7 @@ ${promptContext}
 
 ${
   readContent
-    ? "Read the actual document content carefully and extract exact, search-friendly academic metadata."
+    ? "Read the actual document content carefully and extract exact, search-friendly academic metadata covering the entire document."
     : "Only filename/subject is available; infer clean academic metadata."
 }
 
@@ -176,12 +213,12 @@ CRITICAL SANITIZATION & ACCURACY RULES:
 1. NEVER include personal student/author names (e.g., "Shamim", "Rahim"), student roll numbers or department+roll tags (e.g., "WPE-50", "YE-12", "AE-08", "Roll-50"), batch/section tags, website/blog watermarks (e.g., "bappibutex.blog", "studocu"), or copy suffixes like "(1)", "final", "updated" in title, topic, or description.
 2. NEVER mistake a student's department+roll tag (like "WPE-50") for a course code or exam name.
 3. Expand common JTEC textile abbreviations cleanly in the title when helpful (e.g., "YM-I" -> "Yarn Manufacturing-I", "FM-I" -> "Fabric Manufacturing-I", "TTQC" -> "Textile Testing & Quality Control").
-4. Keep Description strictly factual about what the file contains; do NOT invent claims like "Useful for WPE-50 exams".
+4. Keep Description strictly factual about what the file actually contains; do NOT invent standards or topics that are not in the content.
 
 Return strictly valid JSON with keys "title", "topic", and "description":
 - "title": clean, professional academic title in English (max 85 chars, no file extension, no student names/rolls)
-- "topic": comma-separated main chapters & searchable technical keywords from across the document (max 150 chars) so searching any topic finds this file
-- "description": concise, factual 1-2 sentence summary of the academic content covered (max 240 chars)`,
+- "topic": 4-7 comma-separated primary searchable chapters & technical keywords from across the document (max 150 chars)
+- "description": concise, factual 2-4 sentence overview (max 500 chars) summarizing the material AND explicitly listing the additional major chapters, instruments, methods, or topics covered across the full PDF that did not fit in the topic box`,
     });
 
     let raw: string;
@@ -194,7 +231,7 @@ Return strictly valid JSON with keys "title", "topic", and "description":
       const textOnlyParts = parts.filter((p) => !("inlineData" in p));
       raw = await callGemini(textOnlyParts, { jsonMode: true });
     }
-    const parsed = JSON.parse(raw) as { title?: string; topic?: string; description?: string };
+    const parsed = parseAutoFillJson(raw);
 
     return NextResponse.json({
       success: true,

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { preparePdfForAi } from "@/lib/pdf-sampler";
+import { analyzePdfForAi } from "@/lib/pdf-sampler";
 
 type Subject = {
   id: string;
@@ -157,20 +157,36 @@ export default function UploadForm({
     setAiSourceNote(null);
     setAutoFilling(true);
     try {
-      const prepared = await preparePdfForAi(file, 1.8 * 1024 * 1024);
+      const analyzed = await analyzePdfForAi(file);
       const fd = new FormData();
       fd.append("fileName", file.name);
       if (selectedSubject) {
         fd.append("subjectLabel", `${selectedSubject.subject_code} - ${selectedSubject.subject_name}`);
       }
-      if (prepared.file.size <= 3.8 * 1024 * 1024) {
-        fd.append("file", prepared.file);
+
+      if (analyzed.mode === "text") {
+        fd.append("analysisMode", "text");
+        fd.append("extractedText", analyzed.extractedText);
+        fd.append("totalPages", String(analyzed.totalPages));
+        fd.append("sampledPages", String(analyzed.scannedPages));
+      } else if (analyzed.mode === "images") {
+        fd.append("analysisMode", "images");
+        fd.append("totalPages", String(analyzed.totalPages));
+        fd.append("sampledPages", String(analyzed.scannedPages));
+        for (const img of analyzed.images) {
+          fd.append("images", img);
+        }
+      } else {
+        if (analyzed.prepared.file.size <= 3.8 * 1024 * 1024) {
+          fd.append("file", analyzed.prepared.file);
+        }
+        if (analyzed.prepared.sampled) {
+          fd.append("sampledPdf", "true");
+          fd.append("totalPages", String(analyzed.prepared.totalPages ?? ""));
+          fd.append("sampledPages", String(analyzed.prepared.sampledPages ?? ""));
+        }
       }
-      if (prepared.sampled) {
-        fd.append("sampledPdf", "true");
-        fd.append("totalPages", String(prepared.totalPages ?? ""));
-        fd.append("sampledPages", String(prepared.sampledPages ?? ""));
-      }
+
       const res = await fetch("/api/materials/ai-autofill", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data?.error || "AI Auto-Fill failed.");
@@ -179,9 +195,13 @@ export default function UploadForm({
       if (data.description) setDescription(data.description);
       setAiSourceNote(
         data.readFullFile
-          ? prepared.sampled
-            ? `Sampled ${prepared.sampledPages}/${prepared.totalPages} pages`
-            : "Filled from file content"
+          ? analyzed.mode === "text"
+            ? `Scanned ${analyzed.scannedPages}/${analyzed.totalPages} pages (Full Text)`
+            : analyzed.mode === "images"
+              ? `Scanned ${analyzed.scannedPages}/${analyzed.totalPages} pages (Visual)`
+              : analyzed.prepared.sampled
+                ? `Sampled ${analyzed.prepared.sampledPages}/${analyzed.prepared.totalPages} pages`
+                : "Filled from file content"
           : "Suggested from filename & subject"
       );
     } catch (err) {
@@ -638,7 +658,7 @@ export default function UploadForm({
                   {file.name}
                 </p>
                 <p className="text-[11px] text-emerald-300">
-                  {formatBytes(file.size)} · Ready to upload
+                  {formatBytes(file.size)} Â· Ready to upload
                 </p>
               </div>
             </div>
@@ -693,7 +713,7 @@ export default function UploadForm({
                   Click to choose or drag &amp; drop file
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  PDF, DOCX, PPTX, XLSX, Images · Max {maxUploadSizeMb} MB
+                  PDF, DOCX, PPTX, XLSX, Images Â· Max {maxUploadSizeMb} MB
                 </p>
               </div>
             </div>
