@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { PDFDocument } from "pdf-lib";
 import { callGemini, type GeminiPart } from "@/lib/gemini";
 
 type AiMode = "summary_en" | "summary_bn" | "questions" | "ask";
@@ -107,7 +108,25 @@ export async function POST(request: Request) {
       const normalizedPath = material.file_path.replace(/^\/+/, "").replace(/^academic-materials\//, "");
       const { data: fileBlob } = await serviceSupabase.storage.from("academic-materials").download(normalizedPath);
       if (fileBlob) {
-        const buffer = Buffer.from(await fileBlob.arrayBuffer());
+        let buffer = Buffer.from(await fileBlob.arrayBuffer());
+        if (ft.includes("pdf") && buffer.length > 1.2 * 1024 * 1024) {
+          try {
+            const srcDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+            const totalPages = srcDoc.getPageCount();
+            if (totalPages > 6) {
+              const sampledDoc = await PDFDocument.create();
+              const indices = Array.from({ length: 6 }, (_, i) =>
+                Math.min(totalPages - 1, Math.floor((i * (totalPages - 1)) / 5))
+              );
+              const uniqueIndices = Array.from(new Set(indices));
+              const copied = await sampledDoc.copyPages(srcDoc, uniqueIndices);
+              copied.forEach((p) => sampledDoc.addPage(p));
+              buffer = Buffer.from(await sampledDoc.save());
+            }
+          } catch {
+            // fallback to original buffer if sampling fails
+          }
+        }
         const mime = ft.includes("pdf")
           ? "application/pdf"
           : ft.includes("png")
@@ -130,7 +149,7 @@ export async function POST(request: Request) {
       parts.push({
         text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nList ONLY the main topics covered in this material so a student immediately knows what is inside, and under each topic write a concise 1-2 line definition or core formula. Keep it clean and under 240 words. Write formulas in plain readable math (e.g., A_T, x^2, ×, ÷, ≈, μ, /) and NEVER use LaTeX syntax like $, $$, \\frac, \\text, or --.`,
       });
-      const content = await callGemini(parts);
+      const content = await callGemini(parts, { timeoutMs: 24000 });
       await serviceSupabase.from("materials").update({ ai_summary_en: content } as never).eq("id", material.id);
       return NextResponse.json({ success: true, cached: false, content });
     }
@@ -139,7 +158,7 @@ export async function POST(request: Request) {
       parts.push({
         text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nList ONLY the main topics covered in this material in simple, clear Bangla (keep technical terms in English in parentheses), and under each topic write a concise 1-2 line definition or core formula in simple Bangla. Keep it under 220 words. Write formulas plainly (e.g., A_T, x^2, ×, ÷, ≈, μ, /) and NEVER use LaTeX like $, $$, \\frac, \\text, or --.`,
       });
-      const content = await callGemini(parts);
+      const content = await callGemini(parts, { timeoutMs: 24000 });
       await serviceSupabase.from("materials").update({ ai_summary_bn: content } as never).eq("id", material.id);
       return NextResponse.json({ success: true, cached: false, content });
     }
@@ -148,7 +167,7 @@ export async function POST(request: Request) {
       parts.push({
         text: `You are an academic exam-prep assistant for textile engineering students at JTEC.\n${contextHeader}\n\nGenerate exactly 5 likely exam practice questions based on this material, each with a concise 1-2 sentence answer hint. Return strictly valid JSON array of objects with keys "q" and "hint": [{"q":"...","hint":"..."}]`,
       });
-      const raw = await callGemini(parts, { jsonMode: true });
+      const raw = await callGemini(parts, { jsonMode: true, timeoutMs: 24000 });
       const parsed = JSON.parse(raw);
       const questions = Array.isArray(parsed) ? parsed.slice(0, 5) : [];
       if (questions.length > 0) {
@@ -161,7 +180,7 @@ export async function POST(request: Request) {
     parts.push({
       text: `You are a helpful academic tutor for JTEC textile engineering students.\n${contextHeader}${extraSummary}\n\nStudent Question: ${question}\n\nAnswer clearly and concisely in the same language as the student's question (Bangla or English). Write formulas plainly (e.g., A_T, x^2, /) and NEVER use LaTeX like $, $$, \\frac, or \\text.`,
     });
-    const answer = await callGemini(parts);
+    const answer = await callGemini(parts, { timeoutMs: 24000 });
     return NextResponse.json({ success: true, answer });
   } catch (err) {
     return NextResponse.json(
