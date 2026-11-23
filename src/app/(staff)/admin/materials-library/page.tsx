@@ -1,12 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import {
   MaterialsLibraryClient,
   type LibraryMaterialItem,
 } from "./MaterialsLibraryClient";
-import { QuestionLibrarySection, type LibraryQuestionItem } from "./QuestionLibrarySection";
 
 export const dynamic = "force-dynamic";
 
@@ -42,13 +40,8 @@ export default async function AdminMaterialsLibraryPage() {
   }
 
   const serviceRole = createServiceRoleClient();
-  const rawSb = createRawSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
   const [
     matRes,
-    qRes,
     subjRes,
     deptRes,
     lvlRes,
@@ -60,12 +53,6 @@ export default async function AdminMaterialsLibraryPage() {
       .eq("status", "approved")
       .order("created_at", { ascending: false })
       .limit(1000),
-    rawSb
-      .from("question_bank_items")
-      .select("id, subject_id, subject_code, question_type, exam_year, ct_number, batch_label, file_size_bytes, department_id, level_id, term_id, created_at")
-      .eq("status", "approved")
-      .order("created_at", { ascending: false })
-      .limit(500),
     supabase.from("subjects").select("id, subject_code, subject_name, department_id, level_id, term_id").order("subject_code"),
     supabase.from("departments").select("id, name, code").order("code"),
     supabase.from("levels").select("id, name, sort_order").order("sort_order"),
@@ -73,7 +60,6 @@ export default async function AdminMaterialsLibraryPage() {
   ]);
 
   const rawMaterials = (matRes.data || []) as GenericRow[];
-  const rawQuestions = (qRes.data || []) as GenericRow[];
   const rawSubjects = ((subjRes.data && subjRes.data.length > 0 ? subjRes.data : (await serviceRole.from("subjects").select("id, subject_code, subject_name, department_id, level_id, term_id")).data) || []) as GenericRow[];
   const rawDepts = ((deptRes.data && deptRes.data.length > 0 ? deptRes.data : (await serviceRole.from("departments").select("id, name, code")).data) || []) as GenericRow[];
   const rawLevels = ((lvlRes.data && lvlRes.data.length > 0 ? lvlRes.data : (await serviceRole.from("levels").select("id, name, sort_order")).data) || []) as GenericRow[];
@@ -165,44 +151,12 @@ export default async function AdminMaterialsLibraryPage() {
     };
   });
 
-  const questionItems: LibraryQuestionItem[] = rawQuestions.map((q) => {
-    const subjId = q.subject_id ? String(q.subject_id) : null;
-    const subj = subjId ? subjMap.get(subjId) : undefined;
-    const deptId = q.department_id ? String(q.department_id) : null;
-    const dept = deptId ? deptMap.get(deptId) : undefined;
-    const lvlId = q.level_id ? String(q.level_id) : null;
-    const lvl = lvlId ? levelMap.get(lvlId) : undefined;
-    const trmId = q.term_id ? String(q.term_id) : null;
-    const trm = trmId ? termMap.get(trmId) : undefined;
-    const qType = q.question_type === "ct" ? "ct" : "previous_year";
-    return {
-      id: String(q.id || ""),
-      subject_code: String(q.subject_code || subj?.subject_code || "SUBJ"),
-      subject_name: String(subj?.subject_name || q.subject_code || "Question Paper"),
-      question_type: qType,
-      exam_year: typeof q.exam_year === "number" ? q.exam_year : null,
-      ct_number: typeof q.ct_number === "number" ? q.ct_number : null,
-      batch_label: q.batch_label ? String(q.batch_label) : null,
-      department_code: dept?.code || "ALL",
-      level_name: lvl?.name || "",
-      term_name: trm?.name || "",
-      file_size_bytes: Number(q.file_size_bytes ?? 0),
-      created_at: String(q.created_at || ""),
-    };
-  });
-
   return (
-    <div className="space-y-8">
-      <MaterialsLibraryClient
+    <MaterialsLibraryClient
       materials={items}
       subjects={subjectOptions}
       departments={departments}
       levels={levels}
     />
-      <QuestionLibrarySection
-        initialItems={questionItems}
-        canDelete={profile.role === "super_admin"}
-      />
-    </div>
   );
 }

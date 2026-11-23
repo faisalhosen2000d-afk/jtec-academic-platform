@@ -3,9 +3,11 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, FolderCheck, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import ApprovedMaterialsClient, {
   type ApprovedMaterialRow,
 } from "./ApprovedMaterialsClient";
+import QuestionBankApprovedSection, { type ApprovedQuestionRow } from "./QuestionBankApprovedSection";
 
 type ApprovedMaterial = {
   id: string;
@@ -53,8 +55,12 @@ export default async function ApprovedMaterialsPage() {
   }
 
   const serviceSupabase = createServiceRoleClient();
+  const rawSb = createRawSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
 
-  const [materialsRes, subjectsRes, profilesRes] = await Promise.all([
+  const [materialsRes, subjectsRes, profilesRes, questionsRes, deptsRes, levelsRes, termsRes] = await Promise.all([
     serviceSupabase
       .from("materials")
       .select(
@@ -64,6 +70,14 @@ export default async function ApprovedMaterialsPage() {
       .order("created_at", { ascending: false }),
     serviceSupabase.from("subjects").select("id, subject_name, subject_code"),
     serviceSupabase.from("profiles").select("id, full_name"),
+    rawSb
+      .from("question_bank_items")
+      .select("id, subject_id, subject_code, department_id, level_id, term_id, uploader_id, question_type, exam_year, ct_number, batch_label, file_size_bytes, views_count, downloads_count")
+      .eq("status", "approved")
+      .order("created_at", { ascending: false }),
+    serviceSupabase.from("departments").select("id, code"),
+    serviceSupabase.from("levels").select("id, name"),
+    serviceSupabase.from("terms").select("id, name"),
   ]);
 
   const materials = (materialsRes.data ?? []) as ApprovedMaterial[];
@@ -103,6 +117,41 @@ export default async function ApprovedMaterialsPage() {
     (sum, m) => sum + (m.downloads_count ?? 0),
     0,
   );
+  const deptCodeMap = new Map(
+    ((deptsRes.data ?? []) as Array<{ id: string; code: string | null }>).map((d) => [d.id, d.code || "DEPT"]),
+  );
+  const levelNameMap = new Map(
+    ((levelsRes.data ?? []) as Array<{ id: string; name: string | null }>).map((l) => [l.id, l.name || ""]),
+  );
+  const termNameMap = new Map(
+    ((termsRes.data ?? []) as Array<{ id: string; name: string | null }>).map((t) => [t.id, t.name || ""]),
+  );
+  const subjectNameOnlyMap = new Map(subjects.map((s) => [s.id, s.subject_name]));
+
+  const approvedQuestions: ApprovedQuestionRow[] = ((questionsRes.data ?? []) as Array<Record<string, unknown>>).map((q) => {
+    const qType = q.question_type === "ct" ? "ct" : "previous_year";
+    const sId = String(q.subject_id ?? "");
+    const dId = String(q.department_id ?? "");
+    const lId = String(q.level_id ?? "");
+    const tId = String(q.term_id ?? "");
+    const uId = String(q.uploader_id ?? "");
+    return {
+      id: String(q.id ?? ""),
+      subject_code: String(q.subject_code ?? "SUBJ"),
+      subject_name: subjectNameOnlyMap.get(sId) ?? String(q.subject_code ?? "Question Paper"),
+      question_type: qType,
+      exam_year: typeof q.exam_year === "number" ? q.exam_year : null,
+      ct_number: typeof q.ct_number === "number" ? q.ct_number : null,
+      batch_label: q.batch_label ? String(q.batch_label) : null,
+      department_code: deptCodeMap.get(dId) ?? "DEPT",
+      term_label: [levelNameMap.get(lId), termNameMap.get(tId)].filter(Boolean).join(" - ") || "Term",
+      uploader_name: profileMap.get(uId) ?? "Unknown Uploader",
+      file_size_bytes: Number(q.file_size_bytes ?? 0),
+      views_count: Number(q.views_count ?? 0),
+      downloads_count: Number(q.downloads_count ?? 0),
+    };
+  });
+
   const totalBytes = materials.reduce(
     (sum, m) => sum + (m.file_size_bytes ?? 0),
     0,
@@ -192,7 +241,10 @@ export default async function ApprovedMaterialsPage() {
             </p>
           </div>
         ) : (
-          <ApprovedMaterialsClient materials={enrichedMaterials} />
+          <>
+            <ApprovedMaterialsClient materials={enrichedMaterials} />
+            <QuestionBankApprovedSection initialQuestions={approvedQuestions} />
+          </>
         )}
 
         {/* Slim RLS Footer */}
