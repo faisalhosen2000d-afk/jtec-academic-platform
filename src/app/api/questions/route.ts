@@ -88,17 +88,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Question PDF must be between 1 byte and 50 MB." }, { status: 400 });
     }
 
-    const { data: subject } = await serviceSupabase
+    const rawClient = getRawClient();
+
+    const { data: subjectRow, error: subjectErr } = await rawClient
       .from("subjects")
       .select("id, subject_code, department_id, level_id, term_id")
       .eq("id", subjectId)
-      .single();
+      .maybeSingle();
 
-    if (!subject) {
-      return NextResponse.json({ error: "Selected subject not found." }, { status: 404 });
+    const subject = subjectRow as {
+      id: string;
+      subject_code: string;
+      department_id: string;
+      level_id: string;
+      term_id: string;
+    } | null;
+
+    if (subjectErr || !subject) {
+      return NextResponse.json(
+        { error: subjectErr?.message || "Selected subject not found." },
+        { status: 404 },
+      );
     }
-
-    const rawClient = getRawClient();
 
     let dupQuery = rawClient
       .from("question_bank_items")
