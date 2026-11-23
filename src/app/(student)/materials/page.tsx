@@ -193,6 +193,12 @@ export default async function MaterialsPage() {
     ),
   );
 
+  const questionSubjectByCode = new Map(
+    (curriculumSubjects ?? []).map(
+      (subject) => [subject.subject_code, subject] as const,
+    ),
+  );
+
   const visibleMaterials = (materials ?? []).flatMap((material) => {
     const materialSubject = Array.isArray(material.subject)
       ? material.subject[0] ?? null
@@ -296,18 +302,40 @@ export default async function MaterialsPage() {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     );
-    const { data: qRows } = await rawSb
-      .from("question_bank_items")
-      .select("id, subject_id, subject_code, level_id, term_id, department_id, question_type, exam_year, ct_number, batch_label, notes, file_size_bytes, share_across_depts, status, views_count, downloads_count, created_at")
-      .in("status", ["pending", "approved"])
-      .order("created_at", { ascending: false });
+    const [{ data: qRows }, { data: deptRows }] = await Promise.all([
+      rawSb
+        .from("question_bank_items")
+        .select("id, subject_id, subject_code, level_id, term_id, department_id, question_type, exam_year, ct_number, batch_label, notes, file_size_bytes, share_across_depts, status, views_count, downloads_count, created_at")
+        .in("status", ["pending", "approved"])
+        .order("created_at", { ascending: false }),
+      rawSb.from("departments").select("id, code"),
+    ]);
+
+    const deptCodeById = new Map(
+      ((deptRows ?? []) as Array<{ id: string; code: string | null }>).map((d) => [
+        String(d.id),
+        String(d.code ?? ""),
+      ]),
+    );
+    const levelNameById = new Map(
+      (levelsResult.data ?? []).map((l) => [String(l.id), String(l.name ?? "")]),
+    );
+    const termLabelById = new Map(
+      (termsResult.data ?? []).map((t) => [
+        String(t.id),
+        `${levelNameById.get(String(t.level_id)) ?? "Level"} - ${t.name}`,
+      ]),
+    );
 
     for (const row of (qRows ?? []) as Array<Record<string, unknown>>) {
       const sCode = String(row.subject_code ?? "");
       const sLevel = String(row.level_id ?? "");
       const sTerm = String(row.term_id ?? "");
-      const ownSubj = questionSubjectByKey.get(`${sCode}::${sTerm}`);
+      const exactSubj = questionSubjectByKey.get(`${sCode}::${sTerm}`);
+      const refSubj = !exactSubj ? questionSubjectByCode.get(sCode) : undefined;
+      const ownSubj = exactSubj ?? refSubj;
       if (!ownSubj) continue;
+      const isCrossTermRef = !exactSubj;
 
       const sameDept = String(row.department_id ?? "") === profile.department_id;
       const shared = row.share_across_depts !== false;
@@ -318,15 +346,17 @@ export default async function MaterialsPage() {
       const cNum = typeof row.ct_number === "number" ? row.ct_number : null;
       const st = String(row.status ?? "pending");
 
-      takenQuestionSlots.push({
-        subject_code: sCode,
-        level_id: sLevel,
-        term_id: sTerm,
-        question_type: qType,
-        exam_year: eYear,
-        ct_number: cNum,
-        status: st,
-      });
+      if (!isCrossTermRef) {
+        takenQuestionSlots.push({
+          subject_code: sCode,
+          level_id: sLevel,
+          term_id: sTerm,
+          question_type: qType,
+          exam_year: eYear,
+          ct_number: cNum,
+          status: st,
+        });
+      }
 
       if (st === "approved") {
         questionItems.push({
@@ -345,6 +375,12 @@ export default async function MaterialsPage() {
           views_count: Number(row.views_count ?? 0),
           downloads_count: Number(row.downloads_count ?? 0),
           created_at: String(row.created_at ?? ""),
+          is_reference: isCrossTermRef,
+          source_label: isCrossTermRef
+            ? [deptCodeById.get(String(row.department_id ?? "")), termLabelById.get(sTerm)]
+                .filter(Boolean)
+                .join(" ? ") || "Other Term"
+            : null,
         });
       }
     }

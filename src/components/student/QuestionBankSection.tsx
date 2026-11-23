@@ -38,6 +38,8 @@ export type QuestionBankItem = {
   views_count: number;
   downloads_count: number;
   created_at: string;
+  is_reference?: boolean;
+  source_label?: string | null;
 };
 
 export type QuestionSubjectOption = {
@@ -265,6 +267,16 @@ export default function QuestionBankSection({
       return true;
     });
   }, [items, mode, selectedTermId, selectedSubjectId, selectedYearFilter, selectedCtFilter]);
+
+  const primaryItems = useMemo(
+    () => filteredItems.filter((item) => !item.is_reference),
+    [filteredItems],
+  );
+
+  const referenceItems = useMemo(
+    () => filteredItems.filter((item) => Boolean(item.is_reference)),
+    [filteredItems],
+  );
 
   const availableYears = useMemo(() => {
     const yrs = new Set<number>();
@@ -609,7 +621,7 @@ export default function QuestionBankSection({
         </div>
       )}
 
-      {filteredItems.length === 0 ? (
+      {primaryItems.length === 0 && referenceItems.length === 0 ? (
         <div className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-8 text-center">
           {mode === "previous_year" ? (
             <Calendar className="mx-auto h-9 w-9 text-cyan-400/80" />
