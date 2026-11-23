@@ -2,7 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import ReviewActions from "./ReviewActions";
+import QuestionReviewPanel, { type PendingQuestionReviewItem } from "./QuestionReviewPanel";
 import ReviewFileActions from "./ReviewFileActions";
 import {
   ArrowLeft,
@@ -146,8 +148,33 @@ export default async function AdminMaterialsReviewPage() {
       ? "Back to Super Admin"
       : "Back to Admin Console";
 
-  return (
-    <div className="min-h-screen bg-[#060A12] text-slate-100">
+  let pendingQuestions: PendingQuestionReviewItem[] = [];
+  try {
+    const rawSb = createRawSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
+    const { data: qRows } = await rawSb
+      .from("question_bank_items")
+      .select("id, subject_code, question_type, exam_year, ct_number, batch_label, notes, file_size_bytes, created_at")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    pendingQuestions = ((qRows ?? []) as Array<Record<string, unknown>>).map((r) => ({
+      id: String(r.id),
+      subject_code: String(r.subject_code ?? ""),
+      question_type: r.question_type === "ct" ? "ct" : "previous_year",
+      exam_year: typeof r.exam_year === "number" ? r.exam_year : null,
+      ct_number: typeof r.ct_number === "number" ? r.ct_number : null,
+      batch_label: typeof r.batch_label === "string" ? r.batch_label : null,
+      notes: typeof r.notes === "string" ? r.notes : null,
+      file_size_bytes: Number(r.file_size_bytes ?? 0),
+      created_at: String(r.created_at ?? ""),
+    }));
+  } catch {
+    pendingQuestions = [];
+  }
+
+  return (    <div className="min-h-screen bg-[#060A12] text-slate-100">
       {/* Top Institutional Header */}
       <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#060A12]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
@@ -312,6 +339,7 @@ export default async function AdminMaterialsReviewPage() {
             })}
           </div>
         )}
+        <QuestionReviewPanel items={pendingQuestions} />
       </main>
     </div>
   );

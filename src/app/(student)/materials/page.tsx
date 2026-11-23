@@ -3,7 +3,9 @@ import { Bookmark, CheckCircle2, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getAcademicTermNavigation } from "@/lib/academic-terms";
 import { redirect } from "next/navigation";
-import MaterialsSearch from "@/components/student/MaterialsSearch";
+import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
+import MaterialsVaultClient from "@/components/student/MaterialsVaultClient";
+import type { QuestionBankItem } from "@/components/student/QuestionBankSection";
 
 type Material = {
   id: string;
@@ -272,6 +274,75 @@ export default async function MaterialsPage() {
       : material.subject,
   }));
 
+  const questionItems: QuestionBankItem[] = [];
+  const takenQuestionSlots: Array<{
+    subject_code: string;
+    level_id: string;
+    question_type: "previous_year" | "ct";
+    exam_year: number | null;
+    ct_number: number | null;
+    status: string;
+  }> = [];
+
+  try {
+    const rawSb = createRawSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
+    const { data: qRows } = await rawSb
+      .from("question_bank_items")
+      .select("id, subject_id, subject_code, level_id, term_id, department_id, question_type, exam_year, ct_number, batch_label, notes, file_size_bytes, share_across_depts, status, views_count, downloads_count, created_at")
+      .in("status", ["pending", "approved"])
+      .order("created_at", { ascending: false });
+
+    for (const row of (qRows ?? []) as Array<Record<string, unknown>>) {
+      const sCode = String(row.subject_code ?? "");
+      const sLevel = String(row.level_id ?? "");
+      const ownSubj = curriculumSubjectByKey.get(`${sCode}::${sLevel}`);
+      if (!ownSubj) continue;
+
+      const sameDept = String(row.department_id ?? "") === profile.department_id;
+      const shared = row.share_across_depts !== false;
+      if (!sameDept && !shared) continue;
+
+      const qType = row.question_type === "ct" ? "ct" : "previous_year";
+      const eYear = typeof row.exam_year === "number" ? row.exam_year : null;
+      const cNum = typeof row.ct_number === "number" ? row.ct_number : null;
+      const st = String(row.status ?? "pending");
+
+      takenQuestionSlots.push({
+        subject_code: sCode,
+        level_id: sLevel,
+        question_type: qType,
+        exam_year: eYear,
+        ct_number: cNum,
+        status: st,
+      });
+
+      if (st === "approved") {
+        questionItems.push({
+          id: String(row.id),
+          subject_id: ownSubj.id,
+          subject_code: sCode,
+          level_id: ownSubj.level_id,
+          term_id: ownSubj.term_id,
+          question_type: qType,
+          exam_year: eYear,
+          ct_number: cNum,
+          batch_label: typeof row.batch_label === "string" ? row.batch_label : null,
+          notes: typeof row.notes === "string" ? row.notes : null,
+          file_size_bytes: Number(row.file_size_bytes ?? 0),
+          status: st,
+          views_count: Number(row.views_count ?? 0),
+          downloads_count: Number(row.downloads_count ?? 0),
+          created_at: String(row.created_at ?? ""),
+        });
+      }
+    }
+  } catch {
+    // Gracefully fall back if table is not migrated yet
+  }
+
   return (
     <div className="min-h-full bg-[#060A12] text-slate-100">
       <style>{`
@@ -327,12 +398,14 @@ export default async function MaterialsPage() {
               </section>
 
               {/* Materials Search & Grid */}
-              <MaterialsSearch
+              <MaterialsVaultClient
                 subjects={curriculumSubjects ?? []}
                 materials={materialList}
                 bookmarkedMaterialIds={Array.from(bookmarkedMaterialIds)}
                 terms={termOptions}
-                currentTermId={profile.current_term_id}
+                currentTermId={termNavigation.currentTerm.id}
+                questionItems={questionItems}
+                takenQuestionSlots={takenQuestionSlots}
               />
             </div>
           </main>
