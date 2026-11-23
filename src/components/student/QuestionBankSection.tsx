@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FileText,
   Download,
@@ -16,6 +16,8 @@ import {
   ClipboardList,
   Image as ImageIcon,
   Eye,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { buildCleanQuestionPdf, compressImageForOcr, convertImagesToSinglePdf } from "@/lib/images-to-pdf";
@@ -72,6 +74,141 @@ function formatBytes(bytes: number): string {
   const mb = bytes / (1024 * 1024);
   if (mb >= 1) return `${mb.toFixed(2)} MB`;
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+type QbDropdownOption = {
+  id: string;
+  label: string;
+  code?: string;
+  name?: string;
+};
+
+function QbDropdown({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  wide = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  options: QbDropdownOption[];
+  placeholder?: string;
+  wide?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    if (open) {
+      document.addEventListener("mousedown", onOutside);
+      document.addEventListener("keydown", onEsc);
+    }
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open]);
+
+  const selected = options.find((o) => o.id === value);
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`flex h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-xl border bg-[#060A12] px-3.5 text-left text-xs font-semibold text-white transition-all ${
+          open
+            ? "border-cyan-400/80 ring-2 ring-cyan-500/20"
+            : "border-slate-700/80 hover:border-slate-600"
+        }`}
+      >
+        <span className="min-w-0 flex-1 truncate">
+          {selected ? (
+            selected.code ? (
+              <span className="flex items-center gap-2">
+                <span className="shrink-0 rounded-md border border-cyan-500/35 bg-cyan-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-cyan-300">
+                  {selected.code}
+                </span>
+                <span className="truncate">{selected.name}</span>
+              </span>
+            ) : (
+              selected.label
+            )
+          ) : (
+            placeholder || "Select..."
+          )}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${
+            open ? "rotate-180 text-cyan-300" : ""
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div
+          className={`absolute top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-cyan-500/35 bg-[#0A1020] p-1.5 shadow-[0_24px_60px_rgba(0,0,0,0.88)] ${
+            wide ? "left-0 w-full sm:w-[360px]" : "left-0 right-0"
+          }`}
+        >
+          <div className="space-y-0.5">
+            {options.map((opt) => {
+              const active = opt.id === value;
+              const isPractical = /practical|sessional|\blab\b/i.test(opt.name || "");
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.id);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full cursor-pointer items-start justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors ${
+                    active
+                      ? "bg-cyan-500/20 font-semibold text-cyan-200"
+                      : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                  }`}
+                >
+                  <div className="flex min-w-0 flex-1 items-start gap-2">
+                    {opt.code && (
+                      <span
+                        className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold ${
+                          active ? "bg-cyan-500/25 text-cyan-200" : "bg-slate-800 text-slate-300"
+                        }`}
+                      >
+                        {opt.code}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1 whitespace-normal break-words leading-snug">
+                      {opt.name || opt.label}
+                      {isPractical && (
+                        <span className="ml-1.5 inline-block rounded bg-amber-500/20 px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase tracking-wide text-amber-300">
+                          Practical
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  {active && <Check className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function QuestionBankSection({
@@ -355,66 +492,49 @@ export default function QuestionBankSection({
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-4 sm:p-5">
+      <section className="relative z-30 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-4 sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="grid flex-1 gap-3 sm:grid-cols-3">
-            <div>
-              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Academic Term
-              </label>
-              <select
-                value={selectedTermId}
-                onChange={(e) => {
-                  setSelectedTermId(e.target.value);
-                  setSelectedSubjectId("all");
-                  setSelectedYearFilter("all");
-                }}
-                className="h-11 w-full rounded-xl border border-slate-700/80 bg-[#060A12] px-3 text-xs font-semibold text-white focus:border-cyan-400 focus:outline-none"
-              >
-                {terms.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.id === currentTermId ? `${t.label} (Current)` : t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <QbDropdown
+              label="Academic Term"
+              value={selectedTermId}
+              onChange={(val) => {
+                setSelectedTermId(val);
+                setSelectedSubjectId("all");
+                setSelectedYearFilter("all");
+              }}
+              options={terms.map((t) => ({
+                id: t.id,
+                label: t.id === currentTermId ? `${t.label} (Current)` : t.label,
+              }))}
+            />
 
-            <div>
-              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Subject ({termSubjects.length})
-              </label>
-              <select
-                value={selectedSubjectId}
-                onChange={(e) => setSelectedSubjectId(e.target.value)}
-                className="h-11 w-full rounded-xl border border-slate-700/80 bg-[#060A12] px-3 text-xs font-semibold text-white focus:border-cyan-400 focus:outline-none"
-              >
-                <option value="all">All Subjects in Term</option>
-                {termSubjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.subject_code} - {s.subject_name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <QbDropdown
+              label={`Subject (${termSubjects.length})`}
+              value={selectedSubjectId}
+              onChange={setSelectedSubjectId}
+              wide
+              options={[
+                { id: "all", label: "All Subjects in Term" },
+                ...termSubjects.map((s) => ({
+                  id: s.id,
+                  label: `${s.subject_code} - ${s.subject_name}`,
+                  code: s.subject_code,
+                  name: s.subject_name,
+                })),
+              ]}
+            />
 
             {mode === "previous_year" ? (
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                  Exam Year
-                </label>
-                <select
-                  value={selectedYearFilter}
-                  onChange={(e) => setSelectedYearFilter(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-700/80 bg-[#060A12] px-3 text-xs font-semibold text-white focus:border-cyan-400 focus:outline-none"
-                >
-                  <option value="all">All Years</option>
-                  {availableYears.map((yr) => (
-                    <option key={yr} value={String(yr)}>
-                      {yr}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <QbDropdown
+                label="Exam Year"
+                value={selectedYearFilter}
+                onChange={setSelectedYearFilter}
+                options={[
+                  { id: "all", label: "All Years" },
+                  ...availableYears.map((yr) => ({ id: String(yr), label: String(yr) })),
+                ]}
+              />
             ) : (
               <div>
                 <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -629,22 +749,17 @@ export default function QuestionBankSection({
             </div>
 
             <form onSubmit={handleQuestionUpload} className="mt-4 space-y-3.5">
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                  Subject *
-                </label>
-                <select
-                  value={uploadSubjectId}
-                  onChange={(e) => setUploadSubjectId(e.target.value)}
-                  className="h-10 w-full rounded-xl border border-slate-700 bg-[#060A12] px-3 text-xs font-semibold text-white focus:border-cyan-400 focus:outline-none"
-                >
-                  {termSubjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.subject_code} - {s.subject_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <QbDropdown
+                label="Subject *"
+                value={uploadSubjectId}
+                onChange={setUploadSubjectId}
+                options={termSubjects.map((s) => ({
+                  id: s.id,
+                  label: `${s.subject_code} - ${s.subject_name}`,
+                  code: s.subject_code,
+                  name: s.subject_name,
+                }))}
+              />
 
               <div className="grid grid-cols-2 gap-3">
                 {mode === "previous_year" ? (
