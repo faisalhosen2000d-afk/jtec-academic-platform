@@ -21,9 +21,10 @@ function getB2Config() {
     return null;
   }
 
-  const endpoint = rawEndpoint.startsWith("http")
-    ? rawEndpoint
-    : `https://${rawEndpoint}`;
+  const cleanRaw = rawEndpoint.replace(/\/+$/, "");
+  const endpoint = cleanRaw.startsWith("http")
+    ? cleanRaw
+    : `https://${cleanRaw}`;
   const regionMatch = endpoint.match(/s3\.([a-z0-9-]+)\.backblazeb2\.com/i);
   const region = regionMatch?.[1] ?? "us-west-004";
 
@@ -47,6 +48,8 @@ function getB2Client() {
         secretAccessKey: cfg.appKey,
       },
       forcePathStyle: true,
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      responseChecksumValidation: "WHEN_REQUIRED",
     });
     cachedConfigKey = sig;
   }
