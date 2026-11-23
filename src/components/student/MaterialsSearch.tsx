@@ -157,10 +157,17 @@ function CustomDropdown({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-emerald-500/35 bg-[#0A1020] p-1.5 shadow-[0_24px_60px_rgba(0,0,0,0.85)]">
+        <div
+          className={`absolute top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-emerald-500/35 bg-[#0A1020] p-1.5 shadow-[0_24px_60px_rgba(0,0,0,0.85)] ${
+            options.some((o) => Boolean(o.code))
+              ? "right-0 w-full sm:w-[360px]"
+              : "left-0 right-0"
+          }`}
+        >
           <div className="space-y-0.5">
             {options.map((option) => {
               const isSelected = option.id === value;
+              const isPractical = /practical|sessional|\blab\b/i.test(option.name || "");
               return (
                 <button
                   key={option.id}
@@ -169,16 +176,16 @@ function CustomDropdown({
                     onChange(option.id);
                     setIsOpen(false);
                   }}
-                  className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors ${
+                  className={`flex w-full cursor-pointer items-start justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors ${
                     isSelected
                       ? "bg-emerald-500/20 font-semibold text-emerald-300"
                       : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
                   }`}
                 >
-                  <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex min-w-0 flex-1 items-start gap-2">
                     {option.code && (
                       <span
-                        className={`shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold ${
+                        className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold ${
                           isSelected
                             ? "bg-emerald-500/25 text-emerald-200"
                             : "bg-slate-800 text-slate-300"
@@ -187,13 +194,18 @@ function CustomDropdown({
                         {option.code}
                       </span>
                     )}
-                    <span className="truncate">
+                    <span className="min-w-0 flex-1 whitespace-normal break-words leading-snug">
                       {option.name || option.label}
+                      {isPractical && (
+                        <span className="ml-1.5 inline-block rounded bg-amber-500/20 px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase tracking-wide text-amber-300">
+                          Practical
+                        </span>
+                      )}
                     </span>
                   </div>
 
                   {isSelected && (
-                    <Check className="h-4 w-4 shrink-0 text-emerald-300" />
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
                   )}
                 </button>
               );
