@@ -66,6 +66,22 @@ export default function UploadForm({
   const [isDragging, setIsDragging] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    stage: "idle" | "preparing" | "uploading" | "finalizing" | "done";
+    percent: number;
+    loadedBytes: number;
+    totalBytes: number;
+    speedBps: number;
+    etaSeconds: number | null;
+  }>({
+    stage: "idle",
+    percent: 0,
+    loadedBytes: 0,
+    totalBytes: 0,
+    speedBps: 0,
+    etaSeconds: null,
+  });
+  const activeXhrRef = useRef<XMLHttpRequest | null>(null);
   const [autoFilling, setAutoFilling] = useState(false);
   const [aiSourceNote, setAiSourceNote] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -267,6 +283,15 @@ export default function UploadForm({
         file_hash: fileHash,
       };
 
+      setUploadProgress({
+        stage: "preparing",
+        percent: 4,
+        loadedBytes: 0,
+        totalBytes: file.size,
+        speedBps: 0,
+        etaSeconds: null,
+      });
+
       const prepareResponse = await fetch("/api/materials/upload", {
         method: "POST",
         headers: {
@@ -286,18 +311,63 @@ export default function UploadForm({
         );
       }
 
-      if (typeof prepareData.uploadUrl === "string" && prepareData.uploadUrl.length > 0) {
-        const putRes = await fetch(prepareData.uploadUrl, {
-          method: "PUT",
-          headers: {
-            "Content-Type": file.type || "application/octet-stream",
-          },
-          body: file,
-        });
+      setUploadProgress({
+        stage: "uploading",
+        percent: 6,
+        loadedBytes: 0,
+        totalBytes: file.size,
+        speedBps: 0,
+        etaSeconds: null,
+      });
 
-        if (!putRes.ok) {
-          throw new Error("The file could not be uploaded to cloud storage.");
-        }
+      if (typeof prepareData.uploadUrl === "string" && prepareData.uploadUrl.length > 0) {
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          activeXhrRef.current = xhr;
+          const startedAt = performance.now();
+
+          xhr.open("PUT", prepareData.uploadUrl, true);
+          xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+
+          xhr.upload.onprogress = (ev) => {
+            if (!ev.lengthComputable || ev.total <= 0) return;
+            const elapsedSec = Math.max(0.25, (performance.now() - startedAt) / 1000);
+            const speedBps = ev.loaded / elapsedSec;
+            const remainingBytes = Math.max(0, ev.total - ev.loaded);
+            const etaSeconds = speedBps > 0 ? Math.ceil(remainingBytes / speedBps) : null;
+            const rawPct = Math.round((ev.loaded / ev.total) * 100);
+            const clampedPct = Math.min(96, Math.max(6, rawPct));
+            setUploadProgress({
+              stage: "uploading",
+              percent: clampedPct,
+              loadedBytes: ev.loaded,
+              totalBytes: ev.total,
+              speedBps,
+              etaSeconds,
+            });
+          };
+
+          xhr.onload = () => {
+            activeXhrRef.current = null;
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error("The file could not be uploaded to cloud storage."));
+            }
+          };
+
+          xhr.onerror = () => {
+            activeXhrRef.current = null;
+            reject(new Error("Network error while uploading to cloud storage."));
+          };
+
+          xhr.onabort = () => {
+            activeXhrRef.current = null;
+            reject(new Error("__UPLOAD_CANCELLED__"));
+          };
+
+          xhr.send(file);
+        });
       } else {
         const supabase = createClient();
 
@@ -314,6 +384,15 @@ export default function UploadForm({
           );
         }
       }
+
+      setUploadProgress((prev) => ({
+        ...prev,
+        stage: "finalizing",
+        percent: 98,
+        loadedBytes: file.size,
+        totalBytes: file.size,
+        etaSeconds: 0,
+      }));
 
       const finalizeResponse = await fetch("/api/materials/upload", {
         method: "POST",
@@ -336,6 +415,15 @@ export default function UploadForm({
         );
       }
 
+      setUploadProgress({
+        stage: "done",
+        percent: 100,
+        loadedBytes: file.size,
+        totalBytes: file.size,
+        speedBps: 0,
+        etaSeconds: 0,
+      });
+
       setMessage("Material uploaded successfully and submitted for admin approval!");
       setSelectedSubjectId("");
       setSubjectSearch("");
@@ -347,12 +435,25 @@ export default function UploadForm({
         fileInputRef.current.value = "";
       }
     } catch (err: unknown) {
-      console.error("[upload_form_error]", err);
-      setError(
-        err instanceof Error && err.message
-          ? err.message
-          : "An unexpected error occurred during upload. Please try again.",
-      );
+      if (err instanceof Error && err.message === "__UPLOAD_CANCELLED__") {
+        setUploadProgress({
+          stage: "idle",
+          percent: 0,
+          loadedBytes: 0,
+          totalBytes: 0,
+          speedBps: 0,
+          etaSeconds: null,
+        });
+        setError("Upload cancelled.");
+      } else {
+        console.error("[upload_form_error]", err);
+        setUploadProgress((prev) => ({ ...prev, stage: "idle" }));
+        setError(
+          err instanceof Error && err.message
+            ? err.message
+            : "An unexpected error occurred during upload. Please try again.",
+        );
+      }
     } finally {
       setSubmitting(false);
     }
@@ -737,6 +838,72 @@ export default function UploadForm({
           </div>
         )}
       </div>
+
+      {/* Live 3-Stage Upload Progress Card */}
+      {(submitting || uploadProgress.stage === "done") && (
+        <div className="rounded-xl border border-emerald-500/30 bg-[#0A1324] p-3.5 shadow-[0_0_24px_rgba(16,185,129,0.08)]">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 font-semibold text-slate-100">
+              {uploadProgress.stage === "done" ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+              )}
+              <span>
+                {uploadProgress.stage === "preparing"
+                  ? "1/3 Preparing secure upload..."
+                  : uploadProgress.stage === "uploading"
+                    ? "2/3 Uploading to Cloud Storage..."
+                    : uploadProgress.stage === "finalizing"
+                      ? "3/3 Saving material record..."
+                      : "Upload Complete (100%)"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs font-bold text-emerald-300">
+                {uploadProgress.percent}%
+              </span>
+              {uploadProgress.stage === "uploading" && (
+                <button
+                  type="button"
+                  onClick={() => activeXhrRef.current?.abort()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-rose-500/35 bg-rose-500/10 px-2 py-0.5 text-[11px] font-medium text-rose-300 transition hover:bg-rose-500/20"
+                >
+                  <X className="h-3 w-3" />
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-800/90">
+            <div
+              className={`h-full rounded-full transition-all duration-150 ${
+                uploadProgress.stage === "done"
+                  ? "bg-emerald-400"
+                  : "bg-gradient-to-r from-cyan-400 via-emerald-400 to-teal-300"
+              }`}
+              style={{ width: `${uploadProgress.percent}%` }}
+            />
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+            <span>
+              {formatBytes(uploadProgress.loadedBytes)} / {formatBytes(uploadProgress.totalBytes)}
+            </span>
+            <span>
+              {uploadProgress.stage === "uploading" && uploadProgress.speedBps > 0
+                ? `${formatBytes(uploadProgress.speedBps)}/s${
+                    uploadProgress.etaSeconds !== null ? ` · ~${uploadProgress.etaSeconds}s left` : ""
+                  }`
+                : uploadProgress.stage === "done"
+                  ? "Submitted for admin approval"
+                  : "Connecting..."}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Submit */}
       <div className="flex justify-end pt-1">
