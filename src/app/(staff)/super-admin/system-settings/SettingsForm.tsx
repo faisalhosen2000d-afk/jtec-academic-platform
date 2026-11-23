@@ -20,6 +20,7 @@ type SettingsFormProps = {
   initialSettings: {
     registration_open: boolean;
     max_upload_size_mb: number;
+    material_storage_provider?: "b2" | "supabase";
     maintenance_mode: boolean;
     maintenance_message: string;
     maintenance_start_time: string | null;
@@ -27,6 +28,7 @@ type SettingsFormProps = {
     maintenance_bypass_student_ids?: string | null;
     updated_at: string;
   };
+  b2Configured?: boolean;
 };
 
 const UPLOAD_OPTIONS = [
@@ -85,10 +87,11 @@ function ToggleSwitch({
   );
 }
 
-export default function SettingsForm({ initialSettings }: SettingsFormProps) {
+export default function SettingsForm({ initialSettings, b2Configured = true }: SettingsFormProps) {
   const [registrationOpen, setRegistrationOpen] = useState(
     initialSettings.registration_open,
   );
+  const [materialStorageProvider, setMaterialStorageProvider] = useState<"b2" | "supabase">(initialSettings.material_storage_provider === "supabase" ? "supabase" : "b2");
   const [maxUploadSizeMb, setMaxUploadSizeMb] = useState(
     initialSettings.max_upload_size_mb || 25,
   );
@@ -157,6 +160,7 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
     const result = await savePlatformSettings({
       registration_open: registrationOpen,
       max_upload_size_mb: Number(maxUploadSizeMb),
+      material_storage_provider: materialStorageProvider,
       maintenance_mode: maintenanceMode,
       maintenance_message: maintenanceMessage,
       maintenance_start_time: startTime || null,
@@ -218,6 +222,68 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
           </p>
         </div>
       </section>
+
+      {/* Active Material Storage Provider Card */}
+      <div className="rounded-2xl border border-slate-800/80 bg-[#0A1020] p-5 shadow-lg">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base font-semibold text-white">
+              Active Material Storage Provider
+            </h2>
+            <p className="mt-1 text-xs leading-relaxed text-slate-400">
+              Choose where new student uploads are stored. Existing files in both Backblaze B2 and Supabase remain readable at all times.
+            </p>
+          </div>
+          <span className="rounded-full border border-cyan-500/40 bg-cyan-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-300">
+            {materialStorageProvider === "b2" ? "Backblaze B2 Active" : "Supabase Active"}
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={!b2Configured}
+            onClick={() => setMaterialStorageProvider("b2")}
+            className={`cursor-pointer rounded-xl border p-3.5 text-left transition ${
+              materialStorageProvider === "b2"
+                ? "border-cyan-400/70 bg-cyan-500/15 text-white shadow-[0_0_20px_rgba(34,211,238,0.12)]"
+                : "border-slate-800 bg-[#060A12] text-slate-300 hover:border-slate-700"
+            } disabled:cursor-not-allowed disabled:opacity-50`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold">Backblaze B2 Cloud</span>
+              <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-bold text-cyan-300">
+                10 GB Free
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              {b2Configured
+                ? "Recommended for PDFs & large files (~30 GB/mo bandwidth)."
+                : "Configure B2_* env vars in Vercel to enable."}
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMaterialStorageProvider("supabase")}
+            className={`cursor-pointer rounded-xl border p-3.5 text-left transition ${
+              materialStorageProvider === "supabase"
+                ? "border-emerald-400/70 bg-emerald-500/15 text-white shadow-[0_0_20px_rgba(16,185,129,0.12)]"
+                : "border-slate-800 bg-[#060A12] text-slate-300 hover:border-slate-700"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold">Supabase Storage</span>
+              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                1 GB Free
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              Built-in Supabase bucket (5 GB/mo bandwidth).
+            </p>
+          </button>
+        </div>
+      </div>
 
       {error ? (
         <div className="flex items-center gap-3 rounded-2xl border border-rose-500/35 bg-rose-500/10 px-5 py-3.5 text-xs font-semibold text-rose-300">
@@ -455,6 +521,68 @@ export default function SettingsForm({ initialSettings }: SettingsFormProps) {
           </p>
         </div>
       </section>
+
+      {/* Active Material Storage Provider Card */}
+      <div className="rounded-2xl border border-slate-800/80 bg-[#0A1020] p-5 shadow-lg">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base font-semibold text-white">
+              Active Material Storage Provider
+            </h2>
+            <p className="mt-1 text-xs leading-relaxed text-slate-400">
+              Choose where new student uploads are stored. Existing files in both Backblaze B2 and Supabase remain readable at all times.
+            </p>
+          </div>
+          <span className="rounded-full border border-cyan-500/40 bg-cyan-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-300">
+            {materialStorageProvider === "b2" ? "Backblaze B2 Active" : "Supabase Active"}
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={!b2Configured}
+            onClick={() => setMaterialStorageProvider("b2")}
+            className={`cursor-pointer rounded-xl border p-3.5 text-left transition ${
+              materialStorageProvider === "b2"
+                ? "border-cyan-400/70 bg-cyan-500/15 text-white shadow-[0_0_20px_rgba(34,211,238,0.12)]"
+                : "border-slate-800 bg-[#060A12] text-slate-300 hover:border-slate-700"
+            } disabled:cursor-not-allowed disabled:opacity-50`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold">Backblaze B2 Cloud</span>
+              <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-bold text-cyan-300">
+                10 GB Free
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              {b2Configured
+                ? "Recommended for PDFs & large files (~30 GB/mo bandwidth)."
+                : "Configure B2_* env vars in Vercel to enable."}
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMaterialStorageProvider("supabase")}
+            className={`cursor-pointer rounded-xl border p-3.5 text-left transition ${
+              materialStorageProvider === "supabase"
+                ? "border-emerald-400/70 bg-emerald-500/15 text-white shadow-[0_0_20px_rgba(16,185,129,0.12)]"
+                : "border-slate-800 bg-[#060A12] text-slate-300 hover:border-slate-700"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold">Supabase Storage</span>
+              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                1 GB Free
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              Built-in Supabase bucket (5 GB/mo bandwidth).
+            </p>
+          </button>
+        </div>
+      </div>
 
       <div className="flex justify-end">
         <button

@@ -23,19 +23,37 @@ function jsonError(error: string, status = 400) {
   return NextResponse.json({ error }, { status });
 }
 
-async function getMaxUploadSize(): Promise<{ maxBytes: number; maxMb: number }> {
-  try {
-    const rawSupabase = createRawSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    );
-    const { data } = await rawSupabase.rpc("get_platform_settings");
-    const settings = data as { max_upload_size_mb?: number } | null;
-    const mb = settings?.max_upload_size_mb ?? 100;
-    return { maxBytes: mb * 1024 * 1024, maxMb: mb };
-  } catch {
-    return { maxBytes: 100 * 1024 * 1024, maxMb: 100 };
+async function getUploadSettings(): Promise<{
+  maxBytes: number;
+  maxMb: number;
+  storageProvider: "b2" | "supabase";
+}> {
+  const rawClient = createRawSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const { data, error } = await rawClient
+    .from("platform_settings")
+    .select("max_upload_size_mb, material_storage_provider")
+    .eq("id", 1)
+    .maybeSingle();
+
+  if (!error && data) {
+    const settings = data as {
+      max_upload_size_mb?: number;
+      material_storage_provider?: string;
+    };
+    const mb = settings.max_upload_size_mb ?? 100;
+    const storageProvider =
+      settings.material_storage_provider === "supabase" ? "supabase" : "b2";
+    return { maxBytes: mb * 1024 * 1024, maxMb: mb, storageProvider };
   }
+
+  const { data: fallback } = await rawClient
+    .from("platform_settings")
+    .select("max_upload_size_mb")
+    .eq("id", 1)
+    .maybeSingle();
+
+  const mb = (fallback as { max_upload_size_mb?: number } | null)?.max_upload_size_mb ?? 100;
+  return { maxBytes: mb * 1024 * 1024, maxMb: mb, storageProvider: "b2" };
 }
 
 async function getVerifiedStudent() {
@@ -190,7 +208,7 @@ export async function POST(request: Request) {
       return jsonError("Topic is too long.");
     }
 
-    const { maxBytes, maxMb } = await getMaxUploadSize();
+    const { maxBytes, maxMb, storageProvider } = await getUploadSettings();
     const fileValidationError = validateFileMetadata(fileName, fileSize, maxBytes, maxMb);
 
     if (fileValidationError) {
@@ -248,7 +266,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "prepare") {
-      if (isB2Configured()) {
+      if (storageProvider === "b2" && isB2Configured()) {
         const b2Prep = await createB2UploadPresignedUrl(filePath, fileType);
         if (!b2Prep) {
           return NextResponse.json(

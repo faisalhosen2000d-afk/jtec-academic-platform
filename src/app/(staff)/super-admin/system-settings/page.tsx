@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, Settings2, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getActivePlatformSettings } from "@/lib/platform-settings";
+import { isB2Configured } from "@/lib/material-storage";
 import SettingsForm from "./SettingsForm";
 
 export const dynamic = "force-dynamic";
@@ -72,6 +73,7 @@ export default async function SystemSettingsPage() {
           initialSettings={{
             registration_open: activeSettings.registration_open,
             max_upload_size_mb: activeSettings.max_upload_size_mb,
+            material_storage_provider: activeSettings.material_storage_provider,
             maintenance_mode: activeSettings.maintenance_mode,
             maintenance_message:
               activeSettings.maintenance_message ||
@@ -82,6 +84,7 @@ export default async function SystemSettingsPage() {
               activeSettings.maintenance_bypass_student_ids,
             updated_at: new Date().toISOString(),
           }}
+          b2Configured={isB2Configured()}
         />
 
         <section className="flex items-start gap-3 rounded-2xl border border-slate-800/80 bg-[#0A1020]/70 px-5 py-4 text-xs text-slate-400">

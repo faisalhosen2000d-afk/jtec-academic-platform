@@ -4,6 +4,7 @@ import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 export interface PlatformSettingsData {
   registration_open: boolean;
   max_upload_size_mb: number;
+  material_storage_provider: "b2" | "supabase";
   maintenance_mode: boolean;
   maintenance_start_time: string | null;
   maintenance_end_time: string | null;
@@ -18,7 +19,7 @@ export async function getActivePlatformSettings(): Promise<PlatformSettingsData>
 
   const { data: tableData } = await rawClient
     .from("platform_settings")
-    .select("registration_open, max_upload_size_mb, maintenance_mode, maintenance_start_time, maintenance_end_time, maintenance_message, maintenance_bypass_student_ids")
+    .select("registration_open, max_upload_size_mb, material_storage_provider, maintenance_mode, maintenance_start_time, maintenance_end_time, maintenance_message, maintenance_bypass_student_ids")
     .eq("id", 1)
     .maybeSingle();
 
@@ -27,6 +28,7 @@ export async function getActivePlatformSettings(): Promise<PlatformSettingsData>
     return {
       registration_open: typeof r.registration_open === "boolean" ? r.registration_open : true,
       max_upload_size_mb: typeof r.max_upload_size_mb === "number" ? r.max_upload_size_mb : 25,
+      material_storage_provider: r.material_storage_provider === "supabase" ? "supabase" : "b2",
       maintenance_mode: typeof r.maintenance_mode === "boolean" ? r.maintenance_mode : false,
       maintenance_start_time: typeof r.maintenance_start_time === "string" ? r.maintenance_start_time : null,
       maintenance_end_time: typeof r.maintenance_end_time === "string" ? r.maintenance_end_time : null,
@@ -38,6 +40,7 @@ export async function getActivePlatformSettings(): Promise<PlatformSettingsData>
   return {
     registration_open: true,
     max_upload_size_mb: 25,
+    material_storage_provider: "b2",
     maintenance_mode: false,
     maintenance_start_time: null,
     maintenance_end_time: null,

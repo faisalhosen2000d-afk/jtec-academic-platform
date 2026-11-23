@@ -17,6 +17,7 @@ function normalizeBdTimestamp(val: string | null | undefined): string | null {
 export interface SystemSettingsInput {
   registration_open?: boolean;
   max_upload_size_mb?: number;
+  material_storage_provider?: "b2" | "supabase";
   maintenance_mode?: boolean;
   maintenance_message?: string;
   maintenance_start_time?: string | null;
@@ -50,6 +51,7 @@ export async function savePlatformSettings(input: FormData | SystemSettingsInput
 
   let registration_open = false;
   let max_upload_size_mb = 25;
+  let material_storage_provider: "b2" | "supabase" = "b2";
   let maintenance_mode = false;
   let maintenance_message = "The academic platform is currently undergoing scheduled maintenance. Please check back shortly.";
   let maintenance_start_time: string | null = null;
@@ -59,6 +61,7 @@ export async function savePlatformSettings(input: FormData | SystemSettingsInput
   if (input instanceof FormData) {
     registration_open = input.get("registration_open") === "on" || input.get("registration_open") === "true";
     max_upload_size_mb = Number(input.get("max_upload_size_mb")) || 25;
+    material_storage_provider = input.get("material_storage_provider") === "supabase" ? "supabase" : "b2";
     maintenance_mode = input.get("maintenance_mode") === "on" || input.get("maintenance_mode") === "true";
     maintenance_message = String(input.get("maintenance_message") || maintenance_message);
     maintenance_start_time = normalizeBdTimestamp(input.get("maintenance_start_time") as string);
@@ -68,6 +71,7 @@ export async function savePlatformSettings(input: FormData | SystemSettingsInput
   } else {
     registration_open = Boolean(input.registration_open);
     max_upload_size_mb = Number(input.max_upload_size_mb) || 25;
+    material_storage_provider = input.material_storage_provider === "supabase" ? "supabase" : "b2";
     maintenance_mode = Boolean(input.maintenance_mode);
     maintenance_message = input.maintenance_message || maintenance_message;
     maintenance_start_time = normalizeBdTimestamp(input.maintenance_start_time);
@@ -79,6 +83,7 @@ export async function savePlatformSettings(input: FormData | SystemSettingsInput
     id: 1,
     registration_open,
     max_upload_size_mb,
+    material_storage_provider,
     maintenance_mode,
     maintenance_message,
     maintenance_start_time,
