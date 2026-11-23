@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createMaterialSignedUrl } from "@/lib/material-storage";
 
 export async function getStaffMaterialAccessUrl(
   materialId: string,
@@ -37,11 +38,7 @@ export async function getStaffMaterialAccessUrl(
     return { success: false, error: "Material file not found." };
   }
 
-  const { data: signed, error: signError } = await serviceRole.storage
-    .from("academic-materials")
-    .createSignedUrl(material.file_path, 3600, {
-      download: action === "download",
-    });
+  const signedUrl = await createMaterialSignedUrl(serviceRole, material.file_path, 3600, { download: action === "download" }); const signed = signedUrl ? { signedUrl } : null; const signError = signedUrl ? null : new Error("Could not sign URL");
 
   if (signError || !signed?.signedUrl) {
     return { success: false, error: "Could not generate file access URL." };

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createMaterialSignedUrl } from "@/lib/material-storage";
 
 type ReviewFileRequest = {
   materialId: string;
@@ -194,10 +195,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data: signedUrlData, error: signedUrlError } =
-      await serviceSupabase.storage
-        .from("academic-materials")
-        .createSignedUrl(material.file_path, 300);
+    const signedUrl = await createMaterialSignedUrl(serviceSupabase, material.file_path, 300); const signedUrlData = signedUrl ? { signedUrl } : null; const signedUrlError = signedUrl ? null : new Error("Could not sign review URL");
 
     if (signedUrlError || !signedUrlData?.signedUrl) {
       console.error(

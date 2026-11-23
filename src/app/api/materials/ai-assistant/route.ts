@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createMaterialSignedUrl, downloadMaterialBuffer } from "@/lib/material-storage";
 import { PDFDocument } from "pdf-lib";
 import { callGemini, type GeminiPart } from "@/lib/gemini";
 
@@ -113,10 +114,7 @@ export async function POST(request: Request) {
         },
       });
     } else if (material.file_path && ft.includes("pdf") && material.file_size_bytes > 25 * 1024 * 1024 && !body?.skipClientSample) {
-      const normalizedPath = material.file_path.replace(/^\/+/, "").replace(/^academic-materials\//, "");
-      const { data: signed } = await serviceSupabase.storage
-        .from("academic-materials")
-        .createSignedUrl(normalizedPath, 120);
+      const signedUrl = await createMaterialSignedUrl(serviceSupabase, material.file_path, 120); const signed = signedUrl ? { signedUrl } : null;
       if (signed?.signedUrl) {
         return NextResponse.json({
           success: true,
@@ -125,10 +123,7 @@ export async function POST(request: Request) {
         });
       }
     } else if (canAttachInline) {
-      const normalizedPath = material.file_path.replace(/^\/+/, "").replace(/^academic-materials\//, "");
-      const { data: fileBlob } = await serviceSupabase.storage.from("academic-materials").download(normalizedPath);
-      if (fileBlob) {
-        let buffer = Buffer.from(await fileBlob.arrayBuffer());
+      const downloadedBuffer = await downloadMaterialBuffer(serviceSupabase, material.file_path); if (downloadedBuffer) { let buffer = downloadedBuffer;
         if (ft.includes("pdf") && buffer.length > 1.2 * 1024 * 1024) {
           try {
             const srcDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });

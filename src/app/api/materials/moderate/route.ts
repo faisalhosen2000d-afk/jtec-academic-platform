@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { removeMaterialObject } from "@/lib/material-storage";
 import {
   approveMaterial,
   rejectMaterial,
@@ -158,9 +159,7 @@ export async function POST(request: Request) {
       const isEscalated = "escalated" in result && result.escalated;
       if (!isEscalated && material?.file_path) {
         try {
-          await serviceSupabase.storage
-            .from("academic-materials")
-            .remove([material.file_path]);
+          await removeMaterialObject(serviceSupabase, material.file_path);
         } catch (storageErr) {
           console.error("[materials][moderate][storage-remove]", storageErr);
         }

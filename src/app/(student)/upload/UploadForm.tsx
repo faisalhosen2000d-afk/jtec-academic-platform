@@ -286,19 +286,33 @@ export default function UploadForm({
         );
       }
 
-      const supabase = createClient();
-
-      const { error: storageError } = await supabase.storage
-        .from("academic-materials")
-        .upload(prepareData.filePath, file, {
-          contentType: file.type || "application/octet-stream",
-          upsert: false,
+      if (typeof prepareData.uploadUrl === "string" && prepareData.uploadUrl.length > 0) {
+        const putRes = await fetch(prepareData.uploadUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": file.type || "application/octet-stream",
+          },
+          body: file,
         });
 
-      if (storageError) {
-        throw new Error(
-          storageError.message || "The file could not be uploaded to storage.",
-        );
+        if (!putRes.ok) {
+          throw new Error("The file could not be uploaded to cloud storage.");
+        }
+      } else {
+        const supabase = createClient();
+
+        const { error: storageError } = await supabase.storage
+          .from("academic-materials")
+          .upload(prepareData.filePath, file, {
+            contentType: file.type || "application/octet-stream",
+            upsert: false,
+          });
+
+        if (storageError) {
+          throw new Error(
+            storageError.message || "The file could not be uploaded to storage.",
+          );
+        }
       }
 
       const finalizeResponse = await fetch("/api/materials/upload", {

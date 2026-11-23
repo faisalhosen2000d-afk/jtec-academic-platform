@@ -1,3 +1,4 @@
+import { checkMaterialObjectExists } from "@/lib/material-storage";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
@@ -119,15 +120,7 @@ export async function POST(request: Request) {
         diagnostics.push("Material check: Record not found in database.");
       } else {
         let storageOk = false;
-        if (matRow.file_path) {
-          const cleanPath = matRow.file_path.replace(/^\/+/, "");
-          const folder = cleanPath.includes("/") ? cleanPath.slice(0, cleanPath.lastIndexOf("/")) : "";
-          const fileName = cleanPath.includes("/") ? cleanPath.slice(cleanPath.lastIndexOf("/") + 1) : cleanPath;
-          const { data: listed } = await serviceSupabase.storage
-            .from("academic-materials")
-            .list(folder, { search: fileName, limit: 5 });
-          storageOk = Boolean(listed && listed.some((f) => f.name === fileName));
-        }
+        if (matRow.file_path) { storageOk = await checkMaterialObjectExists(serviceSupabase, matRow.file_path); }
         diagnostics.push(
           `Material "${matRow.title || "Untitled"}" (status: ${matRow.status || "unknown"}), File in storage: ${storageOk ? "Yes" : "NO (Missing/Broken file)"}`
         );

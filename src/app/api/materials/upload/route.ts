@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createB2UploadPresignedUrl, isB2Configured, removeMaterialObject } from "@/lib/material-storage";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
@@ -220,7 +221,7 @@ export async function POST(request: Request) {
       materialId,
     ].join("/");
 
-    if (!filePath.startsWith(`${expectedPrefix}/`)) {
+    if (!filePath.startsWith(`${expectedPrefix}/`) && !filePath.startsWith(`b2://${expectedPrefix}/`)) {
       return jsonError("Invalid storage file path.");
     }
 
@@ -247,10 +248,29 @@ export async function POST(request: Request) {
     }
 
     if (action === "prepare") {
+      if (isB2Configured()) {
+        const b2Prep = await createB2UploadPresignedUrl(filePath, fileType);
+        if (!b2Prep) {
+          return NextResponse.json(
+            { error: "Storage service could not prepare upload URL." },
+            { status: 500 },
+          );
+        }
+        return NextResponse.json({
+          success: true,
+          materialId,
+          filePath: b2Prep.storagePath,
+          uploadUrl: b2Prep.uploadUrl,
+          storageProvider: "b2",
+          message: "Upload preparation successful.",
+        });
+      }
+
       return NextResponse.json({
         success: true,
         materialId,
         filePath,
+        storageProvider: "supabase",
         message: "Upload preparation successful.",
       });
     }
@@ -280,9 +300,7 @@ export async function POST(request: Request) {
     if (materialError || !material) {
       console.error("Material database insert error:", materialError);
 
-      await supabase.storage
-        .from("academic-materials")
-        .remove([filePath]);
+      await removeMaterialObject(createServiceRoleClient(), filePath);
 
       return NextResponse.json(
         { error: materialError?.message ?? "Material could not be saved." },

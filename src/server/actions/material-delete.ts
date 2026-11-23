@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { removeMaterialObject } from "@/lib/material-storage";
 
 export type DeleteApprovedMaterialResult =
   | { success: true }
@@ -105,13 +106,7 @@ export async function deleteApprovedMaterial(
     };
   }
 
-  const { error: storageError } = await serviceSupabase.storage
-    .from("academic-materials")
-    .remove([material.file_path]);
-
-  if (storageError) {
-    console.error("Material storage deletion error:", storageError);
-  }
+  try { await removeMaterialObject(serviceSupabase, material.file_path); } catch (storageError) { console.error("Material storage deletion error:", storageError); }
 
   // Send in-app notification to the uploader
   if (material.uploader_id) {
