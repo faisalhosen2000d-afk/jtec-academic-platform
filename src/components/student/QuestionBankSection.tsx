@@ -99,6 +99,12 @@ export default function QuestionBankSection({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
+  const [uploadProgress, setUploadProgress] = useState<{
+    step: 0 | 1 | 2 | 3 | 4;
+    percent: number;
+    loadedBytes: number;
+    totalBytes: number;
+  }>({ step: 0, percent: 0, loadedBytes: 0, totalBytes: 0 });
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
 
@@ -157,6 +163,7 @@ export default function QuestionBankSection({
     setUploadError("");
     setUploadSuccess("");
     setUploadStatus("");
+    setUploadProgress({ step: 0, percent: 0, loadedBytes: 0, totalBytes: 0 });
     setSelectedFiles([]);
     setUploadNotes("");
     setUploadBatch("");
@@ -218,14 +225,17 @@ export default function QuestionBankSection({
 
       let pdfFile: File;
       if (isSinglePdf) {
+        setUploadProgress({ step: 2, percent: 50, loadedBytes: 0, totalBytes: (selectedFiles[0]?.size ?? 0) });
         pdfFile = selectedFiles[0] as File;
       } else if (pdfFormatMode === "ai_text") {
-        setUploadStatus("Reading question paper layout & extracting copyable text via AI...");
+        setUploadProgress({ step: 1, percent: 22, loadedBytes: 0, totalBytes: 0 });
+        setUploadStatus("AI is reading question format & text...");
         const ocrForm = new FormData();
         for (const f of selectedFiles.slice(0, 8)) {
           const compressed = await compressImageForOcr(f);
           ocrForm.append("images", compressed);
         }
+        setUploadProgress({ step: 1, percent: 38, loadedBytes: 0, totalBytes: 0 });
         const ocrRes = await fetch("/api/questions/extract", {
           method: "POST",
           body: ocrForm,
@@ -240,14 +250,17 @@ export default function QuestionBankSection({
         if (!ocrRes.ok || !ocrData.success || !ocrData.extracted) {
           throw new Error(ocrData?.error || "Could not extract text from question photo.");
         }
-        setUploadStatus("Generating clean formatted A4 PDF (copyable text)...");
+        setUploadProgress({ step: 2, percent: 58, loadedBytes: 0, totalBytes: 0 });
+        setUploadStatus("Generating clean formatted A4 PDF...");
         pdfFile = await buildCleanQuestionPdf(ocrData.extracted, baseName);
       } else {
+        setUploadProgress({ step: 2, percent: 52, loadedBytes: 0, totalBytes: 0 });
         setUploadStatus("Merging photos into A4 PDF...");
         pdfFile = await convertImagesToSinglePdf(selectedFiles, baseName);
       }
 
-      setUploadStatus("Preparing secure upload...");
+      setUploadProgress({ step: 3, percent: 65, loadedBytes: 0, totalBytes: pdfFile.size });
+      setUploadStatus("Preparing secure cloud upload...");
       const prepRes = await fetch("/api/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -270,12 +283,27 @@ export default function QuestionBankSection({
 
       setUploadStatus("Uploading PDF to Cloud Storage...");
       if (typeof prepData.uploadUrl === "string" && prepData.uploadUrl.length > 0) {
-        const putRes = await fetch(prepData.uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": "application/pdf" },
-          body: pdfFile,
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", prepData.uploadUrl, true);
+          xhr.setRequestHeader("Content-Type", "application/pdf");
+          xhr.upload.onprogress = (ev) => {
+            if (!ev.lengthComputable || ev.total <= 0) return;
+            const frac = ev.loaded / ev.total;
+            setUploadProgress({
+              step: 3,
+              percent: Math.min(92, Math.round(65 + frac * 27)),
+              loadedBytes: ev.loaded,
+              totalBytes: ev.total,
+            });
+          };
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve();
+            else reject(new Error("Cloud upload failed."));
+          };
+          xhr.onerror = () => reject(new Error("Network error while uploading PDF."));
+          xhr.send(pdfFile);
         });
-        if (!putRes.ok) throw new Error("Cloud upload failed.");
       } else {
         const sb = createClient();
         const { error: sbErr } = await sb.storage
@@ -287,7 +315,8 @@ export default function QuestionBankSection({
         if (sbErr) throw new Error(sbErr.message || "Storage upload failed.");
       }
 
-      setUploadStatus("Finalizing submission...");
+      setUploadProgress({ step: 4, percent: 96, loadedBytes: pdfFile.size, totalBytes: pdfFile.size });
+      setUploadStatus("Saving question record...");
       const finRes = await fetch("/api/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -310,6 +339,7 @@ export default function QuestionBankSection({
         throw new Error(finData?.error || "Could not save question paper.");
       }
 
+      setUploadProgress({ step: 4, percent: 100, loadedBytes: pdfFile.size, totalBytes: pdfFile.size });
       setUploadSuccess(finData.message || "Question submitted!");
       setSelectedFiles([]);
       setUploadNotes("");
@@ -317,6 +347,7 @@ export default function QuestionBankSection({
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed.");
       setUploadStatus("");
+      setUploadProgress({ step: 0, percent: 0, loadedBytes: 0, totalBytes: 0 });
     } finally {
       setUploading(false);
     }
@@ -762,10 +793,62 @@ export default function QuestionBankSection({
                   <span>{uploadSuccess}</span>
                 </div>
               )}
-              {uploadStatus && (
-                <div className="flex items-center gap-2 text-xs text-cyan-300">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>{uploadStatus}</span>
+              {(uploading || uploadProgress.percent === 100) && uploadProgress.step > 0 && (
+                <div className="rounded-xl border border-cyan-500/35 bg-[#060A12] p-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-cyan-200">
+                      {uploadProgress.percent === 100 ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      ) : (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-cyan-400" />
+                      )}
+                      <span>{uploadStatus || "Completed!"}</span>
+                    </span>
+                    <span className="font-mono font-bold text-cyan-300">{uploadProgress.percent}%</span>
+                  </div>
+
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-800">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        uploadProgress.percent === 100
+                          ? "bg-emerald-400"
+                          : "bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-400"
+                      }`}
+                      style={{ width: `${uploadProgress.percent}%` }}
+                    />
+                  </div>
+
+                  <div className="mt-2.5 grid grid-cols-4 gap-1 text-center text-[10px] font-semibold">
+                    {[
+                      { s: 1, label: "1. AI Read" },
+                      { s: 2, label: "2. Build PDF" },
+                      { s: 3, label: "3. Upload" },
+                      { s: 4, label: "4. Done" },
+                    ].map((st) => {
+                      const active = uploadProgress.step === st.s && uploadProgress.percent < 100;
+                      const done = uploadProgress.step > st.s || uploadProgress.percent === 100;
+                      return (
+                        <div
+                          key={st.s}
+                          className={`rounded-lg px-1 py-1 ${
+                            done
+                              ? "bg-emerald-500/20 text-emerald-300"
+                              : active
+                                ? "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-400/50"
+                                : "bg-slate-900 text-slate-500"
+                          }`}
+                        >
+                          {st.label}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {uploadProgress.totalBytes > 0 && (
+                    <div className="mt-1.5 text-right text-[10px] text-slate-400">
+                      {formatBytes(uploadProgress.loadedBytes)} / {formatBytes(uploadProgress.totalBytes)}
+                    </div>
+                  )}
                 </div>
               )}
 
