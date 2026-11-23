@@ -17,7 +17,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { convertImagesToSinglePdf } from "@/lib/images-to-pdf";
+import { buildCleanQuestionPdf, compressImageForOcr, convertImagesToSinglePdf } from "@/lib/images-to-pdf";
 
 export type QuestionBankItem = {
   id: string;
@@ -94,6 +94,7 @@ export default function QuestionBankSection({
   const [uploadCt, setUploadCt] = useState<number>(1);
   const [uploadBatch, setUploadBatch] = useState("");
   const [uploadNotes, setUploadNotes] = useState("");
+  const [pdfFormatMode, setPdfFormatMode] = useState<"ai_text" | "photo_pdf">("ai_text");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
@@ -203,12 +204,41 @@ export default function QuestionBankSection({
 
     setUploading(true);
     try {
-      setUploadStatus("Converting photos into clean A4 PDF...");
       const baseName =
         mode === "previous_year"
           ? `${activeUploadSubject.subject_code}_PYQ_${uploadYear}.pdf`
           : `${activeUploadSubject.subject_code}_CT${uploadCt}.pdf`;
-      const pdfFile = await convertImagesToSinglePdf(selectedFiles, baseName);
+
+      const isSinglePdf =
+        selectedFiles.length === 1 &&
+        selectedFiles[0] &&
+        (selectedFiles[0].type === "application/pdf" ||
+          selectedFiles[0].name.toLowerCase().endsWith(".pdf"));
+
+      let pdfFile: File;
+      if (isSinglePdf) {
+        pdfFile = selectedFiles[0] as File;
+      } else if (pdfFormatMode === "ai_text") {
+        setUploadStatus("Reading question paper layout & extracting copyable text via AI...");
+        const ocrForm = new FormData();
+        for (const f of selectedFiles.slice(0, 8)) {
+          const compressed = await compressImageForOcr(f);
+          ocrForm.append("images", compressed);
+        }
+        const ocrRes = await fetch("/api/questions/extract", {
+          method: "POST",
+          body: ocrForm,
+        });
+        const ocrData = await ocrRes.json();
+        if (!ocrRes.ok || !ocrData.success || !ocrData.extracted) {
+          throw new Error(ocrData?.error || "Could not extract text from question photo.");
+        }
+        setUploadStatus("Generating clean formatted A4 PDF (copyable text)...");
+        pdfFile = await buildCleanQuestionPdf(ocrData.extracted, baseName);
+      } else {
+        setUploadStatus("Merging photos into A4 PDF...");
+        pdfFile = await convertImagesToSinglePdf(selectedFiles, baseName);
+      }
 
       setUploadStatus("Preparing secure upload...");
       const prepRes = await fetch("/api/questions", {
@@ -658,6 +688,41 @@ export default function QuestionBankSection({
                   />
                 </label>
               </div>
+
+              {selectedFiles.length > 0 &&
+                !selectedFiles.every((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")) && (
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                      PDF Output Format
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPdfFormatMode("ai_text")}
+                        className={`rounded-xl border p-2.5 text-left text-xs transition ${
+                          pdfFormatMode === "ai_text"
+                            ? "border-cyan-400/70 bg-cyan-500/15 text-cyan-200"
+                            : "border-slate-700 bg-[#060A12] text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        <div className="font-bold">AI Clean Text PDF</div>
+                        <div className="mt-0.5 text-[10px] opacity-80">Exact format, copyable text</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPdfFormatMode("photo_pdf")}
+                        className={`rounded-xl border p-2.5 text-left text-xs transition ${
+                          pdfFormatMode === "photo_pdf"
+                            ? "border-cyan-400/70 bg-cyan-500/15 text-cyan-200"
+                            : "border-slate-700 bg-[#060A12] text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        <div className="font-bold">Original Photo PDF</div>
+                        <div className="mt-0.5 text-[10px] opacity-80">Best if paper has diagrams</div>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
               <div>
                 <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
