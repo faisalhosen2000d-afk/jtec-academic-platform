@@ -39,7 +39,15 @@ export type QuestionBankItem = {
   downloads_count: number;
   created_at: string;
   is_reference?: boolean;
+  is_own_dept?: boolean;
   source_label?: string | null;
+  uploader?: {
+    full_name: string;
+    student_id: string | null;
+    avatar_url: string | null;
+    email: string | null;
+    dept_code: string | null;
+  } | null;
 };
 
 export type QuestionSubjectOption = {
@@ -227,6 +235,7 @@ export default function QuestionBankSection({
   const [selectedYearFilter, setSelectedYearFilter] = useState<string>("all");
   const [selectedCtFilter, setSelectedCtFilter] = useState<string>("all");
   const [loadingAccessId, setLoadingAccessId] = useState<string | null>(null);
+  const [activeUploaderProfile, setActiveUploaderProfile] = useState<NonNullable<QuestionBankItem["uploader"]> | null>(null);
   const [accessError, setAccessError] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -998,6 +1007,72 @@ export default function QuestionBankSection({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Uploader Profile Modal */}
+      {activeUploaderProfile && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onClick={() => setActiveUploaderProfile(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-slate-800 bg-[#0B1221] p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                {activeUploaderProfile.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={activeUploaderProfile.avatar_url}
+                    alt={activeUploaderProfile.full_name}
+                    className="h-12 w-12 rounded-full border border-cyan-500/30 object-cover"
+                  />
+                ) : (
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 text-base font-bold text-cyan-200">
+                    {activeUploaderProfile.full_name.charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    {activeUploaderProfile.full_name}
+                  </h3>
+                  <p className="text-xs text-slate-400">Question Contributor</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveUploaderProfile(null)}
+                className="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2 rounded-xl border border-slate-800/90 bg-[#070D19] p-3 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-400">Student ID</span>
+                <span className="font-mono font-semibold text-white">
+                  {activeUploaderProfile.student_id || "Not set"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-400">Department</span>
+                <span className="font-semibold text-cyan-300">
+                  {activeUploaderProfile.dept_code || "JTEC"}
+                </span>
+              </div>
+              {activeUploaderProfile.email && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-400">Email</span>
+                  <span className="truncate font-medium text-slate-200">
+                    {activeUploaderProfile.email}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

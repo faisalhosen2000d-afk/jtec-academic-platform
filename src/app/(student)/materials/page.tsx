@@ -305,11 +305,36 @@ export default async function MaterialsPage() {
     const [{ data: qRows }, { data: deptRows }] = await Promise.all([
       rawSb
         .from("question_bank_items")
-        .select("id, subject_id, subject_code, level_id, term_id, department_id, question_type, exam_year, ct_number, batch_label, notes, file_size_bytes, share_across_depts, status, views_count, downloads_count, created_at")
+        .select("id, uploader_id, subject_id, subject_code, level_id, term_id, department_id, question_type, exam_year, ct_number, batch_label, notes, file_size_bytes, share_across_depts, status, views_count, downloads_count, created_at")
         .in("status", ["pending", "approved"])
         .order("created_at", { ascending: false }),
       rawSb.from("departments").select("id, code"),
     ]);
+
+    const qUploaderIds = Array.from(
+      new Set(
+        ((qRows ?? []) as Array<Record<string, unknown>>)
+          .map((r) => String(r.uploader_id ?? ""))
+          .filter(Boolean),
+      ),
+    );
+    const { data: qProfileRows } = qUploaderIds.length
+      ? await rawSb
+          .from("profiles")
+          .select("id, full_name, student_id, avatar_url, email")
+          .in("id", qUploaderIds)
+      : { data: [] as Array<Record<string, unknown>> };
+    const qUploaderMap = new Map(
+      ((qProfileRows ?? []) as Array<{ id: string; full_name?: string | null; student_id?: string | null; avatar_url?: string | null; email?: string | null }>).map((p) => [
+        String(p.id),
+        {
+          full_name: String(p.full_name || "JTEC Student"),
+          student_id: p.student_id ? String(p.student_id) : null,
+          avatar_url: p.avatar_url ? String(p.avatar_url) : null,
+          email: p.email ? String(p.email) : null,
+        },
+      ]),
+    );
 
     const deptCodeById = new Map(
       ((deptRows ?? []) as Array<{ id: string; code: string | null }>).map((d) => [
@@ -376,11 +401,25 @@ export default async function MaterialsPage() {
           downloads_count: Number(row.downloads_count ?? 0),
           created_at: String(row.created_at ?? ""),
           is_reference: isCrossTermRef,
-          source_label: isCrossTermRef
-            ? [deptCodeById.get(String(row.department_id ?? "")), termLabelById.get(sTerm)]
-                .filter(Boolean)
-                .join(" ? ") || "Other Term"
-            : null,
+          is_own_dept: sameDept,
+          source_label: (() => {
+            const dCode = deptCodeById.get(String(row.department_id ?? ""));
+            if (isCrossTermRef) {
+              return [dCode, termLabelById.get(sTerm)].filter(Boolean).join(" \u00B7 ") || "Other Term";
+            }
+            if (dCode) {
+              return sameDept ? `${dCode} \u00B7 Your Dept` : `${dCode} \u00B7 Same Term`;
+            }
+            return sameDept ? "Your Dept" : "Other Dept";
+          })(),
+          uploader: (() => {
+            const u = qUploaderMap.get(String(row.uploader_id ?? ""));
+            if (!u) return null;
+            return {
+              ...u,
+              dept_code: deptCodeById.get(String(row.department_id ?? "")) || null,
+            };
+          })(),
         });
       }
     }
