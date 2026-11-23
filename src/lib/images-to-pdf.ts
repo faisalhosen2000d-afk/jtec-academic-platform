@@ -9,6 +9,7 @@ export type ExtractedQuestionPaper = {
     number?: string;
     text?: string;
     marks?: string;
+    table?: string[][];
   }>;
 };
 
@@ -22,8 +23,10 @@ function sanitizeForWinAnsi(text: string): string {
     .replace(/\u2264/g, "<=")
     .replace(/\u2265/g, ">=")
     .replace(/\u2248/g, "~=")
-    .replace(/\u00B0/g, " deg ")
-    .replace(/[^\x20-\x7E\n]/g, " ")
+    .replace(/(\d+)\s*\u00B0\s*([cCfFkK])\b/g, (_, n: string, u: string) => `${n}\u00B0${u.toUpperCase()}`)
+    .replace(/(\d+)\s*deg\s*([cCfFkK])\b/gi, (_, n: string, u: string) => `${n}\u00B0${u.toUpperCase()}`)
+    .replace(/(\d+)\s*deg\b/gi, "$1\u00B0")
+    .replace(/[^\x20-\x7E\u00B0\u00B1\u00B2\u00B3\n]/g, " ")
     .replace(/[ \t]+/g, " ")
     .trim();
 }
@@ -128,7 +131,6 @@ export async function buildCleanQuestionPdf(
     y -= 10;
   }
 
-  // Divider rule
   page.drawLine({
     start: { x: marginX, y },
     end: { x: a4W - marginX, y },
@@ -155,16 +157,16 @@ export async function buildCleanQuestionPdf(
   }
   if (instructions.length > 0) y -= 6;
 
-  // Questions with right-aligned marks
+  // Questions + right-aligned marks + bordered tables
   const questions = extracted.questions ?? [];
   for (const q of questions) {
     const qNum = sanitizeForWinAnsi(q.number ?? "");
     const qText = sanitizeForWinAnsi(q.text ?? "");
     const qMarks = sanitizeForWinAnsi(q.marks ?? "");
-    if (!qNum && !qText) continue;
+    if (!qNum && !qText && (!q.table || q.table.length === 0)) continue;
 
     const fullText = qNum ? `${qNum} ${qText}` : qText;
-    const lines = wrapLines(fullText, fontRegular, 11, questionTextMaxW);
+    const lines = fullText ? wrapLines(fullText, fontRegular, 11, questionTextMaxW) : [];
     const neededH = Math.max(18, lines.length * 16 + 6);
     ensureSpace(neededH);
 
@@ -190,6 +192,66 @@ export async function buildCleanQuestionPdf(
     }
 
     y -= lines.length * 16 + 6;
+
+    // Render bordered grid table if present
+    if (Array.isArray(q.table) && q.table.length > 0) {
+      const cleanRows = q.table
+        .map((row) => row.map((cell) => sanitizeForWinAnsi(String(cell ?? ""))))
+        .filter((row) => row.some((cell) => cell.length > 0));
+
+      if (cleanRows.length > 0) {
+        const colCount = Math.max(...cleanRows.map((r) => r.length));
+        const rowH = 22;
+        const tableH = cleanRows.length * rowH;
+        ensureSpace(tableH + 14);
+
+        const firstColW = Math.min(165, Math.max(115, contentW * 0.28));
+        const otherColW = colCount > 1 ? (contentW - firstColW) / (colCount - 1) : contentW;
+
+        const getColX = (cIdx: number) =>
+          marginX + (cIdx === 0 ? 0 : firstColW + (cIdx - 1) * otherColW);
+        const getColW = (cIdx: number) =>
+          colCount === 1 ? contentW : cIdx === 0 ? firstColW : otherColW;
+
+        const topY = y + 2;
+        for (let rIdx = 0; rIdx < cleanRows.length; rIdx++) {
+          const rowTop = topY - rIdx * rowH;
+          const rowBot = rowTop - rowH;
+          const row = cleanRows[rIdx] ?? [];
+
+          for (let cIdx = 0; cIdx < colCount; cIdx++) {
+            const cellX = getColX(cIdx);
+            const cellW = getColW(cIdx);
+            const cellText = row[cIdx] ?? "";
+            const f = cIdx === 0 || rIdx === 0 ? fontBold : fontRegular;
+            const fontSize = cellW < 45 ? 9.5 : 10;
+
+            page.drawRectangle({
+              x: cellX,
+              y: rowBot,
+              width: cellW,
+              height: rowH,
+              borderColor: rgb(0.2, 0.22, 0.28),
+              borderWidth: 0.75,
+            });
+
+            if (cellText) {
+              const tw = f.widthOfTextAtSize(cellText, fontSize);
+              const tx = cellX + Math.max(4, (cellW - tw) / 2);
+              const ty = rowBot + (rowH - fontSize) / 2 + 1.5;
+              page.drawText(cellText, {
+                x: tx,
+                y: ty,
+                size: fontSize,
+                font: f,
+                color: rgb(0.06, 0.06, 0.08),
+              });
+            }
+          }
+        }
+        y = topY - tableH - 12;
+      }
+    }
   }
 
   const pdfBytes = await pdfDoc.save();

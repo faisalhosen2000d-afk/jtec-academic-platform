@@ -11,7 +11,8 @@ RULES:
 1. Extract every header line centered at the top (college name, degree, exam title, level/term, subject name & code).
 2. Extract Time (left) and Full Marks (right) exactly as written.
 3. Transcribe every question, sub-question ((a), (b), (i), etc.), OR-blocks, and the right-side marks exactly. Do NOT summarize, skip, or rephrase anything.
-4. Keep clean ASCII/standard Unicode symbols (use standard -, +, x, =, deg, <=, >=) so standard PDF fonts render cleanly.
+4. Use proper degree symbols like °C or °F (capitalize C/F, e.g. 0°C, 20°C, 800°C) and standard symbols (-, +, x, =, <=, >=, %).
+5. If a question contains any data table / chart of numbers, DO NOT flatten it into plain text lines — put it in the "table" 2D array (rows of cells) on that question object!
 
 Return strictly valid JSON with this exact structure:
 {
@@ -20,7 +21,12 @@ Return strictly valid JSON with this exact structure:
   "marks": "Marks-10",
   "instructions": ["Answer any ...", "..."],
   "questions": [
-    { "number": "1.", "text": "Define Market. Classify the market...", "marks": "2" }
+    {
+      "number": "1.",
+      "text": "Define Market...",
+      "marks": "2",
+      "table": [["Load (tons)", "0.5", "1.0"], ["Thickness loss (%)", "4", "13"]]
+    }
   ]
 }`;
 
