@@ -1,5 +1,6 @@
 import {
   DeleteObjectCommand,
+  ListObjectVersionsCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -180,6 +181,36 @@ export async function removeMaterialObject(
     if (!b2) return;
 
     const cleanKey = normalizeMaterialKey(filePath);
+
+    try {
+      const listed = await b2.client.send(
+        new ListObjectVersionsCommand({
+          Bucket: b2.bucket,
+          Prefix: cleanKey,
+        }),
+      );
+
+      const targets = [
+        ...(listed.Versions ?? []),
+        ...(listed.DeleteMarkers ?? []),
+      ].filter((v) => v.Key === cleanKey && v.VersionId);
+
+      if (targets.length > 0) {
+        for (const item of targets) {
+          await b2.client.send(
+            new DeleteObjectCommand({
+              Bucket: b2.bucket,
+              Key: cleanKey,
+              VersionId: item.VersionId,
+            }),
+          );
+        }
+        return;
+      }
+    } catch {
+      // Fall back to standard DeleteObject if version listing fails
+    }
+
     await b2.client.send(
       new DeleteObjectCommand({
         Bucket: b2.bucket,
