@@ -15,6 +15,7 @@ import {
   Calendar,
   ClipboardList,
   Image as ImageIcon,
+  Eye,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { buildCleanQuestionPdf, compressImageForOcr, convertImagesToSinglePdf } from "@/lib/images-to-pdf";
@@ -534,8 +535,15 @@ export default function QuestionBankSection({
                       <FileText className="h-3.5 w-3.5 text-rose-400" />
                       PDF &middot; {formatBytes(item.file_size_bytes)}
                     </span>
-                    <span>
-                      {item.views_count} views &middot; {item.downloads_count} dl
+                    <span className="inline-flex items-center gap-3">
+                      <span className="inline-flex items-center gap-1" title="Views">
+                        <Eye className="h-3.5 w-3.5 text-cyan-400" />
+                        {item.views_count}
+                      </span>
+                      <span className="inline-flex items-center gap-1" title="Downloads">
+                        <Download className="h-3.5 w-3.5 text-emerald-400" />
+                        {item.downloads_count}
+                      </span>
                     </span>
                   </div>
 
