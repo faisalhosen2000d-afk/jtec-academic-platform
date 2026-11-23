@@ -204,7 +204,7 @@ export async function buildCleanQuestionPdf(
 
 async function fileToJpegBytes(file: File): Promise<Uint8Array> {
   const bitmap = await createImageBitmap(file);
-  const maxDim = 1600;
+  const maxDim = 1200;
   const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
   const w = Math.max(1, Math.round(bitmap.width * scale));
   const h = Math.max(1, Math.round(bitmap.height * scale));
@@ -221,7 +221,7 @@ async function fileToJpegBytes(file: File): Promise<Uint8Array> {
   bitmap.close();
 
   const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob((b) => resolve(b), "image/jpeg", 0.85),
+    canvas.toBlob((b) => resolve(b), "image/jpeg", 0.78),
   );
   if (!blob) throw new Error("Could not process image.");
   return new Uint8Array(await blob.arrayBuffer());

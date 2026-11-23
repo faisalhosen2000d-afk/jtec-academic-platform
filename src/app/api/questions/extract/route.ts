@@ -43,6 +43,7 @@ async function callOpenAiCompatibleVision(
   ];
 
   const res = await fetch(endpoint, {
+    signal: AbortSignal.timeout(18000),
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,

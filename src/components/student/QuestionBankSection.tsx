@@ -229,7 +229,13 @@ export default function QuestionBankSection({
           method: "POST",
           body: ocrForm,
         });
-        const ocrData = await ocrRes.json();
+        const ocrText = await ocrRes.text();
+        let ocrData: { success?: boolean; extracted?: unknown; error?: string };
+        try {
+          ocrData = JSON.parse(ocrText);
+        } catch {
+          throw new Error("AI vision server timed out. Please retry or use Original Photo PDF.");
+        }
         if (!ocrRes.ok || !ocrData.success || !ocrData.extracted) {
           throw new Error(ocrData?.error || "Could not extract text from question photo.");
         }
