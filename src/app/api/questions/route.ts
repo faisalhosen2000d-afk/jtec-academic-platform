@@ -90,7 +90,7 @@ export async function POST(request: Request) {
 
     const rawClient = getRawClient();
 
-    const { data: subjectRow, error: subjectErr } = await rawClient
+    const { data: subjectRow, error: subjectErr } = await supabase
       .from("subjects")
       .select("id, subject_code, department_id, level_id, term_id")
       .eq("id", subjectId)
