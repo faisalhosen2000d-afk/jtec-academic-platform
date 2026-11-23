@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 type ReviewActionsProps = {
   materialId: string;
@@ -11,6 +12,7 @@ type ModalType = "approve" | "reject" | null;
 export default function ReviewActions({
   materialId,
 }: ReviewActionsProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState<"approve" | "reject" | null>(
     null,
   );
@@ -63,7 +65,7 @@ export default function ReviewActions({
       setModal(null);
       setRejectionReason("");
 
-      window.location.reload();
+      router.refresh();
     } catch (err) {
       setError(
         err instanceof Error
@@ -119,7 +121,7 @@ export default function ReviewActions({
       setModal(null);
       setRejectionReason("");
 
-      window.location.reload();
+      router.refresh();
     } catch (err) {
       setError(
         err instanceof Error

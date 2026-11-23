@@ -23,9 +23,11 @@ export default function QuestionReviewPanel({
 }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [handledIds, setHandledIds] = useState<string[]>([]);
   const [error, setError] = useState("");
 
-  if (items.length === 0) return null;
+  const visibleItems = items.filter((it) => !handledIds.includes(it.id));
+  if (visibleItems.length === 0) return null;
 
   const openFile = async (itemId: string) => {
     setError("");
@@ -61,6 +63,7 @@ export default function QuestionReviewPanel({
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data?.error || "Moderation failed.");
+      setHandledIds((prev) => [...prev, itemId]);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Moderation failed.");
@@ -73,7 +76,7 @@ export default function QuestionReviewPanel({
     <section className="mt-8 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="font-serif text-xl font-bold text-white">
-          Pending Question Bank Submissions ({items.length})
+          Pending Question Bank Submissions ({visibleItems.length})
         </h2>
         <span className="rounded-full border border-amber-500/35 bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-300">
           PYQ &amp; CT Papers
@@ -87,7 +90,7 @@ export default function QuestionReviewPanel({
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
-        {items.map((q) => (
+        {visibleItems.map((q) => (
           <div
             key={q.id}
             className="rounded-2xl border border-slate-800 bg-[#0A1020] p-4"
