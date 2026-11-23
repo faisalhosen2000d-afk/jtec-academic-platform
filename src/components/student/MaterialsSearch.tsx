@@ -347,7 +347,7 @@ export default function MaterialsSearch({
   return (
     <div className="space-y-6">
       {/* Search & Filters Panel */}
-      <section className="dash-stagger-2 space-y-4 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-5 shadow-xl transition-all duration-200 hover:border-emerald-500/35">
+      <section className="relative z-30 dash-stagger-2 space-y-4 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-5 shadow-xl transition-all duration-200 hover:border-emerald-500/35">
         <div className="grid gap-4 md:grid-cols-12">
           <div className="md:col-span-6">
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
