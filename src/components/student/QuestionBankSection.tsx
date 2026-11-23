@@ -59,6 +59,7 @@ type QuestionBankSectionProps = {
   takenSlots: Array<{
     subject_code: string;
     level_id: string;
+    term_id: string;
     question_type: "previous_year" | "ct";
     exam_year: number | null;
     ct_number: number | null;
@@ -318,7 +319,7 @@ export default function QuestionBankSection({
     if (!activeUploadSubject) return null;
     return takenSlots.find((s) => {
       if (s.question_type !== mode) return false;
-      if (s.subject_code !== activeUploadSubject.subject_code || s.level_id !== activeUploadSubject.level_id) {
+      if (s.subject_code !== activeUploadSubject.subject_code || s.term_id !== activeUploadSubject.term_id) {
         return false;
       }
       if (mode === "previous_year") return s.exam_year === uploadYear;
@@ -636,7 +637,7 @@ export default function QuestionBankSection({
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredItems.map((item) => {
             const subj = subjects.find(
-              (s) => s.id === item.subject_id || (s.subject_code === item.subject_code && s.level_id === item.level_id),
+              (s) => s.id === item.subject_id || (s.subject_code === item.subject_code && s.term_id === item.term_id),
             );
             const isViewing = loadingAccessId === `${item.id}:view`;
             const isDownloading = loadingAccessId === `${item.id}:download`;

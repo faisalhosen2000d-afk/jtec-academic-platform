@@ -187,6 +187,12 @@ export default async function MaterialsPage() {
     ),
   );
 
+  const questionSubjectByKey = new Map(
+    (curriculumSubjects ?? []).map(
+      (subject) => [`${subject.subject_code}::${subject.term_id}`, subject] as const,
+    ),
+  );
+
   const visibleMaterials = (materials ?? []).flatMap((material) => {
     const materialSubject = Array.isArray(material.subject)
       ? material.subject[0] ?? null
@@ -278,6 +284,7 @@ export default async function MaterialsPage() {
   const takenQuestionSlots: Array<{
     subject_code: string;
     level_id: string;
+    term_id: string;
     question_type: "previous_year" | "ct";
     exam_year: number | null;
     ct_number: number | null;
@@ -298,7 +305,8 @@ export default async function MaterialsPage() {
     for (const row of (qRows ?? []) as Array<Record<string, unknown>>) {
       const sCode = String(row.subject_code ?? "");
       const sLevel = String(row.level_id ?? "");
-      const ownSubj = curriculumSubjectByKey.get(`${sCode}::${sLevel}`);
+      const sTerm = String(row.term_id ?? "");
+      const ownSubj = questionSubjectByKey.get(`${sCode}::${sTerm}`);
       if (!ownSubj) continue;
 
       const sameDept = String(row.department_id ?? "") === profile.department_id;
@@ -313,6 +321,7 @@ export default async function MaterialsPage() {
       takenQuestionSlots.push({
         subject_code: sCode,
         level_id: sLevel,
+        term_id: sTerm,
         question_type: qType,
         exam_year: eYear,
         ct_number: cNum,

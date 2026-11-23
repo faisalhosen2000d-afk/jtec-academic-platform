@@ -114,9 +114,8 @@ export async function POST(request: Request) {
     let dupQuery = rawClient
       .from("question_bank_items")
       .select("id, status")
-      .eq("department_id", subject.department_id)
       .eq("term_id", subject.term_id)
-      .eq("subject_id", subject.id)
+      .eq("subject_code", subject.subject_code)
       .eq("question_type", questionType)
       .in("status", ["pending", "approved"]);
 
