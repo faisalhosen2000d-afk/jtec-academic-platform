@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { signOut } from "@/server/actions/auth";
 import {
@@ -316,7 +317,21 @@ export default async function SuperAdminPage() {
   ]);
 
   const pendingRequests = reqRes.count ?? 0;
-  const pendingMaterials = matRes.count ?? 0;
+  let pendingQCount = 0;
+  try {
+    const rawSb = createRawSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
+    const { count } = await rawSb
+      .from("question_bank_items")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
+    pendingQCount = count ?? 0;
+  } catch {
+    pendingQCount = 0;
+  }
+  const pendingMaterials = (matRes.count ?? 0) + pendingQCount;
   const totalUsers = usersRes.count ?? 0;
   const publishedNotices = noticesRes.count ?? 0;
 

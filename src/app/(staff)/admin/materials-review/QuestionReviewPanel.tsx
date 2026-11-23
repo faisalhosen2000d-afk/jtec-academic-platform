@@ -111,7 +111,7 @@ export default function QuestionReviewPanel({
             )}
             <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-slate-400">
               <FileText className="h-3.5 w-3.5 text-rose-400" />
-              PDF &middot; {(q.file_size_bytes / (1024 * 1024)).toFixed(2)} MB
+              PDF &middot; {q.file_size_bytes >= 1024 * 1024 ? `${(q.file_size_bytes / (1024 * 1024)).toFixed(2)} MB` : `${Math.max(1, Math.round(q.file_size_bytes / 1024))} KB`}
             </p>
 
             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-800 pt-3">
