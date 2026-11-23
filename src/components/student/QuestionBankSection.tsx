@@ -47,6 +47,7 @@ export type QuestionBankItem = {
     avatar_url: string | null;
     email: string | null;
     dept_code: string | null;
+    dept_name?: string | null;
   } | null;
 };
 
@@ -685,6 +686,18 @@ export default function QuestionBankSection({
                         : `CT-${item.ct_number}`}
                     </span>
                   </div>
+                    {item.source_label && (
+                      <p
+                        className={`mt-2 inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold ${
+                          item.is_own_dept
+                            ? "border-emerald-500/35 bg-emerald-500/15 text-emerald-200"
+                            : "border-cyan-500/30 bg-cyan-500/10 text-cyan-200"
+                        }`}
+                      >
+                        {item.source_label}
+                      </p>
+                    )}
+
 
                   <h3 className="mt-2.5 text-sm font-bold text-white">
                     {subj?.subject_name || item.subject_code}
@@ -1093,7 +1106,9 @@ export default function QuestionBankSection({
               <div className="flex items-center justify-between gap-2">
                 <span className="text-slate-400">Department</span>
                 <span className="font-semibold text-cyan-300">
-                  {activeUploaderProfile.dept_code || "JTEC"}
+                  {activeUploaderProfile.dept_name && activeUploaderProfile.dept_code
+                    ? `${activeUploaderProfile.dept_name} (${activeUploaderProfile.dept_code})`
+                    : activeUploaderProfile.dept_code || activeUploaderProfile.dept_name || "JTEC"}
                 </span>
               </div>
               {activeUploaderProfile.email && (

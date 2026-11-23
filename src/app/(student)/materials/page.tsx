@@ -308,7 +308,7 @@ export default async function MaterialsPage() {
         .select("id, uploader_id, subject_id, subject_code, level_id, term_id, department_id, question_type, exam_year, ct_number, batch_label, notes, file_size_bytes, share_across_depts, status, views_count, downloads_count, created_at")
         .in("status", ["pending", "approved"])
         .order("created_at", { ascending: false }),
-      rawSb.from("departments").select("id, code"),
+      supabase.from("departments").select("id, code, name"),
     ]);
 
     const qUploaderIds = Array.from(
@@ -321,26 +321,28 @@ export default async function MaterialsPage() {
     const { data: qProfileRows } = qUploaderIds.length
       ? await rawSb
           .from("profiles")
-          .select("id, full_name, student_id, avatar_url, email")
+          .select("id, full_name, student_id, avatar_url, email, department_id")
           .in("id", qUploaderIds)
       : { data: [] as Array<Record<string, unknown>> };
     const qUploaderMap = new Map(
-      ((qProfileRows ?? []) as Array<{ id: string; full_name?: string | null; student_id?: string | null; avatar_url?: string | null; email?: string | null }>).map((p) => [
+      ((qProfileRows ?? []) as Array<{ id: string; full_name?: string | null; student_id?: string | null; avatar_url?: string | null; email?: string | null; department_id?: string | null }>).map((p) => [
         String(p.id),
         {
           full_name: String(p.full_name || "JTEC Student"),
           student_id: p.student_id ? String(p.student_id) : null,
           avatar_url: p.avatar_url ? String(p.avatar_url) : null,
           email: p.email ? String(p.email) : null,
+          department_id: p.department_id ? String(p.department_id) : null,
         },
       ]),
     );
 
+    const deptRowsTyped = (deptRows ?? []) as Array<{ id: string; code: string | null; name?: string | null }>;
     const deptCodeById = new Map(
-      ((deptRows ?? []) as Array<{ id: string; code: string | null }>).map((d) => [
-        String(d.id),
-        String(d.code ?? ""),
-      ]),
+      deptRowsTyped.map((d) => [String(d.id), String(d.code ?? "")]),
+    );
+    const deptNameById = new Map(
+      deptRowsTyped.map((d) => [String(d.id), String(d.name ?? "")]),
     );
     const levelNameById = new Map(
       (levelsResult.data ?? []).map((l) => [String(l.id), String(l.name ?? "")]),
@@ -417,7 +419,8 @@ export default async function MaterialsPage() {
             if (!u) return null;
             return {
               ...u,
-              dept_code: deptCodeById.get(String(row.department_id ?? "")) || null,
+              dept_code: deptCodeById.get(u.department_id || String(row.department_id ?? "")) || null,
+              dept_name: deptNameById.get(u.department_id || String(row.department_id ?? "")) || null,
             };
           })(),
         });
