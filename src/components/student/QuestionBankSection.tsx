@@ -701,6 +701,38 @@ export default function QuestionBankSection({
                     </p>
                   )}
                 </div>
+                  {item.uploader && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveUploaderProfile(item.uploader ?? null)}
+                      className="mt-3 flex w-full cursor-pointer items-center gap-2 rounded-xl border border-slate-800/90 bg-slate-900/60 px-2.5 py-1.5 text-left transition hover:border-cyan-500/40 hover:bg-slate-900"
+                    >
+                      {item.uploader.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.uploader.avatar_url}
+                          alt={item.uploader.full_name}
+                          className="h-6 w-6 shrink-0 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-[10px] font-bold text-cyan-200">
+                          {item.uploader.full_name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[11px] font-semibold text-slate-200">
+                          {item.uploader.full_name}
+                        </span>
+                        {item.uploader.student_id && (
+                          <span className="block truncate font-mono text-[10px] text-slate-400">
+                            ID: {item.uploader.student_id}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-[10px] font-medium text-cyan-300">Profile</span>
+                    </button>
+                  )}
+
 
                 <div className="mt-4 space-y-2.5 border-t border-slate-800/80 pt-3">
                   <div className="flex items-center justify-between text-[11px] text-slate-400">
