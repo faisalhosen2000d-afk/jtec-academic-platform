@@ -68,16 +68,16 @@ export default async function ApprovedMaterialsPage() {
       )
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
-    serviceSupabase.from("subjects").select("id, subject_name, subject_code"),
+    supabase.from("subjects").select("id, subject_name, subject_code"),
     serviceSupabase.from("profiles").select("id, full_name"),
     rawSb
       .from("question_bank_items")
       .select("id, subject_id, subject_code, department_id, level_id, term_id, uploader_id, question_type, exam_year, ct_number, batch_label, file_size_bytes, views_count, downloads_count")
       .eq("status", "approved")
       .order("created_at", { ascending: false }),
-    serviceSupabase.from("departments").select("id, code"),
-    serviceSupabase.from("levels").select("id, name"),
-    serviceSupabase.from("terms").select("id, name"),
+    supabase.from("departments").select("id, code"),
+    supabase.from("levels").select("id, name"),
+    supabase.from("terms").select("id, name"),
   ]);
 
   const materials = (materialsRes.data ?? []) as ApprovedMaterial[];

@@ -175,7 +175,7 @@ export default function QuestionBankApprovedSection({
                       : `CT-${item.ct_number ?? ""}`}
                   </span>
                   <span className="rounded-md border border-slate-700 bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
-                    {item.department_code} ? {item.term_label}
+                    {item.department_code} &middot; {item.term_label}
                   </span>
                   {item.batch_label && (
                     <span className="text-[11px] text-emerald-300">{item.batch_label}</span>
@@ -185,7 +185,7 @@ export default function QuestionBankApprovedSection({
                   {item.subject_name}
                 </p>
                 <p className="mt-0.5 text-[11px] text-slate-400">
-                  Uploaded by {item.uploader_name} ? {formatBytes(item.file_size_bytes)} ? {item.views_count} views ? {item.downloads_count} downloads
+                  Uploaded by {item.uploader_name} &middot; {formatBytes(item.file_size_bytes)} &middot; {item.views_count} views &middot; {item.downloads_count} downloads
                 </p>
               </div>
 
