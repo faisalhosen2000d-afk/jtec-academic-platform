@@ -412,7 +412,7 @@ export default function QuestionBankSection({
         }
         setUploadProgress({ step: 2, percent: 58, loadedBytes: 0, totalBytes: 0 });
         setUploadStatus("Generating clean formatted A4 PDF...");
-        pdfFile = await buildCleanQuestionPdf(ocrData.extracted, baseName);
+        pdfFile = await buildCleanQuestionPdf(ocrData.extracted, baseName, selectedFiles);
       } else {
         setUploadProgress({ step: 2, percent: 52, loadedBytes: 0, totalBytes: 0 });
         setUploadStatus("Merging photos into A4 PDF...");

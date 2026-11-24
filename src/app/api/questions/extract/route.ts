@@ -14,6 +14,7 @@ RULES:
 3. Transcribe every question, sub-question ((a), (b), (i), etc.), OR-blocks, and the right-side marks exactly. Do NOT summarize, skip, or rephrase anything.
 4. Use proper degree symbols like °C or °F (capitalize C/F, e.g. 0°C, 20°C, 800°C) and standard symbols (-, +, x, =, <=, >=, %).
 5. If a question contains any data table / chart of numbers, DO NOT flatten it into plain text lines — put it in the "table" 2D array (rows of cells) on that question object!
+6. If a question includes a diagram, figure, circuit, graph, or sketch, include a "figureBox" object on that question with normalized 0-1000 coordinates relative to that image: {"pageIndex": 0, "x": left, "y": top, "width": w, "height": h} tightly framing the ENTIRE diagram along with all arrows, dimension numbers, and labels. Omit "figureBox" if the question has no diagram.
 
 Return strictly valid JSON with this exact structure:
 {
@@ -26,7 +27,8 @@ Return strictly valid JSON with this exact structure:
       "number": "1.",
       "text": "Define Market...",
       "marks": "2",
-      "table": [["Load (tons)", "0.5", "1.0"], ["Thickness loss (%)", "4", "13"]]
+      "table": [["Load (tons)", "0.5", "1.0"], ["Thickness loss (%)", "4", "13"]],
+      "figureBox": { "pageIndex": 0, "x": 120, "y": 580, "width": 760, "height": 260 }
     }
   ]
 }`;

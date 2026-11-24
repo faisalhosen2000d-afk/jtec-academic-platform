@@ -10,6 +10,13 @@ export type ExtractedQuestionPaper = {
     text?: string;
     marks?: string;
     table?: string[][];
+    figureBox?: {
+      pageIndex?: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    } | null;
   }>;
 };
 
@@ -56,9 +63,97 @@ function wrapLines(text: string, font: PDFFont, size: number, maxWidth: number):
   return lines;
 }
 
+
+async function cropAndCleanFigurePng(
+  file: File,
+  box: { x: number; y: number; width: number; height: number },
+): Promise<Uint8Array | null> {
+  let objUrl = "";
+  try {
+    if (
+      !Number.isFinite(box.x) ||
+      !Number.isFinite(box.y) ||
+      !Number.isFinite(box.width) ||
+      !Number.isFinite(box.height) ||
+      box.width < 25 ||
+      box.height < 25
+    ) {
+      return null;
+    }
+
+    objUrl = URL.createObjectURL(file);
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Image load failed"));
+      el.src = objUrl;
+    });
+
+    const natW = img.naturalWidth || img.width;
+    const natH = img.naturalHeight || img.height;
+    if (!natW || !natH) return null;
+
+    // Add 3% padding in 0..1000 space so edge labels/arrows are never clipped
+    const pad = 30;
+    const nx1 = Math.max(0, Math.min(1000, box.x - pad));
+    const ny1 = Math.max(0, Math.min(1000, box.y - pad));
+    const nx2 = Math.max(nx1 + 20, Math.min(1000, box.x + box.width + pad));
+    const ny2 = Math.max(ny1 + 20, Math.min(1000, box.y + box.height + pad));
+
+    const sx = Math.round((nx1 / 1000) * natW);
+    const sy = Math.round((ny1 / 1000) * natH);
+    const sw = Math.max(10, Math.round(((nx2 - nx1) / 1000) * natW));
+    const sh = Math.max(10, Math.round(((ny2 - ny1) / 1000) * natH));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = sw;
+    canvas.height = sh;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, sw, sh);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+
+    // Clean light-gray paper background to pure white while keeping diagram lines crisp
+    const imgData = ctx.getImageData(0, 0, sw, sh);
+    const d = imgData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i] ?? 255;
+      const g = d[i + 1] ?? 255;
+      const b = d[i + 2] ?? 255;
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      const spread = Math.max(r, g, b) - Math.min(r, g, b);
+      if (lum > 185 && spread < 35) {
+        d[i] = 255;
+        d[i + 1] = 255;
+        d[i + 2] = 255;
+      } else if (lum < 145) {
+        d[i] = Math.max(0, Math.round(r * 0.82));
+        d[i + 1] = Math.max(0, Math.round(g * 0.82));
+        d[i + 2] = Math.max(0, Math.round(b * 0.82));
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+
+    const pngUrl = canvas.toDataURL("image/png");
+    const b64 = pngUrl.split(",")[1];
+    if (!b64) return null;
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  } catch {
+    return null;
+  } finally {
+    if (objUrl) URL.revokeObjectURL(objUrl);
+  }
+}
+
 export async function buildCleanQuestionPdf(
   extracted: ExtractedQuestionPaper,
   outputName: string,
+  sourceFiles?: File[],
 ): Promise<File> {
   const pdfDoc = await PDFDocument.create();
   const fontRegular = await pdfDoc.embedFont(StandardFonts.TimesRoman);
@@ -163,7 +258,7 @@ export async function buildCleanQuestionPdf(
     const qNum = sanitizeForWinAnsi(q.number ?? "");
     const qText = sanitizeForWinAnsi(q.text ?? "");
     const qMarks = sanitizeForWinAnsi(q.marks ?? "");
-    if (!qNum && !qText && (!q.table || q.table.length === 0)) continue;
+    if (!qNum && !qText && (!q.table || q.table.length === 0) && !q.figureBox) continue;
 
     const fullText = qNum ? `${qNum} ${qText}` : qText;
     const lines = fullText ? wrapLines(fullText, fontRegular, 11, questionTextMaxW) : [];
@@ -250,6 +345,35 @@ export async function buildCleanQuestionPdf(
           }
         }
         y = topY - tableH - 12;
+      }
+    }
+    // Render cropped diagram / figure if detected by Vision AI
+    if (q.figureBox && Array.isArray(sourceFiles) && sourceFiles.length > 0) {
+      const pageIdx = Math.max(
+        0,
+        Math.min(sourceFiles.length - 1, Math.round(q.figureBox.pageIndex ?? 0)),
+      );
+      const srcFile = sourceFiles[pageIdx];
+      if (srcFile) {
+        const figBytes = await cropAndCleanFigurePng(srcFile, q.figureBox);
+        if (figBytes) {
+          const embeddedFig = await pdfDoc.embedPng(figBytes);
+          const maxW = contentW - 40;
+          const maxH = 250;
+          const scale = Math.min(maxW / embeddedFig.width, maxH / embeddedFig.height, 1);
+          const drawW = embeddedFig.width * scale;
+          const drawH = embeddedFig.height * scale;
+          ensureSpace(drawH + 16);
+          y -= 4;
+          const figX = marginX + (contentW - drawW) / 2;
+          page.drawImage(embeddedFig, {
+            x: figX,
+            y: y - drawH,
+            width: drawW,
+            height: drawH,
+          });
+          y -= drawH + 10;
+        }
       }
     }
   }
