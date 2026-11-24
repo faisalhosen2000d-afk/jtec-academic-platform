@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Hind_Siliguri } from "next/font/google";
 import "./globals.css";
 import { TopProgressBar } from "@/components/ui/TopProgressBar";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -52,6 +54,8 @@ export default function RootLayout({
       <body className="min-h-screen bg-[#060A12] text-slate-100 antialiased">
         <TopProgressBar />
         {children}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
