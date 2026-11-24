@@ -82,7 +82,7 @@ export async function POST(request: Request) {
             type: "material_approved",
             title: "Question Approved!",
             body: `Your uploaded question "${questionLabel}" has been approved and is now live in the Question Bank.`,
-            link_url: "/materials",
+            link_url: `/materials?tab=${qItem.question_type === "ct" ? "ct" : "previous_year"}&q=${qItem.id}`,
             is_read: false,
           });
         } catch (notifErr) {
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
             type: "material_rejected",
             title: "Question Rejected",
             body: `Your uploaded question "${questionLabel}" was not approved. Reason: ${reason || "Please review and re-upload a clearer copy."}`,
-            link_url: "/materials",
+            link_url: `/materials?tab=${qItem.question_type === "ct" ? "ct" : "previous_year"}`,
             is_read: false,
           });
         } catch (notifErr) {

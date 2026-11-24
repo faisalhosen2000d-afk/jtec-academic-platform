@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BookOpen, Calendar, ClipboardList } from "lucide-react";
 import MaterialsSearch from "@/components/student/MaterialsSearch";
 import QuestionBankSection, {
@@ -31,6 +31,20 @@ export default function MaterialsVaultClient({
   takenQuestionSlots,
 }: MaterialsVaultClientProps) {
   const [activeTab, setActiveTab] = useState<VaultTab>("notes");
+  const [highlightQuestionId, setHighlightQuestionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    const qId = params.get("q");
+    if (tab === "ct" || tab === "previous_year") {
+      setActiveTab(tab);
+    }
+    if (qId) {
+      setHighlightQuestionId(qId);
+    }
+  }, []);
 
   const pyqCount = questionItems.filter((q) => q.question_type === "previous_year").length;
   const ctCount = questionItems.filter((q) => q.question_type === "ct").length;
@@ -139,6 +153,7 @@ export default function MaterialsVaultClient({
           mode={activeTab}
           items={questionItems}
           takenSlots={takenQuestionSlots}
+          highlightQuestionId={highlightQuestionId}
           subjects={subjects}
           terms={terms}
           currentTermId={currentTermId}

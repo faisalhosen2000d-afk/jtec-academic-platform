@@ -67,6 +67,7 @@ export type QuestionTermOption = {
 type QuestionBankSectionProps = {
   mode: "previous_year" | "ct";
   items: QuestionBankItem[];
+  highlightQuestionId?: string | null;
   takenSlots: Array<{
     subject_code: string;
     level_id: string;
@@ -227,6 +228,7 @@ export default function QuestionBankSection({
   mode,
   items,
   takenSlots,
+  highlightQuestionId,
   subjects,
   terms,
   currentTermId,
@@ -237,6 +239,32 @@ export default function QuestionBankSection({
   const [selectedCtFilter, setSelectedCtFilter] = useState<string>("all");
   const [loadingAccessId, setLoadingAccessId] = useState<string | null>(null);
   const [activeUploaderProfile, setActiveUploaderProfile] = useState<NonNullable<QuestionBankItem["uploader"]> | null>(null);
+  const [pulsingId, setPulsingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!highlightQuestionId) return;
+    const target = items.find((i) => i.id === highlightQuestionId && i.question_type === mode);
+    if (!target) return;
+    setSelectedTermId(target.term_id);
+    setSelectedSubjectId("all");
+    setSelectedYearFilter("all");
+    setSelectedCtFilter("all");
+    setPulsingId(target.id);
+
+    const scrollTimer = window.setTimeout(() => {
+      const el = document.getElementById(`q-card-${target.id}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 180);
+
+    const clearTimer = window.setTimeout(() => {
+      setPulsingId(null);
+    }, 4500);
+
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [highlightQuestionId, items, mode]);
   const [accessError, setAccessError] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -666,9 +694,14 @@ export default function QuestionBankSection({
 
             return (
               <div
-                key={item.id}
-                className="flex flex-col justify-between rounded-2xl border border-slate-800/90 bg-[#0A1020] p-4 transition hover:border-cyan-500/40"
-              >
+                  id={`q-card-${item.id}`}
+                  key={item.id}
+                  className={`flex flex-col justify-between rounded-2xl border bg-[#0A1020] p-4 transition ${
+                    pulsingId === item.id
+                      ? "border-emerald-400 ring-2 ring-emerald-400/70 shadow-[0_0_30px_rgba(16,185,129,0.45)] animate-pulse"
+                      : "border-slate-800/90 hover:border-cyan-500/40"
+                  }`}
+                >
                 <div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 font-mono text-[11px] font-bold text-cyan-300">
