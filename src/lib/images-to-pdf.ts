@@ -53,13 +53,15 @@ type RichSegment = { text: string; kind: "normal" | "sub" | "sup" };
 
 function parseRichSegments(line: string): RichSegment[] {
   const segs: RichSegment[] = [];
-  // Match _{...} or ^{...} or single-char _x / ^x immediately after an alphanumeric or ')'
-  const regex = /(?<=[A-Za-z0-9)]])(_{([^}]+)}|_([A-Za-z0-9+-])|^{([^}]+)}|^([A-Za-z0-9+-]))/g;
+  const regex = /([A-Za-z0-9)\]])(?:_\{([^}]+)\}|_([A-Za-z0-9+-])|\^\{([^}]+)\}|\^([A-Za-z0-9+-]))/g;
   let lastIdx = 0;
   let match: RegExpExecArray | null;
   while ((match = regex.exec(line)) !== null) {
+    const baseChar = match[1] ?? "";
     if (match.index > lastIdx) {
-      segs.push({ text: line.slice(lastIdx, match.index), kind: "normal" });
+      segs.push({ text: line.slice(lastIdx, match.index) + baseChar, kind: "normal" });
+    } else if (baseChar) {
+      segs.push({ text: baseChar, kind: "normal" });
     }
     if (match[2] !== undefined) {
       segs.push({ text: match[2], kind: "sub" });
