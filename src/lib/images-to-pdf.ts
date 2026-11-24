@@ -79,14 +79,18 @@ function cleanCanvasPaperBackground(
     const b = d[i + 2] ?? 255;
     const lum = 0.299 * r + 0.587 * g + 0.114 * b;
     const spread = Math.max(r, g, b) - Math.min(r, g, b);
-    if (lum > 185 && spread < 35) {
+    if (lum >= 232 && spread < 28) {
       d[i] = 255;
       d[i + 1] = 255;
       d[i + 2] = 255;
-    } else if (lum < 150) {
-      d[i] = Math.max(0, Math.round(r * 0.8));
-      d[i + 1] = Math.max(0, Math.round(g * 0.8));
-      d[i + 2] = Math.max(0, Math.round(b * 0.8));
+    } else if (lum < 220) {
+      // Smooth contrast boost: keeps thin anti-aliased strokes crisp and darkens text/lines
+      const t = Math.max(0, Math.min(1, (lum - 45) / 175));
+      const curved = Math.pow(t, 1.45);
+      const scale = lum > 0 ? (curved * 220) / lum : 0;
+      d[i] = Math.max(0, Math.min(255, Math.round(r * scale)));
+      d[i + 1] = Math.max(0, Math.min(255, Math.round(g * scale)));
+      d[i + 2] = Math.max(0, Math.min(255, Math.round(b * scale)));
     }
   }
   ctx.putImageData(imgData, 0, 0);
@@ -259,11 +263,12 @@ async function cropAndCleanFigurePng(
     const natH = img.naturalHeight || img.height;
     if (!natW || !natH) return null;
 
-    const pad = 25;
-    const nx1 = Math.max(0, Math.min(1000, box.x - pad));
-    const ny1 = Math.max(0, Math.min(1000, box.y - pad));
-    const nx2 = Math.max(nx1 + 20, Math.min(1000, box.x + box.width + pad));
-    const ny2 = Math.max(ny1 + 20, Math.min(1000, box.y + box.height + pad));
+    const padX = 12;
+    const padY = 4;
+    const nx1 = Math.max(0, Math.min(1000, box.x - padX));
+    const ny1 = Math.max(0, Math.min(1000, box.y - padY));
+    const nx2 = Math.max(nx1 + 20, Math.min(1000, box.x + box.width + padX));
+    const ny2 = Math.max(ny1 + 20, Math.min(1000, box.y + box.height + padY));
 
     const sx = Math.round((nx1 / 1000) * natW);
     const sy = Math.round((ny1 / 1000) * natH);
