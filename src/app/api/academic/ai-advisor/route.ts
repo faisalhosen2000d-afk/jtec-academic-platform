@@ -1,3 +1,4 @@
+import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { callGemini, type GeminiPart } from "@/lib/gemini";
@@ -43,6 +44,11 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json({ success: false, error: "Authentication is required." }, { status: 401 });
+    }
+
+    const rl = await checkRateLimit({ key: `ai-advisor:${user.id}`, limit: 10, windowSeconds: 60 });
+    if (!rl.allowed) {
+      return rateLimitExceededResponse(rl.retryAfterSeconds);
     }
 
     const body = (await request.json()) as {

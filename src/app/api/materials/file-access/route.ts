@@ -1,3 +1,4 @@
+import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
@@ -56,6 +57,11 @@ export async function POST(request: Request) {
         },
         { status: 401 }
       );
+    }
+
+    const rl = await checkRateLimit({ key: `material-access:${user.id}`, limit: 45, windowSeconds: 60 });
+    if (!rl.allowed) {
+      return rateLimitExceededResponse(rl.retryAfterSeconds);
     }
 
     /*

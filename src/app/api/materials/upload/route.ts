@@ -1,3 +1,4 @@
+import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createB2UploadPresignedUrl, isB2Configured, removeMaterialObject } from "@/lib/material-storage";
@@ -65,6 +66,11 @@ async function getVerifiedStudent() {
 
   if (!user) {
     return { supabase, user: null, error: jsonError("You must be logged in to upload a material.", 401) };
+  }
+
+  const rl = await checkRateLimit({ key: `materials-upload:${user.id}`, limit: 25, windowSeconds: 60 });
+  if (!rl.allowed) {
+    return { supabase, user: null, error: rateLimitExceededResponse(rl.retryAfterSeconds) };
   }
 
   const { data: profile, error: profileError } = await supabase

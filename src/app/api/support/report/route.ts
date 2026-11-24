@@ -1,3 +1,4 @@
+import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
 import { checkMaterialObjectExists } from "@/lib/material-storage";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -47,6 +48,11 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
+
+    const rl = await checkRateLimit({ key: `support-report:${user.id}`, limit: 5, windowSeconds: 300 });
+    if (!rl.allowed) {
+      return rateLimitExceededResponse(rl.retryAfterSeconds);
     }
 
     const body = (await request.json()) as { message?: string; pagePath?: string };

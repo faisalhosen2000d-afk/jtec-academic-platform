@@ -1,3 +1,4 @@
+import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { createClient } from "@/lib/supabase/server";
@@ -39,6 +40,11 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
+
+    const rl = await checkRateLimit({ key: `questions-upload:${user.id}`, limit: 20, windowSeconds: 60 });
+    if (!rl.allowed) {
+      return rateLimitExceededResponse(rl.retryAfterSeconds);
     }
 
     const serviceSupabase = createServiceRoleClient();
