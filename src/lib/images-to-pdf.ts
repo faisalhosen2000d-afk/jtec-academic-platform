@@ -72,27 +72,58 @@ function cleanCanvasPaperBackground(
   h: number,
 ): Uint8Array | null {
   const imgData = ctx.getImageData(0, 0, w, h);
-  const d = imgData.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const r = d[i] ?? 255;
-    const g = d[i + 1] ?? 255;
-    const b = d[i + 2] ?? 255;
-    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-    const spread = Math.max(r, g, b) - Math.min(r, g, b);
-    if (lum >= 232 && spread < 28) {
-      d[i] = 255;
-      d[i + 1] = 255;
-      d[i + 2] = 255;
-    } else if (lum < 220) {
-      // Smooth contrast boost: keeps thin anti-aliased strokes crisp and darkens text/lines
-      const t = Math.max(0, Math.min(1, (lum - 45) / 175));
-      const curved = Math.pow(t, 1.45);
-      const scale = lum > 0 ? (curved * 220) / lum : 0;
-      d[i] = Math.max(0, Math.min(255, Math.round(r * scale)));
-      d[i + 1] = Math.max(0, Math.min(255, Math.round(g * scale)));
-      d[i + 2] = Math.max(0, Math.min(255, Math.round(b * scale)));
+  const src = imgData.data;
+
+  // Step 1: Compute grayscale luminance buffer for crisp 3x3 Unsharp Mask sharpening
+  const total = w * h;
+  const lumBuf = new Float32Array(total);
+  for (let i = 0; i < total; i++) {
+    const o = i * 4;
+    const r = src[o] ?? 255;
+    const g = src[o + 1] ?? 255;
+    const b = src[o + 2] ?? 255;
+    lumBuf[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+  }
+
+  // Step 2: 3x3 Unsharp Mask (sharpens decimal dots, small digits, and diagram lines)
+  const amount = 0.65;
+  for (let y = 0; y < h; y++) {
+    const yUp = y > 0 ? y - 1 : 0;
+    const yDn = y < h - 1 ? y + 1 : h - 1;
+    for (let x = 0; x < w; x++) {
+      const xLt = x > 0 ? x - 1 : 0;
+      const xRt = x < w - 1 ? x + 1 : w - 1;
+      const idx = y * w + x;
+      const center = lumBuf[idx] ?? 255;
+      const avg =
+        ((lumBuf[yUp * w + x] ?? center) +
+          (lumBuf[yDn * w + x] ?? center) +
+          (lumBuf[y * w + xLt] ?? center) +
+          (lumBuf[y * w + xRt] ?? center)) *
+        0.25;
+      let sharp = center + amount * (center - avg);
+      if (sharp < 0) sharp = 0;
+      if (sharp > 255) sharp = 255;
+
+      // Step 3: Clean white paper background + crisp black ink curve
+      let out: number;
+      if (sharp >= 228) {
+        out = 255;
+      } else if (sharp <= 75) {
+        out = 0;
+      } else {
+        const t = (sharp - 75) / (228 - 75);
+        out = Math.round(Math.pow(t, 1.55) * 255);
+      }
+
+      const o = idx * 4;
+      src[o] = out;
+      src[o + 1] = out;
+      src[o + 2] = out;
+      src[o + 3] = 255;
     }
   }
+
   ctx.putImageData(imgData, 0, 0);
   const pngUrl = ctx.canvas.toDataURL("image/png");
   const b64 = pngUrl.split(",")[1];
@@ -275,17 +306,23 @@ async function cropAndCleanFigurePng(
     const sw = Math.max(10, Math.round(((nx2 - nx1) / 1000) * natW));
     const sh = Math.max(10, Math.round(((ny2 - ny1) / 1000) * natH));
 
+    const upScale = sw < 700 ? 2 : sw < 1050 ? 1.5 : 1;
+    const outW = Math.round(sw * upScale);
+    const outH = Math.round(sh * upScale);
+
     const canvas = document.createElement("canvas");
-    canvas.width = sw;
-    canvas.height = sh;
+    canvas.width = outW;
+    canvas.height = outH;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, sw, sh);
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    ctx.fillRect(0, 0, outW, outH);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
 
-    return cleanCanvasPaperBackground(ctx, sw, sh);
+    return cleanCanvasPaperBackground(ctx, outW, outH);
   } catch {
     return null;
   } finally {
