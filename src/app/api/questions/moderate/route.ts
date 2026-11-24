@@ -42,13 +42,28 @@ export async function POST(request: Request) {
 
     const { data: item } = await raw
       .from("question_bank_items")
-      .select("id, file_path")
+      .select("id, uploader_id, subject_code, question_type, exam_year, ct_number, file_path")
       .eq("id", itemId)
       .maybeSingle();
 
     if (!item) {
       return NextResponse.json({ error: "Question record not found." }, { status: 404 });
     }
+
+    const qItem = item as {
+      id: string;
+      uploader_id?: string | null;
+      subject_code?: string | null;
+      question_type?: string | null;
+      exam_year?: number | null;
+      ct_number?: number | null;
+      file_path: string;
+    };
+    const slotText =
+      qItem.question_type === "ct"
+        ? `CT-${qItem.ct_number ?? ""}`
+        : `Year ${qItem.exam_year ?? ""}`;
+    const questionLabel = `${qItem.subject_code || "Question"} (${slotText})`;
 
     if (action === "approve") {
       const { error } = await raw
@@ -60,6 +75,20 @@ export async function POST(request: Request) {
         })
         .eq("id", itemId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (qItem.uploader_id) {
+        try {
+          await serviceSupabase.from("notifications").insert({
+            recipient_id: qItem.uploader_id,
+            type: "material_approved",
+            title: "Question Approved!",
+            body: `Your uploaded question "${questionLabel}" has been approved and is now live in the Question Bank.`,
+            link_url: "/materials",
+            is_read: false,
+          });
+        } catch (notifErr) {
+          console.error("Failed to insert question approval notification:", notifErr);
+        }
+      }
       return NextResponse.json({ success: true, status: "approved" });
     }
 
@@ -75,6 +104,20 @@ export async function POST(request: Request) {
         .eq("id", itemId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       await removeMaterialObject(serviceSupabase, (item as { file_path: string }).file_path);
+      if (qItem.uploader_id) {
+        try {
+          await serviceSupabase.from("notifications").insert({
+            recipient_id: qItem.uploader_id,
+            type: "material_rejected",
+            title: "Question Rejected",
+            body: `Your uploaded question "${questionLabel}" was not approved. Reason: ${reason || "Please review and re-upload a clearer copy."}`,
+            link_url: "/materials",
+            is_read: false,
+          });
+        } catch (notifErr) {
+          console.error("Failed to insert question rejection notification:", notifErr);
+        }
+      }
       return NextResponse.json({ success: true, status: "rejected" });
     }
 
