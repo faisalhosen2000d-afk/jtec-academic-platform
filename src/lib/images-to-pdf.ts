@@ -10,6 +10,7 @@ export type ExtractedQuestionPaper = {
     text?: string;
     marks?: string;
     table?: string[][];
+    hasFigure?: boolean;
     figureBox?: {
       pageIndex?: number;
       x: number;
@@ -64,12 +65,177 @@ function wrapLines(text: string, font: PDFFont, size: number, maxWidth: number):
 }
 
 
+
+function cleanCanvasPaperBackground(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+): Uint8Array | null {
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const d = imgData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i] ?? 255;
+    const g = d[i + 1] ?? 255;
+    const b = d[i + 2] ?? 255;
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    const spread = Math.max(r, g, b) - Math.min(r, g, b);
+    if (lum > 185 && spread < 35) {
+      d[i] = 255;
+      d[i + 1] = 255;
+      d[i + 2] = 255;
+    } else if (lum < 150) {
+      d[i] = Math.max(0, Math.round(r * 0.8));
+      d[i + 1] = Math.max(0, Math.round(g * 0.8));
+      d[i + 2] = Math.max(0, Math.round(b * 0.8));
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+  const pngUrl = ctx.canvas.toDataURL("image/png");
+  const b64 = pngUrl.split(",")[1];
+  if (!b64) return null;
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function detectDiagramBoxFromFile(
+  file: File,
+): Promise<{ x: number; y: number; width: number; height: number } | null> {
+  let objUrl = "";
+  try {
+    objUrl = URL.createObjectURL(file);
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Image load failed"));
+      el.src = objUrl;
+    });
+    const natW = img.naturalWidth || img.width;
+    const natH = img.naturalHeight || img.height;
+    if (!natW || !natH) return null;
+
+    // Downscale to ~400px wide for fast ink-band scanning
+    const scanW = Math.min(400, natW);
+    const scale = scanW / natW;
+    const scanH = Math.max(50, Math.round(natH * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = scanW;
+    canvas.height = scanH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, scanW, scanH);
+    ctx.drawImage(img, 0, 0, scanW, scanH);
+
+    const data = ctx.getImageData(0, 0, scanW, scanH).data;
+    // Ignore 4% outer scanner border edges
+    const marginX = Math.round(scanW * 0.04);
+    const innerW = scanW - marginX * 2;
+    const rowDarkCounts = new Uint16Array(scanH);
+
+    for (let y = 0; y < scanH; y++) {
+      let dark = 0;
+      const rowOff = y * scanW * 4;
+      for (let x = marginX; x < scanW - marginX; x++) {
+        const idx = rowOff + x * 4;
+        const r = data[idx] ?? 255;
+        const g = data[idx + 1] ?? 255;
+        const b = data[idx + 2] ?? 255;
+        if (0.299 * r + 0.587 * g + 0.114 * b < 165) dark++;
+      }
+      rowDarkCounts[y] = dark;
+    }
+
+    // Group vertical ink bands (bridge tiny 3px gaps inside diagrams)
+    const minRowDark = Math.max(2, Math.round(innerW * 0.008));
+    const bands: Array<{ y1: number; y2: number }> = [];
+    let inBand = false;
+    let startY = 0;
+    let gap = 0;
+    const maxGap = Math.max(3, Math.round(scanH * 0.012));
+
+    for (let y = Math.round(scanH * 0.22); y < Math.round(scanH * 0.96); y++) {
+      const hasInk = (rowDarkCounts[y] ?? 0) >= minRowDark;
+      if (hasInk) {
+        if (!inBand) {
+          inBand = true;
+          startY = y;
+        }
+        gap = 0;
+      } else if (inBand) {
+        gap++;
+        if (gap > maxGap) {
+          bands.push({ y1: startY, y2: y - gap });
+          inBand = false;
+          gap = 0;
+        }
+      }
+    }
+    if (inBand) bands.push({ y1: startY, y2: Math.round(scanH * 0.95) });
+
+    // A diagram is much taller than a single line of text (> 8% of page height)
+    const minDiagramH = Math.round(scanH * 0.08);
+    const tallBands = bands.filter((b) => b.y2 - b.y1 >= minDiagramH);
+    if (tallBands.length === 0) return null;
+
+    // Pick the tallest continuous graphic band
+    tallBands.sort((a, b) => (b.y2 - b.y1) - (a.y2 - a.y1));
+    const best = tallBands[0];
+    if (!best) return null;
+
+    // Find tight horizontal bounds inside best band
+    let minX = scanW - marginX;
+    let maxX = marginX;
+    for (let y = best.y1; y <= best.y2; y++) {
+      const rowOff = y * scanW * 4;
+      for (let x = marginX; x < scanW - marginX; x++) {
+        const idx = rowOff + x * 4;
+        const r = data[idx] ?? 255;
+        const g = data[idx + 1] ?? 255;
+        const b = data[idx + 2] ?? 255;
+        if (0.299 * r + 0.587 * g + 0.114 * b < 165) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+        }
+      }
+    }
+    if (maxX <= minX + 10) return null;
+
+    return {
+      x: Math.round((minX / scanW) * 1000),
+      y: Math.round((best.y1 / scanH) * 1000),
+      width: Math.round(((maxX - minX) / scanW) * 1000),
+      height: Math.round(((best.y2 - best.y1) / scanH) * 1000),
+    };
+  } catch {
+    return null;
+  } finally {
+    if (objUrl) URL.revokeObjectURL(objUrl);
+  }
+}
+
 async function cropAndCleanFigurePng(
   file: File,
-  box: { x: number; y: number; width: number; height: number },
+  rawBox: { x: number; y: number; width: number; height: number },
 ): Promise<Uint8Array | null> {
   let objUrl = "";
   try {
+    // Support both 0..1 fractional coordinates and 0..1000 normalized coordinates
+    const isUnitScale =
+      rawBox.x >= 0 && rawBox.x <= 1.01 &&
+      rawBox.y >= 0 && rawBox.y <= 1.01 &&
+      rawBox.width > 0 && rawBox.width <= 1.01 &&
+      rawBox.height > 0 && rawBox.height <= 1.01;
+    const mult = isUnitScale ? 1000 : 1;
+    const box = {
+      x: rawBox.x * mult,
+      y: rawBox.y * mult,
+      width: rawBox.width * mult,
+      height: rawBox.height * mult,
+    };
+
     if (
       !Number.isFinite(box.x) ||
       !Number.isFinite(box.y) ||
@@ -93,8 +259,7 @@ async function cropAndCleanFigurePng(
     const natH = img.naturalHeight || img.height;
     if (!natW || !natH) return null;
 
-    // Add 3% padding in 0..1000 space so edge labels/arrows are never clipped
-    const pad = 30;
+    const pad = 25;
     const nx1 = Math.max(0, Math.min(1000, box.x - pad));
     const ny1 = Math.max(0, Math.min(1000, box.y - pad));
     const nx2 = Math.max(nx1 + 20, Math.min(1000, box.x + box.width + pad));
@@ -115,34 +280,7 @@ async function cropAndCleanFigurePng(
     ctx.fillRect(0, 0, sw, sh);
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
 
-    // Clean light-gray paper background to pure white while keeping diagram lines crisp
-    const imgData = ctx.getImageData(0, 0, sw, sh);
-    const d = imgData.data;
-    for (let i = 0; i < d.length; i += 4) {
-      const r = d[i] ?? 255;
-      const g = d[i + 1] ?? 255;
-      const b = d[i + 2] ?? 255;
-      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-      const spread = Math.max(r, g, b) - Math.min(r, g, b);
-      if (lum > 185 && spread < 35) {
-        d[i] = 255;
-        d[i + 1] = 255;
-        d[i + 2] = 255;
-      } else if (lum < 145) {
-        d[i] = Math.max(0, Math.round(r * 0.82));
-        d[i + 1] = Math.max(0, Math.round(g * 0.82));
-        d[i + 2] = Math.max(0, Math.round(b * 0.82));
-      }
-    }
-    ctx.putImageData(imgData, 0, 0);
-
-    const pngUrl = canvas.toDataURL("image/png");
-    const b64 = pngUrl.split(",")[1];
-    if (!b64) return null;
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return bytes;
+    return cleanCanvasPaperBackground(ctx, sw, sh);
   } catch {
     return null;
   } finally {
@@ -347,32 +485,40 @@ export async function buildCleanQuestionPdf(
         y = topY - tableH - 12;
       }
     }
-    // Render cropped diagram / figure if detected by Vision AI
-    if (q.figureBox && Array.isArray(sourceFiles) && sourceFiles.length > 0) {
+    // Render cropped diagram / figure (AI figureBox OR pixel-exact canvas auto-detector fallback)
+    const mentionsFigure =
+      Boolean(q.hasFigure) ||
+      (/\b(figure below|fig\.|shown below|diagram|circuit|sketch|graph)\b/i.test(qText) &&
+        !/without\s+figure/i.test(qText));
+
+    if ((q.figureBox || mentionsFigure) && Array.isArray(sourceFiles) && sourceFiles.length > 0) {
       const pageIdx = Math.max(
         0,
-        Math.min(sourceFiles.length - 1, Math.round(q.figureBox.pageIndex ?? 0)),
+        Math.min(sourceFiles.length - 1, Math.round(q.figureBox?.pageIndex ?? 0)),
       );
       const srcFile = sourceFiles[pageIdx];
       if (srcFile) {
-        const figBytes = await cropAndCleanFigurePng(srcFile, q.figureBox);
-        if (figBytes) {
-          const embeddedFig = await pdfDoc.embedPng(figBytes);
-          const maxW = contentW - 40;
-          const maxH = 250;
-          const scale = Math.min(maxW / embeddedFig.width, maxH / embeddedFig.height, 1);
-          const drawW = embeddedFig.width * scale;
-          const drawH = embeddedFig.height * scale;
-          ensureSpace(drawH + 16);
-          y -= 4;
-          const figX = marginX + (contentW - drawW) / 2;
-          page.drawImage(embeddedFig, {
-            x: figX,
-            y: y - drawH,
-            width: drawW,
-            height: drawH,
-          });
-          y -= drawH + 10;
+        const resolvedBox = q.figureBox ?? (await detectDiagramBoxFromFile(srcFile));
+        if (resolvedBox) {
+          const figBytes = await cropAndCleanFigurePng(srcFile, resolvedBox);
+          if (figBytes) {
+            const embeddedFig = await pdfDoc.embedPng(figBytes);
+            const maxW = contentW - 36;
+            const maxH = 260;
+            const scale = Math.min(maxW / embeddedFig.width, maxH / embeddedFig.height, 1);
+            const drawW = embeddedFig.width * scale;
+            const drawH = embeddedFig.height * scale;
+            ensureSpace(drawH + 16);
+            y -= 4;
+            const figX = marginX + (contentW - drawW) / 2;
+            page.drawImage(embeddedFig, {
+              x: figX,
+              y: y - drawH,
+              width: drawW,
+              height: drawH,
+            });
+            y -= drawH + 10;
+          }
         }
       }
     }
