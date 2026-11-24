@@ -13,6 +13,7 @@ RULES:
 2. Extract Time (left) and Full Marks (right) exactly as written.
 3. Transcribe every question, sub-question ((a), (b), (i), etc.), OR-blocks, and the right-side marks exactly. Do NOT summarize, skip, or rephrase anything.
 4. Use proper degree symbols like °C or °F (capitalize C/F, e.g. 0°C, 20°C, 800°C) and standard symbols (-, +, x, =, <=, >=, %).
+4b. Do NOT wrap math in $...$ LaTeX delimiters. Write subscripts as D_{7}, P_{85}, H_{2}O and superscripts as m^{2}, 10^{-3}.
 5. If a question contains any data table / chart of numbers, DO NOT flatten it into plain text lines — put it in the "table" 2D array (rows of cells) on that question object!
 6. If a question includes ANY diagram, figure, circuit, graph, or sketch, you MUST set "hasFigure": true AND include "figureBox": {"pageIndex": 0, "x": left, "y": top, "width": w, "height": h} in 0-1000 coordinates tightly framing the entire diagram with all arrows and labels.
 

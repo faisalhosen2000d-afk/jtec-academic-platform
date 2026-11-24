@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
+import {PDFDocument, StandardFonts, rgb, type PDFFont, PDFPage } from "pdf-lib";
 
 export type ExtractedQuestionPaper = {
   headers?: string[];
@@ -21,8 +21,100 @@ export type ExtractedQuestionPaper = {
   }>;
 };
 
+
+function normalizeMathScripts(raw: string): string {
+  const subMap: Record<string, string> = {
+    "\u2080": "0", "\u2081": "1", "\u2082": "2", "\u2083": "3", "\u2084": "4",
+    "\u2085": "5", "\u2086": "6", "\u2087": "7", "\u2088": "8", "\u2089": "9",
+    "\u208A": "+", "\u208B": "-", "\u208C": "=",
+  };
+  const supMap: Record<string, string> = {
+    "\u2070": "0", "\u2074": "4", "\u2075": "5", "\u2076": "6", "\u2077": "7",
+    "\u2078": "8", "\u2079": "9", "\u207A": "+", "\u207B": "-", "\u207F": "n",
+  };
+  return raw
+    .replace(/[\u2080-\u208C]+/g, (m) => "_{" + Array.from(m).map((ch) => subMap[ch] ?? ch).join("") + "}")
+    .replace(/[\u2070\u2074-\u207B\u207F]+/g, (m) => "^{" + Array.from(m).map((ch) => supMap[ch] ?? ch).join("") + "}")
+    .replace(/\$([^$\r\n]{1,60})\$/g, (_m, inner: string) =>
+      inner
+        .replace(/\\times/g, "x")
+        .replace(/\\cdot/g, ".")
+        .replace(/\\pm/g, "\u00B1")
+        .replace(/\\leq?/g, "<=")
+        .replace(/\\geq?/g, ">=")
+        .replace(/\\neq/g, "!=")
+        .replace(/\\circ/g, "\u00B0")
+        .replace(/\\text\{([^}]*)\}/g, "$1")
+        .trim(),
+    );
+}
+
+type RichSegment = { text: string; kind: "normal" | "sub" | "sup" };
+
+function parseRichSegments(line: string): RichSegment[] {
+  const segs: RichSegment[] = [];
+  // Match _{...} or ^{...} or single-char _x / ^x immediately after an alphanumeric or ')'
+  const regex = /(?<=[A-Za-z0-9)]])(_{([^}]+)}|_([A-Za-z0-9+-])|^{([^}]+)}|^([A-Za-z0-9+-]))/g;
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(line)) !== null) {
+    if (match.index > lastIdx) {
+      segs.push({ text: line.slice(lastIdx, match.index), kind: "normal" });
+    }
+    if (match[2] !== undefined) {
+      segs.push({ text: match[2], kind: "sub" });
+    } else if (match[3] !== undefined) {
+      segs.push({ text: match[3], kind: "sub" });
+    } else if (match[4] !== undefined) {
+      segs.push({ text: match[4], kind: "sup" });
+    } else if (match[5] !== undefined) {
+      segs.push({ text: match[5], kind: "sup" });
+    }
+    lastIdx = match.index + match[0].length;
+  }
+  if (lastIdx < line.length) {
+    segs.push({ text: line.slice(lastIdx), kind: "normal" });
+  }
+  return segs;
+}
+
+function measureRichTextWidth(line: string, font: PDFFont, size: number): number {
+  const subSize = size * 0.72;
+  let total = 0;
+  for (const seg of parseRichSegments(line)) {
+    total += font.widthOfTextAtSize(seg.text, seg.kind === "normal" ? size : subSize);
+  }
+  return total;
+}
+
+function drawRichTextLine(
+  page: PDFPage,
+  line: string,
+  opts: { x: number; y: number; size: number; font: PDFFont; color: ReturnType<typeof rgb> },
+): void {
+  const subSize = opts.size * 0.72;
+  let cursorX = opts.x;
+  for (const seg of parseRichSegments(line)) {
+    const drawSize = seg.kind === "normal" ? opts.size : subSize;
+    const yOffset =
+      seg.kind === "sub"
+        ? -opts.size * 0.24
+        : seg.kind === "sup"
+          ? opts.size * 0.35
+          : 0;
+    page.drawText(seg.text, {
+      x: cursorX,
+      y: opts.y + yOffset,
+      size: drawSize,
+      font: opts.font,
+      color: opts.color,
+    });
+    cursorX += opts.font.widthOfTextAtSize(seg.text, drawSize);
+  }
+}
+
 function sanitizeForWinAnsi(text: string): string {
-  return text
+  return normalizeMathScripts(text)
     .replace(/[\u2013\u2014]/g, "-")
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"')
@@ -52,7 +144,7 @@ function wrapLines(text: string, font: PDFFont, size: number, maxWidth: number):
     let current = "";
     for (const word of words) {
       const candidate = current ? `${current} ${word}` : word;
-      if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
+      if (measureRichTextWidth(candidate, font, size) <= maxWidth) {
         current = candidate;
       } else {
         if (current) lines.push(current);
@@ -420,7 +512,7 @@ export async function buildCleanQuestionPdf(
     const lines = wrapLines(inst, fontItalic, 10.5, contentW);
     for (const ln of lines) {
       ensureSpace(15);
-      page.drawText(ln, {
+      drawRichTextLine(page, ln, {
         x: marginX,
         y,
         size: 10.5,
@@ -446,7 +538,7 @@ export async function buildCleanQuestionPdf(
     ensureSpace(neededH);
 
     lines.forEach((ln, li) => {
-      page.drawText(ln, {
+      drawRichTextLine(page, ln, {
         x: marginX,
         y: y - li * 16,
         size: 11,
