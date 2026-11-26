@@ -283,6 +283,7 @@ export default function QuestionBankSection({
   const [movingItem, setMovingItem] = useState<QuestionBankItem | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<QuestionBankFolder | null>(null);
   const [targetMoveFolderId, setTargetMoveFolderId] = useState<string>("");
+  const [moveDropdownOpen, setMoveDropdownOpen] = useState(false);
 
   useEffect(() => {
     setLocalFolders(folders);
@@ -1300,6 +1301,7 @@ export default function QuestionBankSection({
                         onClick={() => {
                           setFolderFeedback("");
                           setMovingItem(item);
+                          setMoveDropdownOpen(false);
                           setTargetMoveFolderId(item.folder_id ?? "");
                         }}
                         className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-700/90 bg-slate-900/90 px-2 py-0.5 text-[10px] font-semibold text-slate-300 transition hover:border-amber-400/50 hover:text-amber-200"
@@ -1500,75 +1502,177 @@ export default function QuestionBankSection({
         </div>
       )}
 
-      {/* Move Question to Folder Modal */}
-      {movingItem && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
-          onClick={() => setMovingItem(null)}
-        >
+      {/* Move Question to Folder Modal (Premium Custom Dropdown) */}
+      {movingItem && (() => {
+        const selectedDest = moveTargetFolderOptions.find((o) => o.id === targetMoveFolderId);
+        return (
           <div
-            className="w-full max-w-md rounded-2xl border border-slate-700/80 bg-[#0A1020] p-5 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+            onClick={() => {
+              setMoveDropdownOpen(false);
+              setMovingItem(null);
+            }}
           >
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <FolderInput className="h-4 w-4 text-amber-400" />
-                <h3 className="text-sm font-bold text-white">Move Question to Folder</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMovingItem(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleMoveItemSubmit} className="mt-4 space-y-4">
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                  Destination Folder ({movingItem.subject_code})
-                </label>
-                <select
-                  value={targetMoveFolderId}
-                  onChange={(e) => setTargetMoveFolderId(e.target.value)}
-                  className="h-10 w-full rounded-xl border border-slate-700 bg-[#060A12] px-3 text-xs font-semibold text-white focus:border-amber-400 focus:outline-none"
-                >
-                  <option value="">{movingItem.subject_code} (Subject Root)</option>
-                  {moveTargetFolderOptions.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                {moveTargetFolderOptions.length === 0 && (
-                  <p className="mt-1.5 text-[11px] text-slate-400">
-                    Open the subject folder first and click &ldquo;+ New Folder&rdquo; to create folders.
-                  </p>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-2">
+            <div
+              className="w-full max-w-md rounded-2xl border border-slate-700/80 bg-[#0A1020] p-5 shadow-[0_28px_70px_rgba(0,0,0,0.85)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-slate-800/90 pb-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-amber-500/35 bg-amber-500/15 text-amber-300">
+                    <FolderInput className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Move Question to Folder</h3>
+                    <p className="text-[11px] text-slate-400">
+                      Organize inside <span className="font-mono font-semibold text-cyan-300">{movingItem.subject_code}</span>
+                    </p>
+                  </div>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setMovingItem(null)}
-                  className="rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800"
+                  onClick={() => {
+                    setMoveDropdownOpen(false);
+                    setMovingItem(null);
+                  }}
+                  className="cursor-pointer rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-white"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={folderBusy}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-cyan-400 px-4 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-300 disabled:opacity-50"
-                >
-                  {folderBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  <span>Move Here</span>
+                  <X className="h-4 w-4" />
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleMoveItemSubmit} className="mt-4 space-y-4">
+                <div className="relative">
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    Destination Folder ({movingItem.subject_code})
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => setMoveDropdownOpen((o) => !o)}
+                    className={`flex h-11 w-full cursor-pointer items-center justify-between gap-2.5 rounded-xl border bg-[#060A12] px-3.5 text-left text-xs font-semibold text-white transition-all ${
+                      moveDropdownOpen
+                        ? "border-amber-400/80 ring-2 ring-amber-500/20"
+                        : "border-slate-700/90 hover:border-slate-600"
+                    }`}
+                  >
+                    <span className="flex min-w-0 flex-1 items-center gap-2.5">
+                      <span
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border ${
+                          selectedDest
+                            ? "border-amber-500/35 bg-amber-500/15 text-amber-300"
+                            : "border-cyan-500/35 bg-cyan-500/15 text-cyan-300"
+                        }`}
+                      >
+                        <Folder className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="truncate">
+                        {selectedDest ? selectedDest.label : `${movingItem.subject_code} (Subject Root)`}
+                      </span>
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${
+                        moveDropdownOpen ? "rotate-180 text-amber-300" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {moveDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-amber-500/35 bg-[#080E1C] p-1.5 shadow-[0_24px_60px_rgba(0,0,0,0.92)] backdrop-blur-xl">
+                      <div className="space-y-0.5">
+                        {/* Subject Root Option */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTargetMoveFolderId("");
+                            setMoveDropdownOpen(false);
+                          }}
+                          className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-xs transition-colors ${
+                            targetMoveFolderId === ""
+                              ? "bg-gradient-to-r from-cyan-500/20 to-amber-500/10 font-semibold text-white ring-1 ring-cyan-400/40"
+                              : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                          }`}
+                        >
+                          <span className="flex min-w-0 flex-1 items-center gap-2.5">
+                            <span className="rounded-md border border-cyan-500/35 bg-cyan-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-cyan-300">
+                              {movingItem.subject_code}
+                            </span>
+                            <span className="truncate">Subject Root</span>
+                          </span>
+                          {targetMoveFolderId === "" && (
+                            <Check className="h-4 w-4 shrink-0 text-cyan-300" />
+                          )}
+                        </button>
+
+                        {/* Nested Custom Folders */}
+                        {moveTargetFolderOptions.map((opt) => {
+                          const active = opt.id === targetMoveFolderId;
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => {
+                                setTargetMoveFolderId(opt.id);
+                                setMoveDropdownOpen(false);
+                              }}
+                              className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-xs transition-colors ${
+                                active
+                                  ? "bg-gradient-to-r from-amber-500/20 to-amber-400/5 font-semibold text-amber-200 ring-1 ring-amber-400/45"
+                                  : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                              }`}
+                            >
+                              <span className="flex min-w-0 flex-1 items-center gap-2.5">
+                                <Folder
+                                  className={`h-4 w-4 shrink-0 ${
+                                    active
+                                      ? "fill-amber-400/25 text-amber-300"
+                                      : "text-amber-400/80"
+                                  }`}
+                                />
+                                <span className="truncate">{opt.label}</span>
+                              </span>
+                              {active && (
+                                <Check className="h-4 w-4 shrink-0 text-amber-300" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {moveTargetFolderOptions.length === 0 && (
+                    <p className="mt-2 text-[11px] text-slate-400">
+                      Open the subject folder first and click &ldquo;+ New Folder&rdquo; to create folders.
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMoveDropdownOpen(false);
+                      setMovingItem(null);
+                    }}
+                    className="cursor-pointer rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={folderBusy}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-cyan-400 px-4 py-2 text-xs font-bold text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.25)] transition hover:bg-cyan-300 disabled:opacity-50"
+                  >
+                    {folderBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    <span>Move Here</span>
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Delete Folder Confirmation Modal */}
       {deletingFolder && (
