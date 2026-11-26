@@ -569,7 +569,7 @@ export async function buildCleanQuestionPdf(
   const marginBottom = isSingleSheet ? 26 : 44;
   const contentW = a4W - marginX * 2;
   const bodySize = isSingleSheet ? 9.6 * scaleFactor : 10.5;
-  const lineStep = isSingleSheet ? 12.0 * scaleFactor : 14.5;
+  const lineStep = isSingleSheet ? 11.4 * scaleFactor : 14.5;
   const questionTextMaxW = contentW - 10;
 
   let page = pdfDoc.addPage([a4W, a4H]);
@@ -691,7 +691,7 @@ export async function buildCleanQuestionPdf(
     }
 
     if (secHeaders.length > 0) {
-      y -= 1.5;
+      y -= 3;
       const partSize = isSingleSheet ? 9.5 : 10.5;
       for (const sh of secHeaders) {
         ensureSpace(partSize + 3);
@@ -773,11 +773,11 @@ export async function buildCleanQuestionPdf(
         color: rgb(0.05, 0.05, 0.07),
       });
       if (!fitsOnLastLine) {
-        y -= lineStep - 1.5;
+        y -= lineStep * 0.55;
       }
     }
 
-    y -= isSingleSheet ? 2 : 5;
+    y -= isSingleSheet ? 6.5 : 8;
 
     // Render bordered grid table if present
     if (Array.isArray(q.table) && q.table.length > 0) {
