@@ -1,5 +1,10 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, PDFPage } from "pdf-lib";
 
+export type FigureAttachment = {
+  file: File;
+  questionNumber?: string;
+};
+
 export type ExtractedQuestionPaper = {
   headers?: string[];
   time?: string;
@@ -302,7 +307,6 @@ function cleanCanvasPaperBackground(
     lumBuf[i] = 0.299 * r + 0.587 * g + 0.114 * b;
   }
 
-  // Adaptive background threshold: handles shaded/tan diagram boxes (e.g. lum ~185-225) cleanly
   let brightSum = 0;
   let brightCount = 0;
   for (let i = 0; i < total; i++) {
@@ -342,7 +346,6 @@ function cleanCanvasPaperBackground(
         out = 0;
       } else {
         const t = (sharp - blackCut) / (whiteCut - blackCut);
-        // Darken mid-tones (gamma 2.2) so small dimension text ("15 mm", "150 mm") prints bold & crisp
         out = Math.round(Math.pow(t, 2.2) * 255);
       }
 
@@ -362,6 +365,45 @@ function cleanCanvasPaperBackground(
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
+}
+
+async function cleanFullFigureFilePng(file: File): Promise<Uint8Array | null> {
+  let objUrl = "";
+  try {
+    objUrl = URL.createObjectURL(file);
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Image load failed"));
+      el.src = objUrl;
+    });
+
+    const natW = img.naturalWidth || img.width;
+    const natH = img.naturalHeight || img.height;
+    if (!natW || !natH) return null;
+
+    const upScale = natW < 650 ? 2 : 1.25;
+    const outW = Math.round(natW * upScale);
+    const outH = Math.round(natH * upScale);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = outW;
+    canvas.height = outH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, outW, outH);
+    ctx.drawImage(img, 0, 0, outW, outH);
+
+    return cleanCanvasPaperBackground(ctx, outW, outH);
+  } catch {
+    return null;
+  } finally {
+    if (objUrl) URL.revokeObjectURL(objUrl);
+  }
 }
 
 async function cropAndCleanFigurePng(
@@ -446,6 +488,7 @@ export async function buildCleanQuestionPdf(
   extracted: ExtractedQuestionPaper,
   outputName: string,
   sourceFiles?: File[],
+  figureAttachments?: FigureAttachment[],
 ): Promise<File> {
   const pdfDoc = await PDFDocument.create();
   const fontRegular = await pdfDoc.embedFont(StandardFonts.TimesRoman);
@@ -456,10 +499,13 @@ export async function buildCleanQuestionPdf(
 
   const questions = extracted.questions ?? [];
   const hasTables = questions.some((q) => Array.isArray(q.table) && q.table.length > 0);
-  const figureCount = questions.filter((q) => Boolean(q.figureBox)).length;
+  const userFigList = (figureAttachments ?? []).filter((fa) => fa && fa.file);
+  const figureCount = Math.max(
+    questions.filter((q) => Boolean(q.figureBox)).length,
+    userFigList.length,
+  );
   const isSingleSheet = (sourceFiles?.length ?? 1) <= 1 && !hasTables && questions.length <= 10;
 
-  // Auto-pick scale so an 8-question exam paper (even with 1-2 diagrams) fits cleanly on 1 A4 page
   const totalChars = questions.reduce(
     (sum, q) => sum + (q.text?.length ?? 0) + (q.textAfterFigure?.length ?? 0),
     0,
@@ -595,6 +641,9 @@ export async function buildCleanQuestionPdf(
     });
   };
 
+  // Track which user-uploaded close-up figure snips have been placed
+  const usedSnipIndices = new Set<number>();
+
   // 4. Questions with Centered Part Headers, Indented Sub-questions, Inline Diagrams, and Bottom-Right Marks
   for (let qIdx = 0; qIdx < questions.length; qIdx++) {
     const q = questions[qIdx]!;
@@ -604,17 +653,35 @@ export async function buildCleanQuestionPdf(
 
     let qText = sanitizeForWinAnsi(q.text ?? "");
     let qAfterText = sanitizeForWinAnsi(q.textAfterFigure ?? "");
+    const qNum = sanitizeForWinAnsi(q.number ?? "");
+    const qMarks = sanitizeForWinAnsi(q.marks ?? "");
 
-    // Safety fallback: if a question has a figureBox and "(b) ..." was kept inside qText after "(a) ... figure:", split it below the figure
-    if (q.figureBox && !qAfterText && /\(a\)[\s\S]*?(?:figure|diagram|sketch)[\s\S]*?\n\s*\(b\)/i.test(qText)) {
+    // Match user-provided close-up figure snip for this question (by Q# or auto order)
+    const qDigits = qNum.replace(/[^0-9]/g, "");
+    let matchedSnipIdx = -1;
+    if (qDigits) {
+      matchedSnipIdx = userFigList.findIndex((fa, idx) => {
+        if (usedSnipIndices.has(idx)) return false;
+        const tagDigits = (fa.questionNumber ?? "").replace(/[^0-9]/g, "");
+        return tagDigits.length > 0 && tagDigits === qDigits;
+      });
+    }
+    if (matchedSnipIdx === -1 && (q.figureBox || q.hasFigure)) {
+      matchedSnipIdx = userFigList.findIndex(
+        (fa, idx) => !usedSnipIndices.has(idx) && !(fa.questionNumber ?? "").replace(/[^0-9]/g, ""),
+      );
+    }
+    const matchedSnip = matchedSnipIdx >= 0 ? userFigList[matchedSnipIdx] : undefined;
+    if (matchedSnipIdx >= 0) usedSnipIndices.add(matchedSnipIdx);
+
+    // Safety fallback: if a question has a figure (AI box OR user snip) and "(b) ..." was kept inside qText after "(a) ... figure:", split it below the figure
+    if ((q.figureBox || matchedSnip) && !qAfterText && /\(a\)[\s\S]*?(?:figure|diagram|sketch)[\s\S]*?\n\s*\(b\)/i.test(qText)) {
       const splitMatch = qText.match(/^([\s\S]*?)\n\s*(\(b\)[\s\S]*)$/i);
       if (splitMatch) {
         qText = (splitMatch[1] ?? "").trim();
         qAfterText = (splitMatch[2] ?? "").trim();
       }
     }
-    const qNum = sanitizeForWinAnsi(q.number ?? "");
-    const qMarks = sanitizeForWinAnsi(q.marks ?? "");
 
     const embeddedPartMatch = qText.match(
       /^(Part\s*:\s*[A-Z])\s*(?:\r?\n|\s+)(\(Answer[^)\r\n]+\))\s*(?:\r?\n|\s+)?([\s\S]*)$/i,
@@ -659,7 +726,7 @@ export async function buildCleanQuestionPdf(
       y -= 1;
     }
 
-    if (!qNum && !qText && !qAfterText && (!q.table || q.table.length === 0) && !q.figureBox) continue;
+    if (!qNum && !qText && !qAfterText && (!q.table || q.table.length === 0) && !q.figureBox && !matchedSnip) continue;
 
     const beforeLines = layoutQuestionParagraphs(
       qNum,
@@ -679,37 +746,41 @@ export async function buildCleanQuestionPdf(
     drawQuestionLineBlock(beforeLines, qNum);
     let lastRenderedLines = beforeLines;
 
-    // Render cropped diagram / figure ONLY when AI explicitly provides a valid figureBox
-    if (q.figureBox && Array.isArray(sourceFiles) && sourceFiles.length > 0) {
+    // Render diagram: prefer user's high-res close-up screenshot if attached, otherwise AI cropped figureBox
+    let figBytes: Uint8Array | null = null;
+    if (matchedSnip) {
+      figBytes = await cleanFullFigureFilePng(matchedSnip.file);
+    } else if (q.figureBox && Array.isArray(sourceFiles) && sourceFiles.length > 0) {
       const pageIdx = Math.max(
         0,
         Math.min(sourceFiles.length - 1, Math.round(q.figureBox.pageIndex ?? 0)),
       );
       const srcFile = sourceFiles[pageIdx];
       if (srcFile) {
-        const figBytes = await cropAndCleanFigurePng(srcFile, q.figureBox);
-        if (figBytes) {
-          const embeddedFig = await pdfDoc.embedPng(figBytes);
-          const maxW = isSingleSheet ? Math.min(contentW - 50, 275) : contentW - 40;
-          const maxH = isSingleSheet ? 92 : 240;
-          const scale = Math.min(maxW / embeddedFig.width, maxH / embeddedFig.height, 1.35);
-          const drawW = embeddedFig.width * scale;
-          const drawH = embeddedFig.height * scale;
-          ensureSpace(drawH + 10);
-          y -= 2;
-          const figX = marginX + (contentW - drawW) / 2;
-          page.drawImage(embeddedFig, {
-            x: figX,
-            y: y - drawH,
-            width: drawW,
-            height: drawH,
-          });
-          y -= drawH + 5;
-        }
+        figBytes = await cropAndCleanFigurePng(srcFile, q.figureBox);
       }
     }
 
-    // Render sub-questions that appear BELOW the diagram (e.g. "8.(b) Explain different types...")
+    if (figBytes) {
+      const embeddedFig = await pdfDoc.embedPng(figBytes);
+      const maxW = isSingleSheet ? Math.min(contentW - 45, 285) : contentW - 40;
+      const maxH = isSingleSheet ? 96 : 240;
+      const scale = Math.min(maxW / embeddedFig.width, maxH / embeddedFig.height, 1.35);
+      const drawW = embeddedFig.width * scale;
+      const drawH = embeddedFig.height * scale;
+      ensureSpace(drawH + 10);
+      y -= 2;
+      const figX = marginX + (contentW - drawW) / 2;
+      page.drawImage(embeddedFig, {
+        x: figX,
+        y: y - drawH,
+        width: drawW,
+        height: drawH,
+      });
+      y -= drawH + 5;
+    }
+
+    // Render sub-questions that appear BELOW the diagram
     if (qAfterText) {
       const afterLines = layoutQuestionParagraphs(
         "",

@@ -343,6 +343,7 @@ export default function QuestionBankSection({
   const [uploadNotes, setUploadNotes] = useState("");
   const [pdfFormatMode, setPdfFormatMode] = useState<"ai_text" | "photo_pdf">("ai_text");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [figureSnips, setFigureSnips] = useState<Array<{ id: string; file: File; previewUrl: string; questionNumber: string }>>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
   const [uploadProgress, setUploadProgress] = useState<{
@@ -625,6 +626,7 @@ export default function QuestionBankSection({
     setUploadStatus("");
     setUploadProgress({ step: 0, percent: 0, loadedBytes: 0, totalBytes: 0 });
     setSelectedFiles([]);
+    setFigureSnips((prev) => { prev.forEach((s) => URL.revokeObjectURL(s.previewUrl)); return []; });
     setUploadNotes("");
     setUploadBatch("");
     setUploadSubjectId(prefillSubjectId || (selectedSubjectId !== "all" ? selectedSubjectId : termSubjects[0]?.id || ""));
@@ -712,7 +714,7 @@ export default function QuestionBankSection({
         }
         setUploadProgress({ step: 2, percent: 58, loadedBytes: 0, totalBytes: 0 });
         setUploadStatus("Generating clean formatted A4 PDF...");
-        pdfFile = await buildCleanQuestionPdf(ocrData.extracted, baseName, selectedFiles);
+        pdfFile = await buildCleanQuestionPdf(ocrData.extracted, baseName, selectedFiles, figureSnips.map((s) => ({ file: s.file, questionNumber: s.questionNumber.trim() || undefined })));
       } else {
         setUploadProgress({ step: 2, percent: 52, loadedBytes: 0, totalBytes: 0 });
         setUploadStatus("Merging photos into A4 PDF...");
@@ -809,6 +811,7 @@ export default function QuestionBankSection({
       setUploadProgress({ step: 4, percent: 100, loadedBytes: pdfFile.size, totalBytes: pdfFile.size });
       setUploadSuccess(finData.message || "Question submitted!");
       setSelectedFiles([]);
+    setFigureSnips((prev) => { prev.forEach((s) => URL.revokeObjectURL(s.previewUrl)); return []; });
       setUploadNotes("");
       setUploadStatus("");
     } catch (err) {
@@ -1789,6 +1792,128 @@ export default function QuestionBankSection({
                         <div className="mt-0.5 text-[10px] opacity-80">Best if paper has diagrams</div>
                       </button>
                     </div>
+
+                    {pdfFormatMode === "ai_text" && (
+                      <div
+                        tabIndex={0}
+                        onPaste={(e) => {
+                          const items = e.clipboardData?.items;
+                          if (!items) return;
+                          const pasted: File[] = [];
+                          for (let i = 0; i < items.length; i++) {
+                            const it = items[i];
+                            if (it && it.type.startsWith("image/")) {
+                              const f = it.getAsFile();
+                              if (f) pasted.push(f);
+                            }
+                          }
+                          if (pasted.length > 0) {
+                            e.preventDefault();
+                            setFigureSnips((prev) => [
+                              ...prev,
+                              ...pasted.map((f) => ({
+                                id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                                file: f,
+                                previewUrl: URL.createObjectURL(f),
+                                questionNumber: "",
+                              })),
+                            ]);
+                          }
+                        }}
+                        className="mt-2.5 rounded-xl border border-amber-500/35 bg-amber-500/5 p-3 focus:border-amber-400 focus:outline-none"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <div className="text-[11px] font-bold text-amber-200">
+                              Close-up Diagram / Figure Snips (Optional)
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              If the paper has diagrams, select or click here &amp; press <kbd className="rounded bg-slate-800 px-1 py-0.5 font-mono text-[9px] text-amber-300">Ctrl+V</kbd> to paste crisp figure screenshots.
+                            </div>
+                          </div>
+                          <label className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-amber-400/40 bg-amber-500/15 px-2.5 py-1.5 text-[11px] font-bold text-amber-200 hover:bg-amber-500/25">
+                            <Plus className="h-3 w-3" />
+                            <span>Add Snip</span>
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/jpeg,image/png,image/webp"
+                              onChange={(e) => {
+                                const picked = Array.from(e.target.files || []);
+                                if (picked.length === 0) return;
+                                setFigureSnips((prev) => [
+                                  ...prev,
+                                  ...picked.map((f) => ({
+                                    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                                    file: f,
+                                    previewUrl: URL.createObjectURL(f),
+                                    questionNumber: "",
+                                  })),
+                                ]);
+                                e.target.value = "";
+                              }}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+
+                        {figureSnips.length > 0 && (
+                          <div className="mt-2.5 space-y-2">
+                            {figureSnips.map((snip, idx) => (
+                              <div
+                                key={snip.id}
+                                className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-[#060A12] p-2"
+                              >
+                                <div className="flex min-w-0 items-center gap-2">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={snip.previewUrl}
+                                    alt={`Figure ${idx + 1}`}
+                                    className="h-10 w-14 shrink-0 rounded border border-slate-700 bg-white object-contain"
+                                  />
+                                  <div className="min-w-0">
+                                    <div className="truncate text-[11px] font-semibold text-slate-200">
+                                      Figure #{idx + 1}
+                                    </div>
+                                    <div className="text-[10px] text-slate-400">
+                                      Target Question # (e.g. 3 or 8)
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex shrink-0 items-center gap-1.5">
+                                  <input
+                                    type="text"
+                                    maxLength={4}
+                                    value={snip.questionNumber}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setFigureSnips((prev) =>
+                                        prev.map((item) =>
+                                          item.id === snip.id ? { ...item, questionNumber: val } : item,
+                                        ),
+                                      );
+                                    }}
+                                    placeholder="Auto"
+                                    className="h-7 w-14 rounded-lg border border-slate-700 bg-slate-900 px-2 text-center font-mono text-[11px] font-bold text-amber-200 placeholder:text-slate-500 focus:border-amber-400 focus:outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      URL.revokeObjectURL(snip.previewUrl);
+                                      setFigureSnips((prev) => prev.filter((item) => item.id !== snip.id));
+                                    }}
+                                    className="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-rose-400"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
