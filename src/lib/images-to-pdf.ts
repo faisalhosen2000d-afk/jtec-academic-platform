@@ -313,10 +313,10 @@ function cleanCanvasPaperBackground(
     }
   }
   const bgMean = brightCount > 0 ? brightSum / brightCount : 230;
-  const whiteCut = Math.max(175, Math.min(232, bgMean - 14));
-  const blackCut = Math.min(115, whiteCut - 65);
+  const whiteCut = Math.max(185, Math.min(236, bgMean - 10));
+  const blackCut = Math.min(145, whiteCut - 45);
 
-  const amount = 0.72;
+  const amount = 0.95;
   for (let y = 0; y < h; y++) {
     const yUp = y > 0 ? y - 1 : 0;
     const yDn = y < h - 1 ? y + 1 : h - 1;
@@ -342,7 +342,8 @@ function cleanCanvasPaperBackground(
         out = 0;
       } else {
         const t = (sharp - blackCut) / (whiteCut - blackCut);
-        out = Math.round(Math.pow(t, 1.65) * 255);
+        // Darken mid-tones (gamma 2.2) so small dimension text ("15 mm", "150 mm") prints bold & crisp
+        out = Math.round(Math.pow(t, 2.2) * 255);
       }
 
       const o = idx * 4;
@@ -405,8 +406,8 @@ async function cropAndCleanFigurePng(
     const natH = img.naturalHeight || img.height;
     if (!natW || !natH) return null;
 
-    const padX = 8;
-    const padY = 4;
+    const padX = 6;
+    const padY = 0;
     const nx1 = Math.max(0, Math.min(1000, box.x - padX));
     const ny1 = Math.max(0, Math.min(1000, box.y - padY));
     const nx2 = Math.max(nx1 + 20, Math.min(1000, box.x + box.width + padX));
@@ -417,7 +418,7 @@ async function cropAndCleanFigurePng(
     const sw = Math.max(10, Math.round(((nx2 - nx1) / 1000) * natW));
     const sh = Math.max(10, Math.round(((ny2 - ny1) / 1000) * natH));
 
-    const upScale = sw < 700 ? 2 : sw < 1050 ? 1.5 : 1;
+    const upScale = sw < 900 ? 3 : sw < 1400 ? 2 : 1.5;
     const outW = Math.round(sw * upScale);
     const outH = Math.round(sh * upScale);
 
@@ -602,7 +603,16 @@ export async function buildCleanQuestionPdf(
       : [];
 
     let qText = sanitizeForWinAnsi(q.text ?? "");
-    const qAfterText = sanitizeForWinAnsi(q.textAfterFigure ?? "");
+    let qAfterText = sanitizeForWinAnsi(q.textAfterFigure ?? "");
+
+    // Safety fallback: if a question has a figureBox and "(b) ..." was kept inside qText after "(a) ... figure:", split it below the figure
+    if (q.figureBox && !qAfterText && /\(a\)[\s\S]*?(?:figure|diagram|sketch)[\s\S]*?\n\s*\(b\)/i.test(qText)) {
+      const splitMatch = qText.match(/^([\s\S]*?)\n\s*(\(b\)[\s\S]*)$/i);
+      if (splitMatch) {
+        qText = (splitMatch[1] ?? "").trim();
+        qAfterText = (splitMatch[2] ?? "").trim();
+      }
+    }
     const qNum = sanitizeForWinAnsi(q.number ?? "");
     const qMarks = sanitizeForWinAnsi(q.marks ?? "");
 
@@ -680,8 +690,8 @@ export async function buildCleanQuestionPdf(
         const figBytes = await cropAndCleanFigurePng(srcFile, q.figureBox);
         if (figBytes) {
           const embeddedFig = await pdfDoc.embedPng(figBytes);
-          const maxW = isSingleSheet ? Math.min(contentW - 80, 230) : contentW - 40;
-          const maxH = isSingleSheet ? 68 : 220;
+          const maxW = isSingleSheet ? Math.min(contentW - 50, 275) : contentW - 40;
+          const maxH = isSingleSheet ? 92 : 240;
           const scale = Math.min(maxW / embeddedFig.width, maxH / embeddedFig.height, 1.35);
           const drawW = embeddedFig.width * scale;
           const drawH = embeddedFig.height * scale;

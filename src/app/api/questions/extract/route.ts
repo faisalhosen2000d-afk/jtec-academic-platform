@@ -23,8 +23,8 @@ LAYOUT & FORMATTING RULES:
 6. PRINTED DIAGRAMS / FIGURES (VERY IMPORTANT):
    - ONLY when an actual printed diagram, mechanical drawing, beam/bar sketch, cross-section, circuit, or graph is visibly drawn on the exam paper for that question:
      * Set "hasFigure": true
-     * Set "figureBox": {"pageIndex": 0, "x": left, "y": top, "width": w, "height": h} in 0-1000 coordinates tightly framing ONLY the drawn diagram and its dimension labels (exclude surrounding question text lines, and NEVER box stickers or signatures!).
-     * If a sub-question (like "(b) Explain different types...") appears BELOW that diagram, put the text before the diagram in "text" and the sub-question(s) below the diagram in "textAfterFigure"!
+     * Set "figureBox": {"pageIndex": 0, "x": left, "y": top, "width": w, "height": h} in 0-1000 coordinates tightly framing ONLY the drawn diagram and its dimension labels (leave a small 1-2 unit gap from the text line above so letters like "portion." are NOT clipped into the box, and NEVER box stickers or signatures!).
+     * CRITICAL: NEVER omit sub-questions that appear BELOW a diagram! For example, in Question 8, "(a) Determine centroid of following figure:" is above the diagram ("text") and "(b) Explain different types of belt drives and gear trains." is BELOW the diagram — you MUST transcribe "(b) ..." completely into "textAfterFigure"!
    - If a question merely says "Describe with diagram" or "Draw the arrangement..." in text WITHOUT any printed drawing on the page, DO NOT set "hasFigure" or "figureBox".
 7. Fractions, subscripts, superscripts & symbols:
    - Write stacked fractions using \frac{numerator}{denominator}, e.g. \frac{24x27}{65x60}.
