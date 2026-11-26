@@ -347,117 +347,6 @@ function cleanCanvasPaperBackground(
   return bytes;
 }
 
-async function detectDiagramBoxFromFile(
-  file: File,
-): Promise<{ x: number; y: number; width: number; height: number } | null> {
-  let objUrl = "";
-  try {
-    objUrl = URL.createObjectURL(file);
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = () => reject(new Error("Image load failed"));
-      el.src = objUrl;
-    });
-    const natW = img.naturalWidth || img.width;
-    const natH = img.naturalHeight || img.height;
-    if (!natW || !natH) return null;
-
-    const scanW = Math.min(400, natW);
-    const scale = scanW / natW;
-    const scanH = Math.max(50, Math.round(natH * scale));
-
-    const canvas = document.createElement("canvas");
-    canvas.width = scanW;
-    canvas.height = scanH;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, scanW, scanH);
-    ctx.drawImage(img, 0, 0, scanW, scanH);
-
-    const data = ctx.getImageData(0, 0, scanW, scanH).data;
-    const marginX = Math.round(scanW * 0.04);
-    const innerW = scanW - marginX * 2;
-    const rowDarkCounts = new Uint16Array(scanH);
-
-    for (let y = 0; y < scanH; y++) {
-      let dark = 0;
-      const rowOff = y * scanW * 4;
-      for (let x = marginX; x < scanW - marginX; x++) {
-        const idx = rowOff + x * 4;
-        const r = data[idx] ?? 255;
-        const g = data[idx + 1] ?? 255;
-        const b = data[idx + 2] ?? 255;
-        if (0.299 * r + 0.587 * g + 0.114 * b < 165) dark++;
-      }
-      rowDarkCounts[y] = dark;
-    }
-
-    const minRowDark = Math.max(2, Math.round(innerW * 0.008));
-    const bands: Array<{ y1: number; y2: number }> = [];
-    let inBand = false;
-    let startY = 0;
-    let gap = 0;
-    const maxGap = Math.max(3, Math.round(scanH * 0.012));
-
-    for (let y = Math.round(scanH * 0.22); y < Math.round(scanH * 0.96); y++) {
-      const hasInk = (rowDarkCounts[y] ?? 0) >= minRowDark;
-      if (hasInk) {
-        if (!inBand) {
-          inBand = true;
-          startY = y;
-        }
-        gap = 0;
-      } else if (inBand) {
-        gap++;
-        if (gap > maxGap) {
-          bands.push({ y1: startY, y2: y - gap });
-          inBand = false;
-          gap = 0;
-        }
-      }
-    }
-    if (inBand) bands.push({ y1: startY, y2: Math.round(scanH * 0.95) });
-
-    const minDiagramH = Math.round(scanH * 0.08);
-    const tallBands = bands.filter((b) => b.y2 - b.y1 >= minDiagramH);
-    if (tallBands.length === 0) return null;
-
-    tallBands.sort((a, b) => (b.y2 - b.y1) - (a.y2 - a.y1));
-    const best = tallBands[0];
-    if (!best) return null;
-
-    let minX = scanW - marginX;
-    let maxX = marginX;
-    for (let y = best.y1; y <= best.y2; y++) {
-      const rowOff = y * scanW * 4;
-      for (let x = marginX; x < scanW - marginX; x++) {
-        const idx = rowOff + x * 4;
-        const r = data[idx] ?? 255;
-        const g = data[idx + 1] ?? 255;
-        const b = data[idx + 2] ?? 255;
-        if (0.299 * r + 0.587 * g + 0.114 * b < 165) {
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-        }
-      }
-    }
-    if (maxX <= minX + 10) return null;
-
-    return {
-      x: Math.round((minX / scanW) * 1000),
-      y: Math.round((best.y1 / scanH) * 1000),
-      width: Math.round(((maxX - minX) / scanW) * 1000),
-      height: Math.round(((best.y2 - best.y1) / scanH) * 1000),
-    };
-  } catch {
-    return null;
-  } finally {
-    if (objUrl) URL.revokeObjectURL(objUrl);
-  }
-}
-
 async function cropAndCleanFigurePng(
   file: File,
   rawBox: { x: number; y: number; width: number; height: number },
@@ -565,7 +454,7 @@ export async function buildCleanQuestionPdf(
     : 1;
 
   const marginX = isSingleSheet ? 38 : 50;
-  const marginTop = isSingleSheet ? 30 : 46;
+  const marginTop = isSingleSheet ? 40 : 48;
   const marginBottom = isSingleSheet ? 26 : 44;
   const contentW = a4W - marginX * 2;
   const bodySize = isSingleSheet ? 9.6 * scaleFactor : 10.5;
@@ -777,7 +666,7 @@ export async function buildCleanQuestionPdf(
       }
     }
 
-    y -= isSingleSheet ? 6.5 : 8;
+    y -= isSingleSheet ? 7 : 9;
 
     // Render bordered grid table if present
     if (Array.isArray(q.table) && q.table.length > 0) {
@@ -839,20 +728,15 @@ export async function buildCleanQuestionPdf(
       }
     }
 
-    // Render cropped diagram / figure if present
-    const mentionsFigure =
-      Boolean(q.hasFigure) ||
-      (/\b(figure below|fig\.|shown below|diagram|circuit|sketch|graph)\b/i.test(qText) &&
-        !/without\s+figure/i.test(qText));
-
-    if ((q.figureBox || mentionsFigure) && Array.isArray(sourceFiles) && sourceFiles.length > 0) {
+    // Render cropped diagram / figure ONLY when AI explicitly provides a valid figureBox
+    if (q.figureBox && Array.isArray(sourceFiles) && sourceFiles.length > 0) {
       const pageIdx = Math.max(
         0,
         Math.min(sourceFiles.length - 1, Math.round(q.figureBox?.pageIndex ?? 0)),
       );
       const srcFile = sourceFiles[pageIdx];
       if (srcFile) {
-        const resolvedBox = q.figureBox ?? (await detectDiagramBoxFromFile(srcFile));
+        const resolvedBox = q.figureBox;
         if (resolvedBox) {
           const figBytes = await cropAndCleanFigurePng(srcFile, resolvedBox);
           if (figBytes) {
