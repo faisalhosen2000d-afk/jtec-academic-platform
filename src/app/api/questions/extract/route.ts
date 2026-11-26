@@ -17,20 +17,25 @@ LAYOUT & FORMATTING RULES:
 3. "marks": Extract Full Marks on the right exactly as written (e.g. "Full marks : 72").
 4. "instructions": Extract general centered exam instructions below Time/Marks (e.g. ["(Use separate answer script for Part: A and Part: B)", "(All parts of a question must be answered consecutively)"]). Do NOT put "Part: A" or "Part: B" here.
 5. "questions": Transcribe every question (1., 2., ... 8.) and sub-questions ((a), (b), (i), (ii), etc.) word-for-word.
-   - If a Part heading appears right before a question (e.g. "Part: A" and "(Answer any three questions)" before question 1, or "Part: B" and "(Answer any three questions)" before question 5), put those lines in "sectionHeader": ["Part: A", "(Answer any three questions)"] on that question object, and DO NOT include "Part: A" inside "text"!
+   - If a Part heading appears right before a question (e.g. "Part: A" and "(Answer any three questions)" before question 1, or "Part: B" and "(Answer any three questions)" before question 5), put those lines in "sectionHeader": ["Part: A", "(Answer any three questions)"] on that question object, and DO NOT include "Part: A" inside "text".
    - Format sub-questions cleanly with newlines so each sub-question starts on its own line: "(a) ...\n(b) ...\n(c) ...".
-   - Put the right-side marks (e.g. "[2+4+3+3=12]") in the "marks" field of that question, NOT inside "text".
-6. Fractions, subscripts, superscripts & symbols:
-   - Write stacked fractions using \frac{numerator}{denominator}, e.g. \frac{24x27}{65x60} or \frac{20x16}{110x51}.
-   - Write subscripts as D_{7}, H_{2}O and superscripts as m^{2}, 10^{-3}.
+   - Put the right-side marks (e.g. "[3+5+4=12]") in the "marks" field of that question, NOT inside "text".
+6. PRINTED DIAGRAMS / FIGURES (VERY IMPORTANT):
+   - ONLY when an actual printed diagram, mechanical drawing, beam/bar sketch, cross-section, circuit, or graph is visibly drawn on the exam paper for that question:
+     * Set "hasFigure": true
+     * Set "figureBox": {"pageIndex": 0, "x": left, "y": top, "width": w, "height": h} in 0-1000 coordinates tightly framing ONLY the drawn diagram and its dimension labels (exclude surrounding question text lines, and NEVER box stickers or signatures!).
+     * If a sub-question (like "(b) Explain different types...") appears BELOW that diagram, put the text before the diagram in "text" and the sub-question(s) below the diagram in "textAfterFigure"!
+   - If a question merely says "Describe with diagram" or "Draw the arrangement..." in text WITHOUT any printed drawing on the page, DO NOT set "hasFigure" or "figureBox".
+7. Fractions, subscripts, superscripts & symbols:
+   - Write stacked fractions using \frac{numerator}{denominator}, e.g. \frac{24x27}{65x60}.
+   - Write subscripts as D_{7}, H_{2}O and superscripts as mm^{2}, m^{2}, 10^{-3}.
    - Use proper degree symbols like °C or °F and standard symbols (-, +, x, =, <=, >=, %). Do NOT wrap formulas in $...$ delimiters.
-7. If a question contains any data table / chart of numbers, put it in the "table" 2D array (rows of cells) on that question object.
-8. If a question includes ANY diagram, figure, circuit, graph, or sketch, set "hasFigure": true AND include "figureBox": {"pageIndex": 0, "x": left, "y": top, "width": w, "height": h} in 0-1000 coordinates tightly framing the entire diagram with all arrows and labels.
+8. If a question contains any data table / chart of numbers, put it in the "table" 2D array (rows of cells) on that question object.
 9. "footer": If there is a centered ending mark at the bottom (e.g. "** ** ** **"), include it; otherwise omit.
 
 Return strictly valid JSON with this exact structure:
 {
-  "headers": ["BANGLADESH UNIVERSITY OF TEXTILES", "B. Sc. in Textile Engineering (For Affiliated colleges)", "Level-2 Term-II, Final Examination-2018", "Subject: Fabric Manufacturing-1 (Code: FE 201)"],
+  "headers": ["BANGLADESH UNIVERSITY OF TEXTILES", "B. Sc. in Textile Engineering (For Affiliated colleges)", "Level-2 Term-II, Final Examination-2018", "Subject: Fundamentals of Mechanical Engineering (Code: IPE 203)"],
   "time": "Time : 3.0 Hrs",
   "marks": "Full marks : 72",
   "instructions": ["(Use separate answer script for Part: A and Part: B)", "(All parts of a question must be answered consecutively)"],
@@ -38,8 +43,16 @@ Return strictly valid JSON with this exact structure:
     {
       "sectionHeader": ["Part: A", "(Answer any three questions)"],
       "number": "1.",
-      "text": "(a) Write down the flow chart of weaving.\n(b) What is ballooning? ...",
-      "marks": "[2+4+3+3=12]"
+      "text": "(a) ...\n(b) ...",
+      "marks": "[3+5+4=12]"
+    },
+    {
+      "number": "8.",
+      "text": "(a) Determine centroid of following figure:",
+      "hasFigure": true,
+      "figureBox": { "pageIndex": 0, "x": 370, "y": 875, "width": 185, "height": 78 },
+      "textAfterFigure": "(b) Explain different types of belt drives and gear trains.",
+      "marks": "[4+8=12]"
     }
   ],
   "footer": "** ** ** **"
@@ -149,7 +162,6 @@ export async function POST(request: Request) {
     let raw = "";
     const errors: string[] = [];
 
-    // 1. Try GitHub Models Vision first
     const ghToken = (process.env.GITHUB_MODELS_TOKEN ?? "").trim();
     if (ghToken && !raw) {
       for (const ghModel of ["openai/gpt-4.1-mini", "openai/gpt-4o-mini"]) {
@@ -167,7 +179,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. Fall back to Gemini Vision
     if (!raw) {
       try {
         raw = await callGemini(parts, { jsonMode: true });
@@ -176,7 +187,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Fall back to OpenRouter Free Vision
     const orKey = (process.env.OPENROUTER_API_KEY ?? "").trim();
     if (!raw && orKey) {
       for (const orModel of ["google/gemma-3-27b-it:free", "openrouter/free"]) {
