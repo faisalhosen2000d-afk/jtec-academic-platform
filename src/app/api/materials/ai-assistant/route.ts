@@ -1,4 +1,4 @@
-import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
+﻿import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -7,6 +7,35 @@ import { PDFDocument } from "pdf-lib";
 import { callGemini, type GeminiPart } from "@/lib/gemini";
 
 type AiMode = "summary_en" | "summary_bn" | "questions" | "ask";
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isValidUuid(value: string): boolean {
+  return UUID_REGEX.test(value);
+}
+
+function shouldAllowClientSample(
+  fileType: string,
+  fileSizeBytes: number,
+  sampledPdfBase64: string,
+): boolean {
+  const ft = (fileType || "").toLowerCase();
+  return (
+    ft.includes("pdf") &&
+    fileSizeBytes > 25 * 1024 * 1024 &&
+    Boolean(sampledPdfBase64) &&
+    sampledPdfBase64.length <= 3_500_000
+  );
+}
+
+function canPersistAiCache(
+  usedClientSample: boolean,
+  role: string,
+): boolean {
+  const isStaff = ["admin", "super_admin", "moderator"].includes(role);
+  return !usedClientSample || isStaff;
+}
 
 export const maxDuration = 60;
 
@@ -18,10 +47,17 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ success: false, error: "Authentication is required." }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: "Authentication is required." },
+        { status: 401 },
+      );
     }
 
-    const rl = await checkRateLimit({ key: `ai-assistant:${user.id}`, limit: 15, windowSeconds: 60 });
+    const rl = await checkRateLimit({
+      key: `ai-assistant:${user.id}`,
+      limit: 15,
+      windowSeconds: 60,
+    });
     if (!rl.allowed) {
       return rateLimitExceededResponse(rl.retryAfterSeconds);
     }
@@ -30,14 +66,29 @@ export async function POST(request: Request) {
     const materialId = String(body?.materialId ?? "").trim();
     const mode = body?.mode as AiMode;
     const question = String(body?.question ?? "").trim();
-    const sampledPdfBase64 = typeof body?.sampledPdfBase64 === "string" ? body.sampledPdfBase64.trim() : "";
+    const sampledPdfBase64 =
+      typeof body?.sampledPdfBase64 === "string"
+        ? body.sampledPdfBase64.trim()
+        : "";
 
-    if (!materialId || !["summary_en", "summary_bn", "questions", "ask"].includes(mode)) {
-      return NextResponse.json({ success: false, error: "Invalid AI request." }, { status: 400 });
+    if (
+      !isValidUuid(materialId) ||
+      !["summary_en", "summary_bn", "questions", "ask"].includes(mode)
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Invalid AI request." },
+        { status: 400 },
+      );
     }
 
     if (mode === "ask" && (!question || question.length > 600)) {
-      return NextResponse.json({ success: false, error: "Please enter a concise question (1-600 characters)." }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Please enter a concise question (1-600 characters).",
+        },
+        { status: 400 },
+      );
     }
 
     const serviceSupabase = createServiceRoleClient();
@@ -53,8 +104,14 @@ export async function POST(request: Request) {
       ((profile.role === "student" && profile.is_verified === true) ||
         ["admin", "super_admin", "moderator"].includes(profile.role));
 
-    if (!isAllowed) {
-      return NextResponse.json({ success: false, error: "Only verified students can use the AI Study Assistant." }, { status: 403 });
+    if (!isAllowed || !profile) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Only verified students can use the AI Study Assistant.",
+        },
+        { status: 403 },
+      );
     }
 
     type MaterialAiRow = {
@@ -72,7 +129,9 @@ export async function POST(request: Request) {
 
     const { data: rawMat, error: matErr } = await serviceSupabase
       .from("materials")
-      .select("id, title, description, topic, file_path, file_type, file_size_bytes, ai_summary_en, ai_summary_bn, ai_questions" as never)
+      .select(
+        "id, title, description, topic, file_path, file_type, file_size_bytes, ai_summary_en, ai_summary_bn, ai_questions" as never,
+      )
       .eq("id", materialId)
       .eq("status", "approved")
       .maybeSingle();
@@ -80,20 +139,43 @@ export async function POST(request: Request) {
     const material = rawMat as unknown as MaterialAiRow | null;
 
     if (matErr) {
-      return NextResponse.json({ success: false, error: `DB error: ${matErr.message}` }, { status: 500 });
+      console.error("[api/materials/ai-assistant][db]", matErr);
+      return NextResponse.json(
+        { success: false, error: "Unable to load material." },
+        { status: 500 },
+      );
     }
     if (!material) {
-      return NextResponse.json({ success: false, error: "Material not found." }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "Material not found." },
+        { status: 404 },
+      );
     }
 
     if (mode === "summary_en" && material.ai_summary_en) {
-      return NextResponse.json({ success: true, cached: true, content: material.ai_summary_en });
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        content: material.ai_summary_en,
+      });
     }
     if (mode === "summary_bn" && material.ai_summary_bn) {
-      return NextResponse.json({ success: true, cached: true, content: material.ai_summary_bn });
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        content: material.ai_summary_bn,
+      });
     }
-    if (mode === "questions" && Array.isArray(material.ai_questions) && material.ai_questions.length > 0) {
-      return NextResponse.json({ success: true, cached: true, questions: material.ai_questions });
+    if (
+      mode === "questions" &&
+      Array.isArray(material.ai_questions) &&
+      material.ai_questions.length > 0
+    ) {
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        questions: material.ai_questions,
+      });
     }
 
     const contextHeader = [
@@ -105,6 +187,7 @@ export async function POST(request: Request) {
       .join("\n");
 
     const parts: GeminiPart[] = [];
+    let usedClientSample = false;
 
     const ft = (material.file_type || "").toLowerCase();
     const canAttachInline =
@@ -112,15 +195,32 @@ export async function POST(request: Request) {
       material.file_size_bytes <= 25 * 1024 * 1024 &&
       (ft.includes("pdf") || ft.includes("image") || ft.includes("text/plain"));
 
-    if (sampledPdfBase64 && sampledPdfBase64.length <= 3_500_000) {
+    if (
+      shouldAllowClientSample(
+        material.file_type,
+        material.file_size_bytes,
+        sampledPdfBase64,
+      )
+    ) {
+      usedClientSample = true;
       parts.push({
         inlineData: {
           mimeType: "application/pdf",
           data: sampledPdfBase64,
         },
       });
-    } else if (material.file_path && ft.includes("pdf") && material.file_size_bytes > 25 * 1024 * 1024 && !body?.skipClientSample) {
-      const signedUrl = await createMaterialSignedUrl(serviceSupabase, material.file_path, 120); const signed = signedUrl ? { signedUrl } : null;
+    } else if (
+      material.file_path &&
+      ft.includes("pdf") &&
+      material.file_size_bytes > 25 * 1024 * 1024 &&
+      !body?.skipClientSample
+    ) {
+      const signedUrl = await createMaterialSignedUrl(
+        serviceSupabase,
+        material.file_path,
+        120,
+      );
+      const signed = signedUrl ? { signedUrl } : null;
       if (signed?.signedUrl) {
         return NextResponse.json({
           success: true,
@@ -129,15 +229,25 @@ export async function POST(request: Request) {
         });
       }
     } else if (canAttachInline) {
-      const downloadedBuffer = await downloadMaterialBuffer(serviceSupabase, material.file_path); if (downloadedBuffer) { let buffer = downloadedBuffer;
+      const downloadedBuffer = await downloadMaterialBuffer(
+        serviceSupabase,
+        material.file_path,
+      );
+      if (downloadedBuffer) {
+        let buffer = downloadedBuffer;
         if (ft.includes("pdf") && buffer.length > 1.2 * 1024 * 1024) {
           try {
-            const srcDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+            const srcDoc = await PDFDocument.load(buffer, {
+              ignoreEncryption: true,
+            });
             const totalPages = srcDoc.getPageCount();
             if (totalPages > 6) {
               const sampledDoc = await PDFDocument.create();
               const indices = Array.from({ length: 6 }, (_, i) =>
-                Math.min(totalPages - 1, Math.floor((i * (totalPages - 1)) / 5))
+                Math.min(
+                  totalPages - 1,
+                  Math.floor((i * (totalPages - 1)) / 5),
+                ),
               );
               const uniqueIndices = Array.from(new Set(indices));
               const copied = await sampledDoc.copyPages(srcDoc, uniqueIndices);
@@ -145,7 +255,9 @@ export async function POST(request: Request) {
               buffer = Buffer.from(await sampledDoc.save());
               if (buffer.length > 2.5 * 1024 * 1024) {
                 const tinyDoc = await PDFDocument.create();
-                const tinyIndices = Array.from(new Set([0, Math.floor(totalPages / 2), totalPages - 1]));
+                const tinyIndices = Array.from(
+                  new Set([0, Math.floor(totalPages / 2), totalPages - 1]),
+                );
                 const tinyCopied = await tinyDoc.copyPages(srcDoc, tinyIndices);
                 tinyCopied.forEach((p) => tinyDoc.addPage(p));
                 buffer = Buffer.from(await tinyDoc.save());
@@ -173,21 +285,33 @@ export async function POST(request: Request) {
       }
     }
 
+    const allowCacheSave = canPersistAiCache(usedClientSample, profile.role);
+
     if (mode === "summary_en") {
       parts.push({
-        text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nList ONLY the main topics covered in this material so a student immediately knows what is inside, and under each topic write a concise 1-2 line definition or core formula. Keep it clean and under 240 words. Write formulas in plain readable math (e.g., A_T, x^2, ×, ÷, ≈, μ, /) and NEVER use LaTeX syntax like $, $$, \\frac, \\text, or --.`,
+        text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nList ONLY the main topics covered in this material so a student immediately knows what is inside, and under each topic write a concise 1-2 line definition or core formula. Keep it clean and under 240 words. Write formulas in plain readable math (e.g., A_T, x^2, x, /, ~) and NEVER use LaTeX syntax like $, $$, \\frac, \\text, or --.`,
       });
       const content = await callGemini(parts, { timeoutMs: 24000 });
-      await serviceSupabase.from("materials").update({ ai_summary_en: content } as never).eq("id", material.id);
+      if (allowCacheSave) {
+        await serviceSupabase
+          .from("materials")
+          .update({ ai_summary_en: content } as never)
+          .eq("id", material.id);
+      }
       return NextResponse.json({ success: true, cached: false, content });
     }
 
     if (mode === "summary_bn") {
       parts.push({
-        text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nList ONLY the main topics covered in this material in simple, clear Bangla (keep technical terms in English in parentheses), and under each topic write a concise 1-2 line definition or core formula in simple Bangla. Keep it under 220 words. Write formulas plainly (e.g., A_T, x^2, ×, ÷, ≈, μ, /) and NEVER use LaTeX like $, $$, \\frac, \\text, or --.`,
+        text: `You are an academic assistant for textile engineering students at JTEC.\n${contextHeader}\n\nList ONLY the main topics covered in this material in simple, clear Bangla (keep technical terms in English in parentheses), and under each topic write a concise 1-2 line definition or core formula in simple Bangla. Keep it under 220 words. Write formulas plainly (e.g., A_T, x^2, x, /, ~) and NEVER use LaTeX like $, $$, \\frac, \\text, or --.`,
       });
       const content = await callGemini(parts, { timeoutMs: 24000 });
-      await serviceSupabase.from("materials").update({ ai_summary_bn: content } as never).eq("id", material.id);
+      if (allowCacheSave) {
+        await serviceSupabase
+          .from("materials")
+          .update({ ai_summary_bn: content } as never)
+          .eq("id", material.id);
+      }
       return NextResponse.json({ success: true, cached: false, content });
     }
 
@@ -198,22 +322,31 @@ export async function POST(request: Request) {
       const raw = await callGemini(parts, { jsonMode: true, timeoutMs: 24000 });
       const parsed = JSON.parse(raw);
       const questions = Array.isArray(parsed) ? parsed.slice(0, 5) : [];
-      if (questions.length > 0) {
-        await serviceSupabase.from("materials").update({ ai_questions: questions } as never).eq("id", material.id);
+      if (questions.length > 0 && allowCacheSave) {
+        await serviceSupabase
+          .from("materials")
+          .update({ ai_questions: questions } as never)
+          .eq("id", material.id);
       }
       return NextResponse.json({ success: true, cached: false, questions });
     }
 
-    const extraSummary = [material.ai_summary_en ? `\nSummary (EN):\n${material.ai_summary_en}` : "", material.ai_summary_bn ? `\nSummary (BN):\n${material.ai_summary_bn}` : ""].filter(Boolean).join("");
+    const extraSummary = [
+      material.ai_summary_en ? `\nSummary (EN):\n${material.ai_summary_en}` : "",
+      material.ai_summary_bn ? `\nSummary (BN):\n${material.ai_summary_bn}` : "",
+    ]
+      .filter(Boolean)
+      .join("");
     parts.push({
       text: `You are a helpful academic tutor for JTEC textile engineering students.\n${contextHeader}${extraSummary}\n\nStudent Question: ${question}\n\nAnswer clearly and concisely in the same language as the student's question (Bangla or English). Write formulas plainly (e.g., A_T, x^2, /) and NEVER use LaTeX like $, $$, \\frac, or \\text.`,
     });
     const answer = await callGemini(parts, { timeoutMs: 24000 });
     return NextResponse.json({ success: true, answer });
   } catch (err) {
+    console.error("[api/materials/ai-assistant]", err);
     return NextResponse.json(
-      { success: false, error: err instanceof Error ? err.message : "AI request failed." },
-      { status: 500 }
+      { success: false, error: "AI request failed. Please try again." },
+      { status: 500 },
     );
   }
 }

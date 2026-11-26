@@ -1,4 +1,4 @@
-import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
+﻿import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
@@ -16,7 +16,7 @@ function isValidUuid(value: unknown): value is string {
   }
 
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
+    value,
   );
 }
 
@@ -44,22 +44,21 @@ export async function POST(request: Request) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    console.log("[file-access][auth]", {
-      userId: user?.id ?? null,
-      email: user?.email ?? null,
-    });
-
     if (!user) {
       return NextResponse.json(
         {
           success: false,
           error: "Authentication is required.",
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    const rl = await checkRateLimit({ key: `material-access:${user.id}`, limit: 45, windowSeconds: 60 });
+    const rl = await checkRateLimit({
+      key: `material-access:${user.id}`,
+      limit: 45,
+      windowSeconds: 60,
+    });
     if (!rl.allowed) {
       return rateLimitExceededResponse(rl.retryAfterSeconds);
     }
@@ -77,7 +76,7 @@ export async function POST(request: Request) {
           success: false,
           error: "Invalid JSON request body.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -87,7 +86,7 @@ export async function POST(request: Request) {
           success: false,
           error: "Invalid file access request.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -98,32 +97,19 @@ export async function POST(request: Request) {
 
     const { data: profile, error: profileError } = await serviceSupabase
       .from("profiles")
-      .select("id, role, is_verified, student_id, email")
+      .select("id, role, is_verified")
       .eq("id", user.id)
       .maybeSingle();
 
-    console.log("[file-access][profile]", {
-      authUserId: user.id,
-      profileId: profile?.id ?? null,
-      role: profile?.role ?? null,
-      isVerified: profile?.is_verified ?? null,
-      studentId: profile?.student_id ?? null,
-      profileEmail: profile?.email ?? null,
-      error: profileError?.message ?? null,
-    });
-
     if (profileError) {
-      console.error(
-        "[api/materials/file-access][profile]",
-        profileError
-      );
+      console.error("[api/materials/file-access][profile]", profileError);
 
       return NextResponse.json(
         {
           success: false,
           error: "Unable to verify your account.",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -135,9 +121,8 @@ export async function POST(request: Request) {
       profile.role !== "student" ||
       profile.is_verified !== true
     ) {
-      console.error("[file-access][authorization-failed]", {
+      console.warn("[file-access][authorization-failed]", {
         authUserId: user.id,
-        profileId: profile?.id ?? null,
         role: profile?.role ?? null,
         isVerified: profile?.is_verified ?? null,
       });
@@ -147,32 +132,28 @@ export async function POST(request: Request) {
           success: false,
           error: "Only verified students can access approved materials.",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     /*
      * 5. Load the material.
      */
-    const { data: material, error: materialError } =
-      await serviceSupabase
-        .from("materials")
-        .select("id, status, file_path")
-        .eq("id", body.materialId)
-        .maybeSingle();
+    const { data: material, error: materialError } = await serviceSupabase
+      .from("materials")
+      .select("id, status, file_path")
+      .eq("id", body.materialId)
+      .maybeSingle();
 
     if (materialError) {
-      console.error(
-        "[api/materials/file-access][material]",
-        materialError
-      );
+      console.error("[api/materials/file-access][material]", materialError);
 
       return NextResponse.json(
         {
           success: false,
           error: "Unable to load the material.",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -182,7 +163,7 @@ export async function POST(request: Request) {
           success: false,
           error: "Material could not be found.",
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -195,7 +176,7 @@ export async function POST(request: Request) {
           success: false,
           error: "This material is not currently available.",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -208,7 +189,7 @@ export async function POST(request: Request) {
           success: false,
           error: "The material file is not available.",
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -217,20 +198,24 @@ export async function POST(request: Request) {
      *
      * Bucket remains private.
      */
-    const signedUrl = await createMaterialSignedUrl(serviceSupabase, material.file_path, 300, { download: body.action === "download" }); const signedUrlData = signedUrl ? { signedUrl } : null; const signedUrlError = signedUrl ? null : new Error("Could not sign material URL");
+    const signedUrl = await createMaterialSignedUrl(
+      serviceSupabase,
+      material.file_path,
+      300,
+      { download: body.action === "download" },
+    );
 
-    if (signedUrlError || !signedUrlData?.signedUrl) {
-      console.error(
-        "[api/materials/file-access][signed-url]",
-        signedUrlError
-      );
+    if (!signedUrl) {
+      console.error("[api/materials/file-access][signed-url]", {
+        materialId: material.id,
+      });
 
       return NextResponse.json(
         {
           success: false,
-          error: signedUrlError?.message ? `Unable to access file: ${signedUrlError.message}` : "Unable to create secure access to the material file.",
+          error: "Unable to create secure access to the material file.",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -246,10 +231,7 @@ export async function POST(request: Request) {
         });
 
       if (logError) {
-        console.error(
-          "[api/materials/file-access][view-log]",
-          logError
-        );
+        console.error("[api/materials/file-access][view-log]", logError);
       }
     }
 
@@ -265,10 +247,7 @@ export async function POST(request: Request) {
         });
 
       if (logError) {
-        console.error(
-          "[api/materials/file-access][download-log]",
-          logError
-        );
+        console.error("[api/materials/file-access][download-log]", logError);
       }
     }
 
@@ -279,9 +258,9 @@ export async function POST(request: Request) {
       {
         success: true,
         action: body.action,
-        url: signedUrlData.signedUrl,
+        url: signedUrl,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("[api/materials/file-access]", error);
@@ -289,12 +268,9 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "The material file could not be accessed.",
+        error: "The material file could not be accessed.",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

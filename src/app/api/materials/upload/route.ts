@@ -1,4 +1,4 @@
-import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
+﻿import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createB2UploadPresignedUrl, isB2Configured, removeMaterialObject } from "@/lib/material-storage";
@@ -20,6 +20,56 @@ const ALLOWED_EXTENSIONS = new Set([
 
 const BLOCKED_EXTENSIONS = new Set(["xls", "xlsx"]);
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isValidUuid(value: string): boolean {
+  return UUID_REGEX.test(value);
+}
+
+function isSafeStoragePath(filePath: string, expectedPrefix: string): boolean {
+  if (!filePath || filePath.includes("\0") || filePath.includes("\\")) {
+    return false;
+  }
+
+  const lower = filePath.toLowerCase();
+  if (
+    filePath.includes("..") ||
+    lower.includes("%2e") ||
+    lower.includes("%2f") ||
+    lower.includes("%5c")
+  ) {
+    return false;
+  }
+
+  const normalizedPath = filePath.startsWith("b2://")
+    ? filePath.slice("b2://".length)
+    : filePath;
+
+  const prefixWithSlash = `${expectedPrefix}/`;
+  if (!normalizedPath.startsWith(prefixWithSlash)) {
+    return false;
+  }
+
+  const fileNamePart = normalizedPath.slice(prefixWithSlash.length);
+
+  // Must be a single flat filename inside expectedPrefix (no extra folders)
+  if (!fileNamePart || fileNamePart.includes("/")) {
+    return false;
+  }
+
+  if (!/^[a-zA-Z0-9._-]+$/.test(fileNamePart)) {
+    return false;
+  }
+
+  const ext = fileNamePart.split(".").pop()?.toLowerCase() ?? "";
+  if (!ext || BLOCKED_EXTENSIONS.has(ext) || !ALLOWED_EXTENSIONS.has(ext)) {
+    return false;
+  }
+
+  return true;
+}
+
 function jsonError(error: string, status = 400) {
   return NextResponse.json({ error }, { status });
 }
@@ -29,7 +79,10 @@ async function getUploadSettings(): Promise<{
   maxMb: number;
   storageProvider: "b2" | "supabase";
 }> {
-  const rawClient = createRawSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const rawClient = createRawSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
   const { data, error } = await rawClient
     .from("platform_settings")
     .select("max_upload_size_mb, material_storage_provider")
@@ -112,7 +165,7 @@ function validateFileMetadata(
     return "Please select a file.";
   }
 
-  if (fileSize <= 0) {
+  if (!Number.isFinite(fileSize) || fileSize <= 0) {
     return "The selected file is empty.";
   }
 
@@ -169,7 +222,10 @@ function createStoragePath(
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return jsonError("Invalid JSON request body.");
+    }
 
     const action = body?.action ?? "prepare";
 
@@ -231,22 +287,34 @@ export async function POST(request: Request) {
       return jsonError("Selected subject was not found.");
     }
 
-    const materialId = String(body.material_id ?? "").trim() || randomUUID();
+    let materialId: string;
+    let filePath: string;
 
-    const filePath =
-      String(body.file_path ?? "").trim() ||
-      createStoragePath(subject, materialId, fileName);
+    if (action === "prepare") {
+      // Server always generates a fresh UUID and safe storage path
+      materialId = randomUUID();
+      filePath = createStoragePath(subject, materialId, fileName);
+    } else {
+      const requestedMaterialId = String(body.material_id ?? "").trim();
+      if (!isValidUuid(requestedMaterialId)) {
+        return jsonError("Invalid material ID.");
+      }
+      materialId = requestedMaterialId;
 
-    const expectedPrefix = [
-      subject.department_id,
-      subject.level_id,
-      subject.term_id,
-      subject.id,
-      materialId,
-    ].join("/");
+      const requestedFilePath = String(body.file_path ?? "").trim();
+      const expectedPrefix = [
+        subject.department_id,
+        subject.level_id,
+        subject.term_id,
+        subject.id,
+        materialId,
+      ].join("/");
 
-    if (!filePath.startsWith(`${expectedPrefix}/`) && !filePath.startsWith(`b2://${expectedPrefix}/`)) {
-      return jsonError("Invalid storage file path.");
+      if (!isSafeStoragePath(requestedFilePath, expectedPrefix)) {
+        return jsonError("Invalid storage file path.");
+      }
+
+      filePath = requestedFilePath;
     }
 
     if (fileHash && !/^[a-f0-9]{64}$/.test(fileHash)) {
@@ -266,7 +334,7 @@ export async function POST(request: Request) {
       if (existingDuplicate) {
         return NextResponse.json(
           { error: `This exact file has already been uploaded ("${existingDuplicate.title}"). Duplicate files are not allowed.` },
-          { status: 409 }
+          { status: 409 },
         );
       }
     }
@@ -327,7 +395,7 @@ export async function POST(request: Request) {
       await removeMaterialObject(createServiceRoleClient(), filePath);
 
       return NextResponse.json(
-        { error: materialError?.message ?? "Material could not be saved." },
+        { error: "Material could not be saved." },
         { status: 500 },
       );
     }
