@@ -36,18 +36,16 @@ function normalizeMathScripts(raw: string): string {
   return raw
     .replace(/[\u2080-\u208C]+/g, (m) => "_{" + Array.from(m).map((ch) => subMap[ch] ?? ch).join("") + "}")
     .replace(/[\u2070\u2074-\u207B\u207F]+/g, (m) => "^{" + Array.from(m).map((ch) => supMap[ch] ?? ch).join("") + "}")
-    .replace(/\$([^$\r\n]{1,80})\$/g, (_m, inner: string) =>
-      inner
-        .replace(/\\times/g, "x")
-        .replace(/\\cdot/g, ".")
-        .replace(/\\pm/g, "\u00B1")
-        .replace(/\\leq?/g, "<=")
-        .replace(/\\geq?/g, ">=")
-        .replace(/\\neq/g, "!=")
-        .replace(/\\circ/g, "\u00B0")
-        .replace(/\\text\{([^}]*)\}/g, "$1")
-        .trim(),
-    );
+    .replace(/\$([^$\r\n]{1,100})\$/g, (_m, inner: string) => inner.trim())
+    .replace(/\\times/g, "x")
+    .replace(/\\cdot/g, ".")
+    .replace(/\\pm/g, "\u00B1")
+    .replace(/\\leq?/g, "<=")
+    .replace(/\\geq?/g, ">=")
+    .replace(/\\neq/g, "!=")
+    .replace(/\\circ/g, "\u00B0")
+    .replace(/\\text\{([^}]*)\}/g, "$1")
+    .replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, "\\frac{$1}{$2}");
 }
 
 type RichSegment =
@@ -85,7 +83,7 @@ function parseInlineScripts(chunk: string): RichSegment[] {
 
 function parseRichSegments(line: string): RichSegment[] {
   const result: RichSegment[] = [];
-  const fracRegex = /\\frac\{([^{}]+)\}\{([^{}]+)\}/g;
+  const fracRegex = /\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g;
   let lastIdx = 0;
   let m: RegExpExecArray | null;
   while ((m = fracRegex.exec(line)) !== null) {
@@ -137,7 +135,7 @@ function drawRichTextLine(
       const barY = opts.y + opts.size * 0.28;
       page.drawText(seg.num, {
         x: cursorX + (boxW - nw) / 2,
-        y: barY + 2.2,
+        y: barY + 2.0,
         size: fracSize,
         font: opts.font,
         color: opts.color,
@@ -150,7 +148,7 @@ function drawRichTextLine(
       });
       page.drawText(seg.den, {
         x: cursorX + (boxW - dw) / 2,
-        y: barY - fracSize - 1.2,
+        y: barY - fracSize - 1.0,
         size: fracSize,
         font: opts.font,
         color: opts.color,
@@ -195,14 +193,22 @@ function sanitizeForWinAnsi(text: string): string {
 }
 
 function wrapLines(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const paragraphs = text.split(/\r?\n/);
+  // Keep \frac{a}{b} intact as a single non-breaking token during word-wrap
+  const protectedText = text.replace(
+    /\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g,
+    (_m, a: string, b: string) => `\\frac{${a.replace(/\s+/g, "\u00A0")}}{${b.replace(/\s+/g, "\u00A0")}}`,
+  );
+  const paragraphs = protectedText.split(/\r?\n/);
   const lines: string[] = [];
 
   for (const para of paragraphs) {
-    const words = para.trim().split(/\s+/).filter(Boolean);
-    if (words.length === 0) {
-      continue;
-    }
+    const words = para
+      .trim()
+      .split(/[ \t]+/)
+      .filter(Boolean)
+      .map((w) => w.replace(/\u00A0/g, " "));
+    if (words.length === 0) continue;
+
     let current = "";
     for (const word of words) {
       const candidate = current ? `${current} ${word}` : word;
@@ -218,8 +224,6 @@ function wrapLines(text: string, font: PDFFont, size: number, maxWidth: number):
   return lines;
 }
 
-// Split a question into indented sub-lines matching authentic BUTEX layout:
-// e.g. "1. (a) ...\n   (b) ...\n      (i) ..."
 type FormattedQuestionLine = {
   text: string;
   indent: number;
@@ -233,7 +237,6 @@ function layoutQuestionParagraphs(
   size: number,
   maxWidth: number,
 ): FormattedQuestionLine[] {
-  // Normalize inline "(b) ", "(c) ", "(d) ", "(i) ", "(ii) ", "(iii) " onto new lines if merged
   const normalized = qText
     .replace(/\s+(?=\([b-z]\)\s)/g, "\n")
     .replace(/\s+(?=\((?:ii|iii|iv|v)\)\s)/g, "\n");
@@ -271,7 +274,7 @@ function layoutQuestionParagraphs(
       output.push({
         text: ln,
         indent: lineIndent,
-        hasFrac: /\\frac\{/.test(ln),
+        hasFrac: /\\frac\s*\{/.test(ln),
       });
     });
   });
@@ -545,21 +548,29 @@ export async function buildCleanQuestionPdf(
   const a4W = 595.28;
   const a4H = 841.89;
 
-  // Determine compact single-page scaling when source is a single page without giant tables
   const questions = extracted.questions ?? [];
   const hasTablesOrFigures = questions.some(
     (q) => (Array.isArray(q.table) && q.table.length > 0) || Boolean(q.figureBox) || Boolean(q.hasFigure),
   );
   const isSingleSheet = (sourceFiles?.length ?? 1) <= 1 && !hasTablesOrFigures && questions.length <= 10;
 
-  // Estimate vertical height at 10pt so an 8-question BUTEX paper fits cleanly on 1 A4 page
-  const marginX = isSingleSheet ? 40 : 50;
-  const marginTop = isSingleSheet ? 34 : 46;
-  const marginBottom = isSingleSheet ? 30 : 44;
+  // Auto-pick scale so an 8-question exam paper ALWAYS fits on 1 single A4 page
+  const totalChars = questions.reduce((sum, q) => sum + (q.text?.length ?? 0), 0);
+  const scaleFactor = isSingleSheet
+    ? totalChars > 2600
+      ? 0.86
+      : totalChars > 2100
+        ? 0.91
+        : 0.96
+    : 1;
+
+  const marginX = isSingleSheet ? 38 : 50;
+  const marginTop = isSingleSheet ? 30 : 46;
+  const marginBottom = isSingleSheet ? 26 : 44;
   const contentW = a4W - marginX * 2;
-  const bodySize = isSingleSheet ? 9.6 : 10.5;
-  const lineStep = isSingleSheet ? 12.2 : 14.5;
-  const questionTextMaxW = contentW - 16;
+  const bodySize = isSingleSheet ? 9.6 * scaleFactor : 10.5;
+  const lineStep = isSingleSheet ? 12.0 * scaleFactor : 14.5;
+  const questionTextMaxW = contentW - 10;
 
   let page = pdfDoc.addPage([a4W, a4H]);
   let y = a4H - marginTop;
@@ -571,34 +582,33 @@ export async function buildCleanQuestionPdf(
     }
   };
 
-  // 1. Centered University / College Headers (exact BUTEX hierarchy)
+  // 1. Centered University / College Headers
   const headers = (extracted.headers ?? []).map(sanitizeForWinAnsi).filter(Boolean);
   headers.forEach((line, idx) => {
-    const size = idx === 0 ? (isSingleSheet ? 13 : 13.5) : isSingleSheet ? 10.2 : 11;
-    const f = idx === 0 || idx === headers.length - 1 ? fontBold : fontBold;
-    const wrapped = wrapLines(line, f, size, contentW);
+    const size = idx === 0 ? (isSingleSheet ? 12.6 : 13.5) : isSingleSheet ? 9.8 : 11;
+    const wrapped = wrapLines(line, fontBold, size, contentW);
     for (const wLine of wrapped) {
-      ensureSpace(size + 3.5);
-      const w = f.widthOfTextAtSize(wLine, size);
+      ensureSpace(size + 3);
+      const w = fontBold.widthOfTextAtSize(wLine, size);
       page.drawText(wLine, {
         x: Math.max(marginX, (a4W - w) / 2),
         y,
         size,
-        font: f,
+        font: fontBold,
         color: rgb(0.05, 0.05, 0.07),
       });
-      y -= size + 3.2;
+      y -= size + 2.8;
     }
   });
 
-  y -= 2;
+  y -= 1.5;
 
   // 2. Time (left) & Full Marks (right)
   const timeStr = sanitizeForWinAnsi(extracted.time ?? "");
   const marksStr = sanitizeForWinAnsi(extracted.marks ?? "");
   if (timeStr || marksStr) {
     ensureSpace(14);
-    const metaSize = isSingleSheet ? 9.8 : 10.5;
+    const metaSize = isSingleSheet ? 9.6 : 10.5;
     if (timeStr) {
       page.drawText(timeStr, {
         x: marginX,
@@ -618,18 +628,17 @@ export async function buildCleanQuestionPdf(
         color: rgb(0.05, 0.05, 0.07),
       });
     }
-    y -= metaSize + 4;
+    y -= metaSize + 3.5;
   }
 
-  // 3. Centered Bold Exam Instructions (e.g. "(Use separate answer script for Part: A and Part: B)")
+  // 3. Centered Bold Exam Instructions
   const rawInstructions = (extracted.instructions ?? []).map(sanitizeForWinAnsi).filter(Boolean);
   for (const inst of rawInstructions) {
-    // Skip if AI accidentally put Part: A here (we render Part headers per section)
     if (/^part\s*:\s*[a-z]$/i.test(inst)) continue;
-    const instSize = isSingleSheet ? 9.6 : 10.2;
+    const instSize = isSingleSheet ? 9.4 : 10.2;
     const lines = wrapLines(inst, fontBold, instSize, contentW);
     for (const ln of lines) {
-      ensureSpace(instSize + 3);
+      ensureSpace(instSize + 2.5);
       const lw = measureRichTextWidth(ln, fontBold, instSize);
       drawRichTextLine(page, ln, {
         x: Math.max(marginX, (a4W - lw) / 2),
@@ -638,14 +647,14 @@ export async function buildCleanQuestionPdf(
         font: fontBold,
         color: rgb(0.05, 0.05, 0.07),
       });
-      y -= instSize + 3;
+      y -= instSize + 2.5;
     }
   }
-  if (rawInstructions.length > 0) y -= 2;
+  if (rawInstructions.length > 0) y -= 1.5;
 
   // 4. Questions with Centered Part Headers, Indented Sub-questions, and Bottom-Right Marks
-  for (const q of questions) {
-    // Check if question has explicit sectionHeader OR starts with "Part: A" / "Part: B"
+  for (let qIdx = 0; qIdx < questions.length; qIdx++) {
+    const q = questions[qIdx]!;
     const secHeaders: string[] = Array.isArray(q.sectionHeader)
       ? q.sectionHeader.map(sanitizeForWinAnsi).filter(Boolean)
       : [];
@@ -654,7 +663,7 @@ export async function buildCleanQuestionPdf(
     const qNum = sanitizeForWinAnsi(q.number ?? "");
     const qMarks = sanitizeForWinAnsi(q.marks ?? "");
 
-    // Fallback: extract embedded "Part: A\n(Answer any three questions)" from start of qText if AI merged it
+    // Fallback: extract embedded "Part: A / (Answer any three questions)" if AI merged it into text
     const embeddedPartMatch = qText.match(
       /^(Part\s*:\s*[A-Z])\s*(?:\r?\n|\s+)(\(Answer[^)\r\n]+\))\s*(?:\r?\n|\s+)?([\s\S]*)$/i,
     );
@@ -666,11 +675,26 @@ export async function buildCleanQuestionPdf(
       qText = (embeddedPartMatch[3] ?? "").trim();
     }
 
+    // Also detect trailing "Part: B / (Answer any three questions)" accidentally appended to previous question
+    const trailingPartMatch = qText.match(
+      /([\s\S]*?)\s*(Part\s*:\s*[A-Z])\s*(?:\r?\n|\s+)(\(Answer[^)\r\n]+\))\s*$/i,
+    );
+    let nextQuestionExtraHeader: string[] = [];
+    if (trailingPartMatch) {
+      qText = (trailingPartMatch[1] ?? "").trim();
+      if (trailingPartMatch[2]) nextQuestionExtraHeader.push(trailingPartMatch[2].trim());
+      if (trailingPartMatch[3]) nextQuestionExtraHeader.push(trailingPartMatch[3].trim());
+    }
+    if (nextQuestionExtraHeader.length > 0 && questions[qIdx + 1]) {
+      const nextQ = questions[qIdx + 1]!;
+      nextQ.sectionHeader = [...nextQuestionExtraHeader, ...(nextQ.sectionHeader ?? [])];
+    }
+
     if (secHeaders.length > 0) {
-      y -= 2;
-      const partSize = isSingleSheet ? 9.8 : 10.5;
+      y -= 1.5;
+      const partSize = isSingleSheet ? 9.5 : 10.5;
       for (const sh of secHeaders) {
-        ensureSpace(partSize + 3.5);
+        ensureSpace(partSize + 3);
         const sw = fontBold.widthOfTextAtSize(sh, partSize);
         page.drawText(sh, {
           x: Math.max(marginX, (a4W - sw) / 2),
@@ -679,7 +703,7 @@ export async function buildCleanQuestionPdf(
           font: fontBold,
           color: rgb(0.05, 0.05, 0.07),
         });
-        y -= partSize + 2.8;
+        y -= partSize + 2.4;
       }
       y -= 1;
     }
@@ -695,13 +719,13 @@ export async function buildCleanQuestionPdf(
     );
 
     const totalTextH = formattedLines.reduce(
-      (acc, fl) => acc + (fl.hasFrac ? lineStep + 6 : lineStep),
+      (acc, fl) => acc + (fl.hasFrac ? lineStep + 5 : lineStep),
       0,
     );
-    ensureSpace(Math.max(16, totalTextH + (qMarks ? 11 : 3)));
+    ensureSpace(Math.max(15, totalTextH + (qMarks ? 10 : 2)));
 
     formattedLines.forEach((fl, idx) => {
-      if (fl.hasFrac && idx > 0) y -= 3;
+      if (fl.hasFrac && idx > 0) y -= 2.5;
       const isBoldNumberPrefix = idx === 0 && qNum.length > 0 && fl.text.startsWith(qNum);
       if (isBoldNumberPrefix) {
         const rest = fl.text.slice(qNum.length);
@@ -729,18 +753,18 @@ export async function buildCleanQuestionPdf(
           color: rgb(0.05, 0.05, 0.07),
         });
       }
-      y -= fl.hasFrac ? lineStep + 4 : lineStep;
+      y -= fl.hasFrac ? lineStep + 3.5 : lineStep;
     });
 
-    // Bottom-right marks aligned to the right margin just like authentic BUTEX papers
+    // Bottom-right marks aligned to right margin
     if (qMarks) {
       const mw = fontRegular.widthOfTextAtSize(qMarks, bodySize);
       const lastLine = formattedLines[formattedLines.length - 1];
       const lastLineEndX = lastLine
         ? marginX + lastLine.indent + measureRichTextWidth(lastLine.text, fontRegular, bodySize)
         : 0;
-      const fitsOnLastLine = lastLine && lastLineEndX + 16 < a4W - marginX - mw;
-      const markY = fitsOnLastLine ? y + lineStep : y + 1;
+      const fitsOnLastLine = lastLine && lastLineEndX + 14 < a4W - marginX - mw;
+      const markY = fitsOnLastLine ? y + lineStep : y + 1.5;
       page.drawText(qMarks, {
         x: a4W - marginX - mw,
         y: markY,
@@ -749,11 +773,11 @@ export async function buildCleanQuestionPdf(
         color: rgb(0.05, 0.05, 0.07),
       });
       if (!fitsOnLastLine) {
-        y -= lineStep - 1;
+        y -= lineStep - 1.5;
       }
     }
 
-    y -= isSingleSheet ? 2.5 : 5;
+    y -= isSingleSheet ? 2 : 5;
 
     // Render bordered grid table if present
     if (Array.isArray(q.table) && q.table.length > 0) {
@@ -854,11 +878,11 @@ export async function buildCleanQuestionPdf(
     }
   }
 
-  // Optional centered footer (e.g. "** ** ** **")
+  // Optional centered footer
   const footerStr = sanitizeForWinAnsi(extracted.footer ?? "");
   if (footerStr) {
     const fw = fontBold.widthOfTextAtSize(footerStr, 9.5);
-    const footerY = Math.max(18, y - 4);
+    const footerY = Math.max(16, y - 3);
     page.drawText(footerStr, {
       x: Math.max(marginX, (a4W - fw) / 2),
       y: footerY,
