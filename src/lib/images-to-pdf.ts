@@ -679,7 +679,7 @@ export async function buildCleanQuestionPdf(
     const trailingPartMatch = qText.match(
       /([\s\S]*?)\s*(Part\s*:\s*[A-Z])\s*(?:\r?\n|\s+)(\(Answer[^)\r\n]+\))\s*$/i,
     );
-    let nextQuestionExtraHeader: string[] = [];
+    const nextQuestionExtraHeader: string[] = [];
     if (trailingPartMatch) {
       qText = (trailingPartMatch[1] ?? "").trim();
       if (trailingPartMatch[2]) nextQuestionExtraHeader.push(trailingPartMatch[2].trim());
