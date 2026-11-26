@@ -20,6 +20,7 @@ import {
   AcademicPerformanceCard,
   type TermTrendPoint,
 } from "@/components/dashboard/AcademicPerformanceCard";
+import { AnimatedCountText } from "@/components/dashboard/StudentMotionShell";
 import {
   getStudentBookmarksCount,
   getStudentVisibleMaterialsCount,
@@ -394,128 +395,103 @@ export default async function StudentDashboardPage() {
   const greeting = getBDTimeGreeting();
 
   return (
-    <div className="min-h-full bg-[#060A12] text-slate-100">
-      <style>{`
-        @keyframes dashFadeUp {
-          from {
-            opacity: 0;
-            transform: translateY(12px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .dash-stagger-1 { animation: dashFadeUp 0.45s ease-out both; }
-        .dash-stagger-2 { animation: dashFadeUp 0.45s ease-out 0.08s both; }
-        .dash-stagger-3 { animation: dashFadeUp 0.45s ease-out 0.16s both; }
-        .dash-stagger-4 { animation: dashFadeUp 0.45s ease-out 0.24s both; }
-      `}</style>
-
+    <div className="min-h-full bg-[#060911] text-slate-100">
       <div className="flex min-h-full">
-
         <div className="flex min-w-0 flex-1 flex-col">
-
-          <main className="relative flex-1 p-5 sm:p-6 lg:p-8">
+          <main className="relative flex-1 p-4 sm:p-6 lg:p-7">
             <div className="pointer-events-none fixed inset-0 overflow-hidden">
-              <div className="absolute -top-40 left-1/3 h-96 w-96 rounded-full bg-emerald-500/5 blur-3xl" />
-              <div className="absolute bottom-0 right-1/4 h-80 w-80 rounded-full bg-cyan-500/5 blur-3xl" />
+              <div className="absolute -top-44 left-1/3 h-96 w-96 rounded-full bg-emerald-500/[0.035] blur-3xl" />
+              <div className="absolute bottom-0 right-1/4 h-80 w-80 rounded-full bg-sky-500/[0.035] blur-3xl" />
             </div>
 
-            <div className="relative z-10 mx-auto w-full max-w-7xl space-y-6">
-              {/* Refreshing Greeting Hero */}
-              <section className="dash-stagger-1 flex flex-col gap-3 rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-[#0A1020] via-[#0A1020] to-emerald-950/20 p-6 shadow-xl sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-300">
-                    <Sparkles className="h-3 w-3" />
-                    {greeting}
-                  </span>
-                  <h2 className="mt-2.5 font-serif text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                    {studentName}
-                  </h2>
-                  <p className="mt-1 text-xs text-slate-400 sm:text-sm">
-                    Your JTEC Academic Hub · Everything organized for today&apos;s
-                    study.
-                  </p>
+            <div className="relative z-10 mx-auto w-full max-w-7xl space-y-5">
+              {/* Greeting Hero + Compact Academic Identity Pills (No Hover Clipping) */}
+              <section className="dash-stagger-1 rounded-2xl border border-slate-800/85 bg-gradient-to-br from-[#0B111E] via-[#0B111E] to-[#0E1826] p-5 sm:p-6 shadow-[0_12px_34px_-12px_rgba(0,0,0,0.7)]">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-300">
+                      <Sparkles className="h-3 w-3" />
+                      {greeting}
+                    </span>
+                    <h2 className="mt-2 font-serif text-2xl font-bold tracking-tight text-slate-100 sm:text-3xl">
+                      {studentName}
+                    </h2>
+                    <p className="mt-0.5 text-xs text-slate-400 sm:text-sm">
+                      Your JTEC Academic Hub · Everything organized for today&apos;s
+                      study.
+                    </p>
+                  </div>
+
+                  {isApprovedStudent ? (
+                    <span className="inline-flex w-fit items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3.5 py-2 text-xs font-semibold text-emerald-300">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                      Verified Student
+                    </span>
+                  ) : (
+                    <span className="inline-flex w-fit items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-2 text-xs font-semibold text-amber-300">
+                      Pending Verification
+                    </span>
+                  )}
                 </div>
 
-                {isApprovedStudent ? (
-                  <span className="inline-flex w-fit items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3.5 py-2 text-xs font-semibold text-emerald-300">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
-                    Verified Student
-                  </span>
-                ) : (
-                  <span className="inline-flex w-fit items-center gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3.5 py-2 text-xs font-semibold text-amber-300">
-                    Pending Verification
-                  </span>
-                )}
-              </section>
-
-              {/* Collapsible Academic Information */}
-              <CollapsibleSectionCard
-                storageKey="academic_info"
-                title="Academic Information"
-                subtitle="Your current academic assignment and enrollment details."
-                className="dash-stagger-2"
-                borderHoverCls="hover:border-cyan-500/35"
-              >
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="rounded-xl border border-cyan-500/25 bg-[#060A12] p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400/55 hover:bg-[#0D162B]">
-                    <div className="flex items-center gap-2 text-xs text-cyan-400">
-                      <Building2 className="h-3.5 w-3.5" />
+                {/* Academic Identity Row */}
+                <div className="mt-4 grid gap-2.5 border-t border-slate-800/75 pt-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="group rounded-xl border border-slate-800/90 bg-[#070B14]/90 px-3.5 py-2.5 transition-all duration-200 hover:border-cyan-500/40 hover:bg-[#0D1526]">
+                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-cyan-400/90">
+                      <Building2 className="h-3.5 w-3.5 shrink-0" />
                       <span>Department</span>
                     </div>
-                    <p className="mt-2 text-sm font-semibold text-white">
+                    <p className="mt-1 truncate text-xs font-semibold text-slate-100 sm:text-sm">
                       {departmentName}
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-violet-500/25 bg-[#060A12] p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-400/55 hover:bg-[#0D162B]">
-                    <div className="flex items-center gap-2 text-xs text-violet-400">
-                      <Users className="h-3.5 w-3.5" />
+                  <div className="group rounded-xl border border-slate-800/90 bg-[#070B14]/90 px-3.5 py-2.5 transition-all duration-200 hover:border-violet-500/40 hover:bg-[#0D1526]">
+                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-violet-400/90">
+                      <Users className="h-3.5 w-3.5 shrink-0" />
                       <span>Batch</span>
                     </div>
-                    <p className="mt-2 text-sm font-semibold text-white">
+                    <p className="mt-1 truncate text-xs font-semibold text-slate-100 sm:text-sm">
                       {batchName}
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-emerald-500/25 bg-[#060A12] p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-400/55 hover:bg-[#0D162B]">
-                    <div className="flex items-center gap-2 text-xs text-emerald-400">
-                      <Layers className="h-3.5 w-3.5" />
+                  <div className="group rounded-xl border border-slate-800/90 bg-[#070B14]/90 px-3.5 py-2.5 transition-all duration-200 hover:border-emerald-500/40 hover:bg-[#0D1526]">
+                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-400/90">
+                      <Layers className="h-3.5 w-3.5 shrink-0" />
                       <span>Level</span>
                     </div>
-                    <p className="mt-2 text-sm font-semibold text-white">
+                    <p className="mt-1 truncate text-xs font-semibold text-slate-100 sm:text-sm">
                       {levelName}
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-amber-500/25 bg-[#060A12] p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-400/55 hover:bg-[#0D162B]">
-                    <div className="flex items-center gap-2 text-xs text-amber-400">
-                      <GraduationCap className="h-3.5 w-3.5" />
+                  <div className="group rounded-xl border border-slate-800/90 bg-[#070B14]/90 px-3.5 py-2.5 transition-all duration-200 hover:border-amber-500/40 hover:bg-[#0D1526]">
+                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-amber-400/90">
+                      <GraduationCap className="h-3.5 w-3.5 shrink-0" />
                       <span>Term</span>
                     </div>
-                    <p className="mt-2 text-sm font-semibold text-white">
+                    <p className="mt-1 truncate text-xs font-semibold text-slate-100 sm:text-sm">
                       {termName}
                     </p>
                   </div>
                 </div>
-              </CollapsibleSectionCard>
+              </section>
 
               {/* 4 KPI Stat Cards */}
-              <section className="dash-stagger-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <section className="dash-stagger-2 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <Link
                   href="/materials"
-                  className="group rounded-2xl border border-cyan-500/30 bg-[#0A1020] p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400/65 hover:bg-[#0D162B] hover:shadow-[0_12px_30px_rgba(6,182,212,0.14)]"
+                  className="group rounded-2xl border border-slate-800/85 bg-[#0B111E] p-5 shadow-md transition-all duration-200 hover:border-cyan-500/40 hover:bg-[#0E1628]"
                 >
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                       Materials
                     </p>
-                    <BookOpen className="h-4 w-4 text-cyan-400 transition-transform group-hover:scale-110" />
+                    <BookOpen className="h-4 w-4 text-cyan-400 transition-transform duration-200 group-hover:scale-110" />
                   </div>
-                  <p className="mt-3 font-serif text-3xl font-bold text-cyan-300">
-                    {materialsCount}
+                  <p className="mt-2.5 font-serif text-3xl font-bold text-cyan-300">
+                    <AnimatedCountText value={materialsCount} />
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
                     Available for you
@@ -524,32 +500,40 @@ export default async function StudentDashboardPage() {
 
                 <Link
                   href="/bookmarks"
-                  className="group rounded-2xl border border-emerald-500/30 bg-[#0A1020] p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-400/65 hover:bg-[#0D162B] hover:shadow-[0_12px_30px_rgba(16,185,129,0.14)]"
+                  className="group rounded-2xl border border-slate-800/85 bg-[#0B111E] p-5 shadow-md transition-all duration-200 hover:border-emerald-500/40 hover:bg-[#0E1628]"
                 >
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                       Bookmarks
                     </p>
-                    <Bookmark className="h-4 w-4 text-emerald-400 transition-transform group-hover:scale-110" />
+                    <Bookmark className="h-4 w-4 text-emerald-400 transition-transform duration-200 group-hover:scale-110" />
                   </div>
-                  <p className="mt-3 font-serif text-3xl font-bold text-emerald-300">
-                    {bookmarksCount || 0}
+                  <p className="mt-2.5 font-serif text-3xl font-bold text-emerald-300">
+                    <AnimatedCountText value={bookmarksCount || 0} />
                   </p>
                   <p className="mt-1 text-xs text-slate-400">Saved materials</p>
                 </Link>
 
                 <Link
                   href="/results"
-                  className="group rounded-2xl border border-sky-500/30 bg-[#0A1020] p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-400/65 hover:bg-[#0D162B] hover:shadow-[0_12px_30px_rgba(56,189,248,0.14)]"
+                  className="group rounded-2xl border border-slate-800/85 bg-[#0B111E] p-5 shadow-md transition-all duration-200 hover:border-sky-500/40 hover:bg-[#0E1628]"
                 >
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                       Results
                     </p>
-                    <TrendingUp className="h-4 w-4 text-sky-400 transition-transform group-hover:scale-110" />
+                    <TrendingUp className="h-4 w-4 text-sky-400 transition-transform duration-200 group-hover:scale-110" />
                   </div>
-                  <p className="mt-3 font-serif text-2xl font-bold text-sky-300 sm:text-3xl">
-                    {cardScoreText}
+                  <p className="mt-2.5 font-serif text-2xl font-bold text-sky-300 sm:text-3xl">
+                    {currentNumericScore !== null ? (
+                      <AnimatedCountText
+                        value={currentNumericScore}
+                        decimals={2}
+                        suffix={` ${scoreLabel}`}
+                      />
+                    ) : (
+                      cardScoreText
+                    )}
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
                     {lastTerm
@@ -560,15 +544,15 @@ export default async function StudentDashboardPage() {
 
                 <Link
                   href="/ranking"
-                  className="group rounded-2xl border border-amber-500/30 bg-[#0A1020] p-5 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-400/65 hover:bg-[#0D162B] hover:shadow-[0_12px_30px_rgba(245,158,11,0.14)]"
+                  className="group rounded-2xl border border-slate-800/85 bg-[#0B111E] p-5 shadow-md transition-all duration-200 hover:border-amber-500/40 hover:bg-[#0E1628]"
                 >
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                       Ranking
                     </p>
-                    <Award className="h-4 w-4 text-amber-400 transition-transform group-hover:scale-110" />
+                    <Award className="h-4 w-4 text-amber-400 transition-transform duration-200 group-hover:scale-110" />
                   </div>
-                  <p className="mt-3 font-serif text-2xl font-bold text-amber-300 sm:text-3xl">
+                  <p className="mt-2.5 font-serif text-2xl font-bold text-amber-300 sm:text-3xl">
                     {cardRankText}
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
@@ -579,7 +563,7 @@ export default async function StudentDashboardPage() {
                 </Link>
               </section>
 
-              {/* Animated Academic Performance Trend + CGPA Gauge */}
+              {/* Animated Academic Performance Trend + CGPA Gauge (Visible Above Fold on Login) */}
               <AcademicPerformanceCard
                 terms={trendPoints}
                 currentScore={currentNumericScore}
@@ -587,74 +571,75 @@ export default async function StudentDashboardPage() {
                 isApproved={isApprovedStudent}
               />
 
-              {/* Collapsible Official Notices */}
-              <CollapsibleSectionCard
-                storageKey="official_notices"
-                title="Official Notices"
-                subtitle="Recent academic notices relevant to you."
-                className="dash-stagger-4"
-                borderHoverCls="hover:border-cyan-500/35"
-                icon={
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-500/35 bg-cyan-500/15 text-cyan-300">
-                    <Bell className="h-5 w-5" />
-                  </div>
-                }
-                headerRight={
-                  <Link
-                    href="/notifications"
-                    className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 bg-gradient-to-b from-slate-800/90 to-slate-900 px-3.5 text-xs font-semibold text-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 hover:border-cyan-500/50 hover:text-cyan-300 active:scale-95"
-                  >
-                    View Notifications
-                  </Link>
-                }
-              >
-                {notices && notices.length > 0 ? (
-                  <NoticeList categories={noticeCategories ?? []}>
-                    <div className="divide-y divide-slate-800/80">
-                      {notices.map((notice) => (
-                        <Link
-                          key={notice.id}
-                          href={`/notices/${notice.id}`}
-                          data-notice-search={`${notice.title} ${notice.content}`}
-                          data-notice-category={notice.category_id ?? ""}
-                          className="block rounded-xl p-4 transition-all duration-150 hover:bg-[#0D162B]/90"
-                        >
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h4 className="text-sm font-semibold text-white">
-                                  {notice.title}
-                                </h4>
-                                {notice.is_pinned ? (
-                                  <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">
-                                    Pinned
-                                  </span>
-                                ) : null}
-                              </div>
-                              <p className="mt-1 text-xs text-slate-400">
-                                {new Intl.DateTimeFormat("en-US", {
-                                  timeZone: "Asia/Dhaka",
-                                  dateStyle: "medium",
-                                  timeStyle: "short",
-                                }).format(new Date(notice.created_at))}
-                              </p>
-                            </div>
-                          </div>
-                        </Link>
-                      ))}
+              {/* Scroll-Revealed Collapsible Official Notices */}
+              <div data-reveal>
+                <CollapsibleSectionCard
+                  storageKey="official_notices"
+                  title="Official Notices"
+                  subtitle="Recent academic notices relevant to you."
+                  borderHoverCls="hover:border-cyan-500/30"
+                  icon={
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-300">
+                      <Bell className="h-5 w-5" />
                     </div>
-                  </NoticeList>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center">
-                    <p className="font-serif text-sm font-bold text-white">
-                      No notices yet
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      New academic notices relevant to you will appear here.
-                    </p>
-                  </div>
-                )}
-              </CollapsibleSectionCard>
+                  }
+                  headerRight={
+                    <Link
+                      href="/notifications"
+                      className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-xl border border-slate-800 bg-[#070B14] px-3.5 text-xs font-semibold text-slate-200 transition-all duration-150 hover:border-cyan-500/40 hover:text-cyan-300 active:scale-95"
+                    >
+                      View Notifications
+                    </Link>
+                  }
+                >
+                  {notices && notices.length > 0 ? (
+                    <NoticeList categories={noticeCategories ?? []}>
+                      <div className="divide-y divide-slate-800/75">
+                        {notices.map((notice) => (
+                          <Link
+                            key={notice.id}
+                            href={`/notices/${notice.id}`}
+                            data-notice-search={`${notice.title} ${notice.content}`}
+                            data-notice-category={notice.category_id ?? ""}
+                            className="block rounded-xl p-4 transition-all duration-150 hover:bg-[#0F172A]/80"
+                          >
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h4 className="text-sm font-semibold text-slate-100">
+                                    {notice.title}
+                                  </h4>
+                                  {notice.is_pinned ? (
+                                    <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+                                      Pinned
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p className="mt-1 text-xs text-slate-400">
+                                  {new Intl.DateTimeFormat("en-US", {
+                                    timeZone: "Asia/Dhaka",
+                                    dateStyle: "medium",
+                                    timeStyle: "short",
+                                  }).format(new Date(notice.created_at))}
+                                </p>
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    </NoticeList>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center">
+                      <p className="font-serif text-sm font-bold text-slate-100">
+                        No notices yet
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        New academic notices relevant to you will appear here.
+                      </p>
+                    </div>
+                  )}
+                </CollapsibleSectionCard>
+              </div>
             </div>
           </main>
         </div>

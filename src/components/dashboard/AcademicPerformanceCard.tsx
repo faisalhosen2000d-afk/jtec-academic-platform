@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, TrendingUp } from "lucide-react";
 import { CollapsibleSectionCard } from "./CollapsibleSectionCard";
+import { AnimatedCountText } from "./StudentMotionShell";
 
 export type TermTrendPoint = {
   termKey: string;
@@ -28,12 +29,12 @@ export function AcademicPerformanceCard({
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 80);
+    const t = setTimeout(() => setMounted(true), 120);
     return () => clearTimeout(t);
   }, []);
 
   const chartWidth = 540;
-  const chartHeight = 200;
+  const chartHeight = 196;
   const padLeft = 42;
   const padRight = 24;
   const padTop = 28;
@@ -91,7 +92,7 @@ export function AcademicPerformanceCard({
     hoveredIdx !== null ? hoveredIdx : points.length > 0 ? points.length - 1 : null;
   const activePoint = activeIdx !== null ? points[activeIdx] ?? null : null;
 
-  const gaugeRadius = 74;
+  const gaugeRadius = 72;
   const semiCircumference = Math.PI * gaugeRadius;
   const normalizedScore =
     currentScore !== null ? Math.min(4, Math.max(0, currentScore)) / 4 : 0;
@@ -106,10 +107,10 @@ export function AcademicPerformanceCard({
       storageKey="performance_trend"
       title="Academic Performance Trend"
       subtitle="Term-by-term GPA progression and cumulative standing."
-      borderHoverCls="hover:border-emerald-500/40"
+      borderHoverCls="hover:border-emerald-500/30"
       className="dash-stagger-3"
       icon={
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/35 bg-emerald-500/15 text-emerald-300">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/25 bg-emerald-500/10 text-emerald-300">
           <TrendingUp className="h-5 w-5" />
         </div>
       }
@@ -119,17 +120,25 @@ export function AcademicPerformanceCard({
           from { stroke-dashoffset: 1200; }
           to { stroke-dashoffset: 0; }
         }
+        @keyframes fadeAreaIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
         .trend-line-animate {
           stroke-dasharray: 1200;
           stroke-dashoffset: 1200;
-          animation: drawTrendLine 1.1s ease-out 0.15s forwards;
+          animation: drawTrendLine 1.15s cubic-bezier(0.22, 1, 0.36, 1) 0.18s forwards;
+        }
+        .trend-area-animate {
+          opacity: 0;
+          animation: fadeAreaIn 0.8s ease-out 0.35s forwards;
         }
       `}</style>
 
       {!isApproved || terms.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-[#060A12]/60 p-8 text-center">
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-[#070B14] p-8 text-center">
           <Activity className="h-7 w-7 text-slate-500" />
-          <p className="mt-2 text-sm font-semibold text-white">
+          <p className="mt-2 text-sm font-semibold text-slate-100">
             {isApproved
               ? "No published term results yet"
               : "Verification pending"}
@@ -140,38 +149,38 @@ export function AcademicPerformanceCard({
           </p>
         </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-12 lg:items-center">
+        <div className="grid gap-5 lg:grid-cols-12 lg:items-center">
           {/* Left: Smooth SVG Area-Line Chart */}
-          <div className="lg:col-span-8 rounded-xl border border-slate-800/80 bg-[#060A12] p-4">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="lg:col-span-8 rounded-xl border border-slate-800/80 bg-[#070B14] p-4">
+            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-3">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   Term GPA Trajectory
                 </span>
                 {hasAnyRetakes ? (
                   <span className="inline-flex items-center gap-1.5 text-[10px] font-medium text-amber-300/90">
-                    <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.9)]" />
+                    <span className="h-2 w-2 rounded-full bg-amber-400" />
                     Retake in term
                   </span>
                 ) : null}
               </div>
 
               {activePoint ? (
-                <div className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
+                <div className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
                   <span>Term {activePoint.termKey}</span>
-                  <span className="text-slate-500">·</span>
+                  <span className="text-slate-600">·</span>
                   <span>GPA {activePoint.gpa.toFixed(2)}</span>
                   {activePoint.cgpa !== null && activePoint.termKey !== "1-1" ? (
                     <>
-                      <span className="text-slate-500">·</span>
-                      <span className="text-cyan-300">
+                      <span className="text-slate-600">·</span>
+                      <span className="text-sky-300">
                         CGPA {activePoint.cgpa.toFixed(2)}
                       </span>
                     </>
                   ) : null}
                   {activePoint.retakes > 0 ? (
                     <>
-                      <span className="text-slate-500">·</span>
+                      <span className="text-slate-600">·</span>
                       <span className="inline-flex items-center gap-1 text-amber-300">
                         <AlertTriangle className="h-3 w-3" />
                         {activePoint.retakes}{" "}
@@ -185,18 +194,18 @@ export function AcademicPerformanceCard({
 
             <svg
               viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-              className="h-48 w-full overflow-visible"
+              className="h-44 w-full overflow-visible sm:h-48"
               role="img"
               aria-label="Term GPA progression chart"
             >
               <defs>
                 <linearGradient id="jtecAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.0" />
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.26" />
+                  <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.0" />
                 </linearGradient>
                 <linearGradient id="jtecLineGrad" x1="0" y1="0" x2="1" y2="0">
                   <stop offset="0%" stopColor="#34d399" />
-                  <stop offset="100%" stopColor="#22d3ee" />
+                  <stop offset="100%" stopColor="#38bdf8" />
                 </linearGradient>
               </defs>
 
@@ -227,7 +236,11 @@ export function AcademicPerformanceCard({
               })}
 
               {areaPath ? (
-                <path d={areaPath} fill="url(#jtecAreaGrad)" />
+                <path
+                  d={areaPath}
+                  fill="url(#jtecAreaGrad)"
+                  className="trend-area-animate"
+                />
               ) : null}
 
               {linePath ? (
@@ -235,7 +248,7 @@ export function AcademicPerformanceCard({
                   d={linePath}
                   fill="none"
                   stroke="url(#jtecLineGrad)"
-                  strokeWidth="3"
+                  strokeWidth="2.75"
                   strokeLinecap="round"
                   className="trend-line-animate"
                 />
@@ -254,7 +267,6 @@ export function AcademicPerformanceCard({
                   >
                     <circle cx={pt.x} cy={pt.y} r="15" fill="transparent" />
 
-                    {/* Retake Warning Halo & Symbol Badge */}
                     {hasRetake ? (
                       <>
                         <circle
@@ -262,10 +274,10 @@ export function AcademicPerformanceCard({
                           cy={pt.y}
                           r={isSelected ? 11 : 9}
                           fill="#f59e0b"
-                          fillOpacity="0.22"
+                          fillOpacity="0.18"
                           stroke="#fbbf24"
                           strokeWidth="1"
-                          strokeOpacity="0.6"
+                          strokeOpacity="0.55"
                         />
                         <g transform={`translate(${pt.x}, ${pt.y - 18})`}>
                           <rect
@@ -294,7 +306,7 @@ export function AcademicPerformanceCard({
                         cy={pt.y}
                         r="9"
                         fill="#10b981"
-                        fillOpacity="0.25"
+                        fillOpacity="0.22"
                       />
                     ) : null}
 
@@ -307,9 +319,9 @@ export function AcademicPerformanceCard({
                           ? "#fbbf24"
                           : isSelected
                             ? "#34d399"
-                            : "#22d3ee"
+                            : "#38bdf8"
                       }
-                      stroke="#060A12"
+                      stroke="#070B14"
                       strokeWidth="2"
                     />
                     <text
@@ -333,29 +345,29 @@ export function AcademicPerformanceCard({
           </div>
 
           {/* Right: Semi-Circular Animated CGPA Gauge */}
-          <div className="lg:col-span-4 flex flex-col items-center justify-center rounded-xl border border-slate-800/80 bg-[#060A12] p-5 text-center">
-            <svg viewBox="0 0 180 110" className="w-48 overflow-visible">
+          <div className="lg:col-span-4 flex flex-col items-center justify-center rounded-xl border border-slate-800/80 bg-[#070B14] p-5 text-center">
+            <svg viewBox="0 0 180 108" className="w-44 overflow-visible sm:w-48">
               <defs>
                 <linearGradient id="jtecGaugeGrad" x1="0" y1="0" x2="1" y2="0">
                   <stop offset="0%" stopColor="#34d399" />
-                  <stop offset="60%" stopColor="#22d3ee" />
+                  <stop offset="65%" stopColor="#38bdf8" />
                   <stop offset="100%" stopColor="#fbbf24" />
                 </linearGradient>
               </defs>
 
               <path
-                d={`M ${90 - gaugeRadius} 92 A ${gaugeRadius} ${gaugeRadius} 0 0 1 ${90 + gaugeRadius} 92`}
+                d={`M ${90 - gaugeRadius} 90 A ${gaugeRadius} ${gaugeRadius} 0 0 1 ${90 + gaugeRadius} 90`}
                 fill="none"
                 stroke="#1e293b"
-                strokeWidth="12"
+                strokeWidth="11"
                 strokeLinecap="round"
               />
 
               <path
-                d={`M ${90 - gaugeRadius} 92 A ${gaugeRadius} ${gaugeRadius} 0 0 1 ${90 + gaugeRadius} 92`}
+                d={`M ${90 - gaugeRadius} 90 A ${gaugeRadius} ${gaugeRadius} 0 0 1 ${90 + gaugeRadius} 90`}
                 fill="none"
                 stroke="url(#jtecGaugeGrad)"
-                strokeWidth="12"
+                strokeWidth="11"
                 strokeLinecap="round"
                 strokeDasharray={semiCircumference}
                 strokeDashoffset={currentOffset}
@@ -363,9 +375,13 @@ export function AcademicPerformanceCard({
               />
             </svg>
 
-            <div className="-mt-9">
-              <p className="font-serif text-3xl font-bold text-white">
-                {currentScore !== null ? currentScore.toFixed(2) : "—"}
+            <div className="-mt-8">
+              <p className="font-serif text-3xl font-bold text-slate-100">
+                {currentScore !== null ? (
+                  <AnimatedCountText value={currentScore} decimals={2} />
+                ) : (
+                  "—"
+                )}
                 <span className="ml-1 text-sm font-normal text-slate-400">
                   / 4.00
                 </span>
@@ -375,9 +391,9 @@ export function AcademicPerformanceCard({
               </p>
             </div>
 
-            <div className="mt-4 w-full rounded-lg border border-slate-800 bg-[#0A1020] px-3 py-2 text-[11px] text-slate-400">
+            <div className="mt-3.5 w-full rounded-lg border border-slate-800/90 bg-[#0B111E] px-3 py-2 text-[11px] text-slate-400">
               Completed{" "}
-              <span className="font-bold text-white">{terms.length}</span>{" "}
+              <span className="font-bold text-slate-100">{terms.length}</span>{" "}
               {terms.length === 1 ? "term" : "terms"}
             </div>
           </div>

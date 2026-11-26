@@ -22,7 +22,7 @@ export function CollapsibleSectionCard({
   icon,
   headerRight,
   defaultCollapsed = false,
-  borderHoverCls = "hover:border-cyan-500/35",
+  borderHoverCls = "hover:border-slate-700/90",
   className = "",
   children,
 }: CollapsibleSectionCardProps) {
@@ -55,13 +55,15 @@ export function CollapsibleSectionCard({
 
   return (
     <section
-      className={`rounded-2xl border border-slate-800/90 bg-[#0A1020] p-4 sm:p-6 shadow-xl transition-all duration-200 ${borderHoverCls} ${className}`}
+      className={`rounded-2xl border border-slate-800/80 bg-[#0B111E]/95 p-4 sm:p-6 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.65)] transition-colors duration-200 ${borderHoverCls} ${className}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {icon}
           <div>
-            <h3 className="font-serif text-base sm:text-lg font-bold text-white">{title}</h3>
+            <h3 className="font-serif text-base sm:text-lg font-bold tracking-tight text-slate-100">
+              {title}
+            </h3>
             {subtitle && !collapsed ? (
               <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>
             ) : null}
@@ -74,7 +76,7 @@ export function CollapsibleSectionCard({
             type="button"
             onClick={toggleCollapsed}
             aria-expanded={!collapsed}
-            className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-xl border border-slate-700/80 bg-[#060A12] px-3 text-xs font-semibold text-slate-300 transition-all duration-150 hover:border-emerald-500/50 hover:text-emerald-300 active:scale-95"
+            className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-xl border border-slate-800 bg-[#080C16] px-3 text-xs font-medium text-slate-300 transition-all duration-150 hover:border-emerald-500/40 hover:text-emerald-300 active:scale-95"
           >
             {collapsed ? (
               <>
@@ -103,7 +105,9 @@ export function CollapsibleSectionCard({
             : "mt-5 grid-rows-[1fr] opacity-100"
         }`}
       >
-        <div className="overflow-hidden">{children}</div>
+        <div className={collapsed ? "overflow-hidden" : "overflow-visible"}>
+          {children}
+        </div>
       </div>
     </section>
   );
