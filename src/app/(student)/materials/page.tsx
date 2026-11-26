@@ -5,7 +5,7 @@ import { getAcademicTermNavigation } from "@/lib/academic-terms";
 import { redirect } from "next/navigation";
 import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import MaterialsVaultClient from "@/components/student/MaterialsVaultClient";
-import type { QuestionBankItem } from "@/components/student/QuestionBankSection";
+import type { QuestionBankFolder, QuestionBankItem } from "@/components/student/QuestionBankSection";
 
 type Material = {
   id: string;
@@ -43,7 +43,6 @@ type Material = {
 
 export default async function MaterialsPage() {
   const supabase = await createClient();
-  
 
   const {
     data: { user },
@@ -287,6 +286,7 @@ export default async function MaterialsPage() {
   }));
 
   const questionItems: QuestionBankItem[] = [];
+  const questionFolders: QuestionBankFolder[] = [];
   const takenQuestionSlots: Array<{
     subject_code: string;
     level_id: string;
@@ -302,14 +302,40 @@ export default async function MaterialsPage() {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     );
-    const [{ data: qRows }, { data: deptRows }] = await Promise.all([
+    const [{ data: qRows }, { data: deptRows }, { data: fRows }] = await Promise.all([
       rawSb
         .from("question_bank_items")
-        .select("id, uploader_id, subject_id, subject_code, level_id, term_id, department_id, question_type, exam_year, ct_number, batch_label, notes, file_size_bytes, share_across_depts, status, views_count, downloads_count, created_at")
+        .select("id, uploader_id, subject_id, subject_code, level_id, term_id, department_id, folder_id, question_type, exam_year, ct_number, batch_label, notes, file_size_bytes, share_across_depts, status, views_count, downloads_count, created_at")
         .in("status", ["pending", "approved"])
         .order("created_at", { ascending: false }),
       supabase.from("departments").select("id, code, name"),
+      rawSb
+        .from("question_bank_folders")
+        .select("id, department_id, term_id, subject_id, subject_code, question_type, parent_id, name, created_by, created_at")
+        .order("name", { ascending: true }),
     ]);
+
+    for (const fRow of (fRows ?? []) as Array<Record<string, unknown>>) {
+      const fCode = String(fRow.subject_code ?? "");
+      const fTerm = String(fRow.term_id ?? "");
+      const exactSubj = questionSubjectByKey.get(`${fCode}::${fTerm}`);
+      const refSubj = !exactSubj ? questionSubjectByCode.get(fCode) : undefined;
+      const ownSubj = exactSubj ?? refSubj;
+      if (!ownSubj) continue;
+
+      questionFolders.push({
+        id: String(fRow.id),
+        department_id: String(fRow.department_id ?? ""),
+        term_id: ownSubj.term_id,
+        subject_id: ownSubj.id,
+        subject_code: fCode,
+        question_type: fRow.question_type === "ct" ? "ct" : "previous_year",
+        parent_id: typeof fRow.parent_id === "string" ? fRow.parent_id : null,
+        name: String(fRow.name ?? "Folder"),
+        created_by: String(fRow.created_by ?? ""),
+        created_at: String(fRow.created_at ?? ""),
+      });
+    }
 
     const qUploaderIds = Array.from(
       new Set(
@@ -392,6 +418,7 @@ export default async function MaterialsPage() {
           subject_code: sCode,
           level_id: ownSubj.level_id,
           term_id: ownSubj.term_id,
+          folder_id: typeof row.folder_id === "string" ? row.folder_id : null,
           question_type: qType,
           exam_year: eYear,
           ct_number: cNum,
@@ -492,6 +519,7 @@ export default async function MaterialsPage() {
                 terms={termOptions}
                 currentTermId={termNavigation.currentTerm.id}
                 questionItems={questionItems}
+                questionFolders={questionFolders}
                 takenQuestionSlots={takenQuestionSlots}
               />
             </div>

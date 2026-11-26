@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BookOpen, Calendar, ClipboardList } from "lucide-react";
 import MaterialsSearch from "@/components/student/MaterialsSearch";
 import QuestionBankSection, {
+  type QuestionBankFolder,
   type QuestionBankItem,
   type QuestionSubjectOption,
   type QuestionTermOption,
@@ -16,6 +17,7 @@ type MaterialsVaultClientProps = {
   terms: QuestionTermOption[];
   currentTermId: string;
   questionItems: QuestionBankItem[];
+  questionFolders?: QuestionBankFolder[];
   takenQuestionSlots: Parameters<typeof QuestionBankSection>[0]["takenSlots"];
 };
 
@@ -28,6 +30,7 @@ export default function MaterialsVaultClient({
   terms,
   currentTermId,
   questionItems,
+  questionFolders = [],
   takenQuestionSlots,
 }: MaterialsVaultClientProps) {
   const [activeTab, setActiveTab] = useState<VaultTab>("notes");
@@ -152,6 +155,7 @@ export default function MaterialsVaultClient({
         <QuestionBankSection
           mode={activeTab}
           items={questionItems}
+          folders={questionFolders}
           takenSlots={takenQuestionSlots}
           highlightQuestionId={highlightQuestionId}
           subjects={subjects}

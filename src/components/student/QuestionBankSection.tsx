@@ -17,10 +17,31 @@ import {
   Image as ImageIcon,
   Eye,
   ChevronDown,
+  ChevronRight,
   Check,
+  Folder,
+  FolderPlus,
+  FolderInput,
+  Pencil,
+  Trash2,
+  ArrowLeft,
+  LayoutGrid,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { buildCleanQuestionPdf, compressImageForOcr, convertImagesToSinglePdf } from "@/lib/images-to-pdf";
+
+export type QuestionBankFolder = {
+  id: string;
+  department_id: string;
+  term_id: string;
+  subject_id: string;
+  subject_code: string;
+  question_type: "previous_year" | "ct";
+  parent_id: string | null;
+  name: string;
+  created_by: string;
+  created_at: string;
+};
 
 export type QuestionBankItem = {
   id: string;
@@ -28,6 +49,7 @@ export type QuestionBankItem = {
   subject_code: string;
   level_id: string;
   term_id: string;
+  folder_id?: string | null;
   question_type: "previous_year" | "ct";
   exam_year: number | null;
   ct_number: number | null;
@@ -67,6 +89,7 @@ export type QuestionTermOption = {
 type QuestionBankSectionProps = {
   mode: "previous_year" | "ct";
   items: QuestionBankItem[];
+  folders?: QuestionBankFolder[];
   highlightQuestionId?: string | null;
   takenSlots: Array<{
     subject_code: string;
@@ -227,8 +250,9 @@ function QbDropdown({
 export default function QuestionBankSection({
   mode,
   items,
-  takenSlots,
+  folders = [],
   highlightQuestionId,
+  takenSlots,
   subjects,
   terms,
   currentTermId,
@@ -241,12 +265,55 @@ export default function QuestionBankSection({
   const [activeUploaderProfile, setActiveUploaderProfile] = useState<NonNullable<QuestionBankItem["uploader"]> | null>(null);
   const [pulsingId, setPulsingId] = useState<string | null>(null);
 
+  // Google Drive-style Folder State
+  const [viewMode, setViewMode] = useState<"folders" | "all">("folders");
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
+  const [localFolders, setLocalFolders] = useState<QuestionBankFolder[]>(folders);
+  const [itemFolderOverrides, setItemFolderOverrides] = useState<Record<string, string | null>>({});
+
+  // Folder Create / Rename / Move Modals
+  const [folderModal, setFolderModal] = useState<{
+    mode: "create" | "rename";
+    folderId?: string;
+    initialName: string;
+  } | null>(null);
+  const [folderNameInput, setFolderNameInput] = useState("");
+  const [folderBusy, setFolderBusy] = useState(false);
+  const [folderFeedback, setFolderFeedback] = useState("");
+  const [movingItem, setMovingItem] = useState<QuestionBankItem | null>(null);
+  const [deletingFolder, setDeletingFolder] = useState<QuestionBankFolder | null>(null);
+  const [targetMoveFolderId, setTargetMoveFolderId] = useState<string>("");
+
+  useEffect(() => {
+    setLocalFolders(folders);
+  }, [folders]);
+
+  // Reset folder path when switching between PYQ and CT tabs
+  useEffect(() => {
+    setActiveFolderId(null);
+    setSelectedSubjectId("all");
+    setSelectedYearFilter("all");
+    setSelectedCtFilter("all");
+    setFolderFeedback("");
+  }, [mode]);
+
+  const effectiveItems = useMemo(
+    () =>
+      items.map((it) =>
+        Object.prototype.hasOwnProperty.call(itemFolderOverrides, it.id)
+          ? { ...it, folder_id: itemFolderOverrides[it.id] ?? null }
+          : it,
+      ),
+    [items, itemFolderOverrides],
+  );
+
   useEffect(() => {
     if (!highlightQuestionId) return;
-    const target = items.find((i) => i.id === highlightQuestionId && i.question_type === mode);
+    const target = effectiveItems.find((i) => i.id === highlightQuestionId && i.question_type === mode);
     if (!target) return;
     setSelectedTermId(target.term_id);
-    setSelectedSubjectId("all");
+    setSelectedSubjectId(target.subject_id);
+    setActiveFolderId(target.folder_id ?? null);
     setSelectedYearFilter("all");
     setSelectedCtFilter("all");
     setPulsingId(target.id);
@@ -264,7 +331,8 @@ export default function QuestionBankSection({
       window.clearTimeout(scrollTimer);
       window.clearTimeout(clearTimer);
     };
-  }, [highlightQuestionId, items, mode]);
+  }, [highlightQuestionId, effectiveItems, mode]);
+
   const [accessError, setAccessError] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -291,8 +359,48 @@ export default function QuestionBankSection({
     [subjects, selectedTermId],
   );
 
+  const activeSubjectObj = useMemo(
+    () =>
+      selectedSubjectId !== "all"
+        ? termSubjects.find((s) => s.id === selectedSubjectId) || null
+        : null,
+    [termSubjects, selectedSubjectId],
+  );
+
+  // Folders belonging to current term, mode & selected subject
+  const subjectFolders = useMemo(() => {
+    if (!activeSubjectObj) return [];
+    return localFolders.filter(
+      (f) =>
+        f.question_type === mode &&
+        f.term_id === selectedTermId &&
+        (f.subject_id === activeSubjectObj.id || f.subject_code === activeSubjectObj.subject_code),
+    );
+  }, [localFolders, activeSubjectObj, mode, selectedTermId]);
+
+  const folderBreadcrumb = useMemo(() => {
+    if (!activeFolderId) return [];
+    const chain: QuestionBankFolder[] = [];
+    const map = new Map(subjectFolders.map((f) => [f.id, f]));
+    let curr = map.get(activeFolderId) || null;
+    const seen = new Set<string>();
+    while (curr && !seen.has(curr.id)) {
+      seen.add(curr.id);
+      chain.unshift(curr);
+      curr = curr.parent_id ? map.get(curr.parent_id) || null : null;
+    }
+    return chain;
+  }, [activeFolderId, subjectFolders]);
+
+  const currentChildFolders = useMemo(() => {
+    if (!activeSubjectObj) return [];
+    return subjectFolders
+      .filter((f) => (f.parent_id ?? null) === activeFolderId)
+      .sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true }));
+  }, [subjectFolders, activeSubjectObj, activeFolderId]);
+
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
+    return effectiveItems.filter((item) => {
       if (item.question_type !== mode) return false;
       if (item.term_id !== selectedTermId) return false;
       if (selectedSubjectId !== "all" && item.subject_id !== selectedSubjectId) return false;
@@ -304,27 +412,191 @@ export default function QuestionBankSection({
       }
       return true;
     });
-  }, [items, mode, selectedTermId, selectedSubjectId, selectedYearFilter, selectedCtFilter]);
+  }, [effectiveItems, mode, selectedTermId, selectedSubjectId, selectedYearFilter, selectedCtFilter]);
+
+  const visibleGridItems = useMemo(() => {
+    if (viewMode === "all" || selectedSubjectId === "all") {
+      return filteredItems;
+    }
+    const validFolderIds = new Set(subjectFolders.map((f) => f.id));
+    return filteredItems.filter((it) => {
+      const fid = it.folder_id && validFolderIds.has(it.folder_id) ? it.folder_id : null;
+      return fid === activeFolderId;
+    });
+  }, [viewMode, selectedSubjectId, filteredItems, subjectFolders, activeFolderId]);
 
   const primaryItems = useMemo(
-    () => filteredItems.filter((item) => !item.is_reference),
-    [filteredItems],
+    () => visibleGridItems.filter((item) => !item.is_reference),
+    [visibleGridItems],
   );
 
   const referenceItems = useMemo(
-    () => filteredItems.filter((item) => Boolean(item.is_reference)),
-    [filteredItems],
+    () => visibleGridItems.filter((item) => Boolean(item.is_reference)),
+    [visibleGridItems],
   );
 
   const availableYears = useMemo(() => {
     const yrs = new Set<number>();
-    for (const item of items) {
+    for (const item of effectiveItems) {
       if (item.question_type === "previous_year" && item.term_id === selectedTermId && item.exam_year) {
         yrs.add(item.exam_year);
       }
     }
     return Array.from(yrs).sort((a, b) => b - a);
-  }, [items, selectedTermId]);
+  }, [effectiveItems, selectedTermId]);
+
+  // Count helper for folder badges
+  const getFolderItemCount = (folderId: string): number => {
+    const childMap = new Map<string, string[]>();
+    for (const f of subjectFolders) {
+      if (f.parent_id) {
+        const arr = childMap.get(f.parent_id) || [];
+        arr.push(f.id);
+        childMap.set(f.parent_id, arr);
+      }
+    }
+    const branch = new Set<string>([folderId]);
+    const stack = [folderId];
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      for (const cid of childMap.get(id) || []) {
+        if (!branch.has(cid)) {
+          branch.add(cid);
+          stack.push(cid);
+        }
+      }
+    }
+    return effectiveItems.filter(
+      (it) =>
+        it.question_type === mode &&
+        it.term_id === selectedTermId &&
+        it.folder_id &&
+        branch.has(it.folder_id),
+    ).length;
+  };
+
+  // Folder CRUD Handlers
+  const handleSaveFolderModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!folderModal || folderBusy) return;
+    const cleanName = folderNameInput.trim();
+    if (!cleanName) return;
+
+    setFolderBusy(true);
+    setFolderFeedback("");
+    try {
+      if (folderModal.mode === "create") {
+        if (!activeSubjectObj) throw new Error("Select a subject first.");
+        const res = await fetch("/api/questions/folders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subject_id: activeSubjectObj.id,
+            question_type: mode,
+            parent_id: activeFolderId,
+            name: cleanName,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success || !data.folder) {
+          throw new Error(data?.error || "Could not create folder.");
+        }
+        setLocalFolders((prev) => [...prev, data.folder as QuestionBankFolder]);
+      } else if (folderModal.mode === "rename" && folderModal.folderId) {
+        const res = await fetch("/api/questions/folders", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "rename",
+            folder_id: folderModal.folderId,
+            name: cleanName,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data?.error || "Could not rename folder.");
+        }
+        setLocalFolders((prev) =>
+          prev.map((f) => (f.id === folderModal.folderId ? { ...f, name: cleanName } : f)),
+        );
+      }
+      setFolderModal(null);
+      setFolderNameInput("");
+    } catch (err) {
+      setFolderFeedback(err instanceof Error ? err.message : "Folder action failed.");
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
+  const confirmDeleteFolder = async () => {
+    if (!deletingFolder || folderBusy) return;
+    const folder = deletingFolder;
+    setFolderBusy(true);
+    setFolderFeedback("");
+    try {
+      const res = await fetch("/api/questions/folders", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folder_id: folder.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data?.error || "Could not delete folder.");
+      }
+      const nextParent = folder.parent_id ?? null;
+      setLocalFolders((prev) =>
+        prev
+          .filter((f) => f.id !== folder.id)
+          .map((f) => (f.parent_id === folder.id ? { ...f, parent_id: nextParent } : f)),
+      );
+      setItemFolderOverrides((prev) => {
+        const next = { ...prev };
+        for (const it of effectiveItems) {
+          if (it.folder_id === folder.id) next[it.id] = nextParent;
+        }
+        return next;
+      });
+      if (activeFolderId === folder.id) {
+        setActiveFolderId(nextParent);
+      }
+      setDeletingFolder(null);
+    } catch (err) {
+      setFolderFeedback(err instanceof Error ? err.message : "Could not delete folder.");
+      setDeletingFolder(null);
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
+  const handleMoveItemSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!movingItem || folderBusy) return;
+    setFolderBusy(true);
+    setFolderFeedback("");
+    const destId = targetMoveFolderId.trim() ? targetMoveFolderId.trim() : null;
+    try {
+      const res = await fetch("/api/questions/folders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "move_item",
+          item_id: movingItem.id,
+          folder_id: destId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data?.error || "Could not move question.");
+      }
+      setItemFolderOverrides((prev) => ({ ...prev, [movingItem.id]: destId }));
+      setMovingItem(null);
+    } catch (err) {
+      setFolderFeedback(err instanceof Error ? err.message : "Could not move question.");
+    } finally {
+      setFolderBusy(false);
+    }
+  };
 
   const openOrDownload = async (itemId: string, action: "view" | "download") => {
     setAccessError("");
@@ -447,6 +719,11 @@ export default function QuestionBankSection({
         pdfFile = await convertImagesToSinglePdf(selectedFiles, baseName);
       }
 
+      const targetUploadFolderId =
+        activeSubjectObj && activeUploadSubject.id === activeSubjectObj.id
+          ? activeFolderId
+          : null;
+
       setUploadProgress({ step: 3, percent: 65, loadedBytes: 0, totalBytes: pdfFile.size });
       setUploadStatus("Preparing secure cloud upload...");
       const prepRes = await fetch("/api/questions", {
@@ -460,6 +737,7 @@ export default function QuestionBankSection({
           ct_number: mode === "ct" ? uploadCt : null,
           batch_label: uploadBatch.trim() || null,
           notes: uploadNotes.trim() || null,
+          folder_id: targetUploadFolderId,
           file_name: pdfFile.name,
           file_size: pdfFile.size,
         }),
@@ -518,6 +796,7 @@ export default function QuestionBankSection({
           ct_number: mode === "ct" ? uploadCt : null,
           batch_label: uploadBatch.trim() || null,
           notes: uploadNotes.trim() || null,
+          folder_id: targetUploadFolderId,
           file_name: pdfFile.name,
           file_size: pdfFile.size,
         }),
@@ -541,6 +820,34 @@ export default function QuestionBankSection({
     }
   };
 
+  // Build hierarchical folder options for the "Move to Folder" modal
+  const moveTargetFolderOptions = useMemo(() => {
+    if (!movingItem) return [];
+    const itemFolders = localFolders.filter(
+      (f) =>
+        f.question_type === movingItem.question_type &&
+        f.term_id === movingItem.term_id &&
+        (f.subject_id === movingItem.subject_id || f.subject_code === movingItem.subject_code),
+    );
+    const byParent = new Map<string | null, QuestionBankFolder[]>();
+    for (const f of itemFolders) {
+      const key = f.parent_id ?? null;
+      const arr = byParent.get(key) || [];
+      arr.push(f);
+      byParent.set(key, arr);
+    }
+    const result: Array<{ id: string; label: string }> = [];
+    const walk = (parentId: string | null, prefix: string) => {
+      for (const f of byParent.get(parentId) || []) {
+        const pathLabel = prefix ? `${prefix} / ${f.name}` : f.name;
+        result.push({ id: f.id, label: pathLabel });
+        walk(f.id, pathLabel);
+      }
+    };
+    walk(null, "");
+    return result;
+  }, [movingItem, localFolders]);
+
   return (
     <div className="space-y-5">
       <section className="relative z-30 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-4 sm:p-5">
@@ -552,6 +859,7 @@ export default function QuestionBankSection({
               onChange={(val) => {
                 setSelectedTermId(val);
                 setSelectedSubjectId("all");
+                setActiveFolderId(null);
                 setSelectedYearFilter("all");
               }}
               options={terms.map((t) => ({
@@ -563,7 +871,10 @@ export default function QuestionBankSection({
             <QbDropdown
               label={`Subject (${termSubjects.length})`}
               value={selectedSubjectId}
-              onChange={setSelectedSubjectId}
+              onChange={(val) => {
+                setSelectedSubjectId(val);
+                setActiveFolderId(null);
+              }}
               wide
               options={[
                 { id: "all", label: "All Subjects in Term" },
@@ -611,21 +922,54 @@ export default function QuestionBankSection({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => openUploadModal()}
-            className="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-400 px-4 text-xs font-bold text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.25)] transition hover:bg-cyan-300"
-          >
-            <Plus className="h-4 w-4" />
-            <span>{mode === "previous_year" ? "Add Year Question" : "Add CT Question"}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Folder View vs All Cards Toggle */}
+            <div className="inline-flex h-11 items-center rounded-xl border border-slate-700/80 bg-[#060A12] p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode("folders")}
+                className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition ${
+                  viewMode === "folders"
+                    ? "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-400/50"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Folder className="h-3.5 w-3.5" />
+                <span>Folders</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("all")}
+                className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition ${
+                  viewMode === "all"
+                    ? "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-400/50"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                <span>All Cards</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => openUploadModal()}
+              className="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-400 px-4 text-xs font-bold text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.25)] transition hover:bg-cyan-300"
+            >
+              <Plus className="h-4 w-4" />
+              <span>{mode === "previous_year" ? "Add Year Question" : "Add CT Question"}</span>
+            </button>
+          </div>
         </div>
 
         {termSubjects.length > 0 && (
           <div className="mt-3.5 flex flex-wrap gap-1.5 border-t border-slate-800/80 pt-3">
             <button
               type="button"
-              onClick={() => setSelectedSubjectId("all")}
+              onClick={() => {
+                setSelectedSubjectId("all");
+                setActiveFolderId(null);
+              }}
               className={`cursor-pointer rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
                 selectedSubjectId === "all"
                   ? "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-400/50"
@@ -638,7 +982,10 @@ export default function QuestionBankSection({
               <button
                 key={s.id}
                 type="button"
-                onClick={() => setSelectedSubjectId(s.id)}
+                onClick={() => {
+                  setSelectedSubjectId(s.id);
+                  setActiveFolderId(null);
+                }}
                 className={`cursor-pointer rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
                   selectedSubjectId === s.id
                     ? "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-400/50"
@@ -651,6 +998,235 @@ export default function QuestionBankSection({
           </div>
         )}
       </section>
+
+      {/* Google Drive-style Folder Browser & Breadcrumb */}
+      {viewMode === "folders" && (
+        <section className="rounded-2xl border border-slate-800/90 bg-[#0A1020] p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Breadcrumb Navigation */}
+            <nav aria-label="Folder breadcrumb" className="flex flex-wrap items-center gap-1.5 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSubjectId("all");
+                  setActiveFolderId(null);
+                }}
+                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition ${
+                  selectedSubjectId === "all"
+                    ? "bg-cyan-500/20 text-cyan-200"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
+              >
+                <Folder className="h-3.5 w-3.5 text-amber-400" />
+                <span>{mode === "previous_year" ? "Board Questions" : "CT Questions"}</span>
+              </button>
+
+              {activeSubjectObj && (
+                <>
+                  <ChevronRight className="h-3.5 w-3.5 text-slate-600" />
+                  <button
+                    type="button"
+                    onClick={() => setActiveFolderId(null)}
+                    className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold transition ${
+                      activeFolderId === null
+                        ? "bg-cyan-500/20 text-cyan-200"
+                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    }`}
+                  >
+                    <span className="font-mono text-[11px] text-cyan-300">
+                      {activeSubjectObj.subject_code}
+                    </span>
+                    <span className="max-w-[200px] truncate">{activeSubjectObj.subject_name}</span>
+                  </button>
+                </>
+              )}
+
+              {folderBreadcrumb.map((crumb, idx) => {
+                const isLast = idx === folderBreadcrumb.length - 1;
+                return (
+                  <span key={crumb.id} className="inline-flex items-center gap-1.5">
+                    <ChevronRight className="h-3.5 w-3.5 text-slate-600" />
+                    <button
+                      type="button"
+                      onClick={() => setActiveFolderId(crumb.id)}
+                      className={`cursor-pointer rounded-lg px-2.5 py-1.5 font-semibold transition ${
+                        isLast
+                          ? "bg-amber-500/20 text-amber-200"
+                          : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                      }`}
+                    >
+                      {crumb.name}
+                    </button>
+                  </span>
+                );
+              })}
+            </nav>
+
+            {/* Folder Actions (Back + Create New Folder) */}
+            {activeSubjectObj && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (folderBreadcrumb.length > 0) {
+                      const curr = folderBreadcrumb[folderBreadcrumb.length - 1];
+                      setActiveFolderId(curr?.parent_id ?? null);
+                    } else {
+                      setSelectedSubjectId("all");
+                      setActiveFolderId(null);
+                    }
+                  }}
+                  className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl border border-slate-700 bg-[#060A12] px-3 text-xs font-semibold text-slate-300 transition hover:border-slate-600 hover:text-white"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <span>Back</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFolderFeedback("");
+                    setFolderNameInput("");
+                    setFolderModal({ mode: "create", initialName: "" });
+                  }}
+                  className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 text-xs font-bold text-amber-200 transition hover:bg-amber-500/25"
+                >
+                  <FolderPlus className="h-3.5 w-3.5" />
+                  <span>New Folder</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {folderFeedback && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-500/35 bg-rose-500/10 px-3.5 py-2 text-xs text-rose-200">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{folderFeedback}</span>
+            </div>
+          )}
+
+          {/* Level 1: Subject Folders Grid */}
+          {selectedSubjectId === "all" ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {termSubjects.map((subj) => {
+                const subjItemsCount = effectiveItems.filter(
+                  (it) =>
+                    it.question_type === mode &&
+                    it.term_id === selectedTermId &&
+                    it.subject_id === subj.id,
+                ).length;
+                const subjSubfoldersCount = localFolders.filter(
+                  (f) =>
+                    f.question_type === mode &&
+                    f.term_id === selectedTermId &&
+                    (f.subject_id === subj.id || f.subject_code === subj.subject_code),
+                ).length;
+
+                return (
+                  <button
+                    key={subj.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedSubjectId(subj.id);
+                      setActiveFolderId(null);
+                    }}
+                    className="group flex cursor-pointer items-center gap-3.5 rounded-xl border border-slate-800/90 bg-[#060A12] p-3.5 text-left transition hover:border-amber-400/50 hover:bg-[#0D1526]"
+                  >
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/15 text-amber-300 transition group-hover:scale-105">
+                      <Folder className="h-5 w-5 fill-amber-400/20" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded bg-cyan-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-cyan-300">
+                          {subj.subject_code}
+                        </span>
+                        <span className="text-[11px] font-semibold text-slate-400">
+                          {subjItemsCount} {subjItemsCount === 1 ? "file" : "files"}
+                          {subjSubfoldersCount > 0 ? ` · ${subjSubfoldersCount} folders` : ""}
+                        </span>
+                      </div>
+                      <p className="mt-1 truncate text-xs font-bold text-slate-100 group-hover:text-amber-200">
+                        {subj.subject_name}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-500 transition group-hover:translate-x-0.5 group-hover:text-amber-300" />
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            /* Level 2+: Nested Custom Folders inside Selected Subject */
+            <div className="mt-4">
+              {currentChildFolders.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {currentChildFolders.map((folder) => {
+                    const count = getFolderItemCount(folder.id);
+                    return (
+                      <div
+                        key={folder.id}
+                        className="group flex items-center justify-between gap-2 rounded-xl border border-slate-800/90 bg-[#060A12] p-3 transition hover:border-amber-400/50 hover:bg-[#0D1526]"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setActiveFolderId(folder.id)}
+                          className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left"
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/15 text-amber-300">
+                            <Folder className="h-5 w-5 fill-amber-400/25" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-bold text-slate-100 group-hover:text-amber-200">
+                              {folder.name}
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-slate-400">
+                              {count} {count === 1 ? "question" : "questions"}
+                            </p>
+                          </div>
+                        </button>
+
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            title="Rename Folder"
+                            onClick={() => {
+                              setFolderFeedback("");
+                              setFolderNameInput(folder.name);
+                              setFolderModal({
+                                mode: "rename",
+                                folderId: folder.id,
+                                initialName: folder.name,
+                              });
+                            }}
+                            className="cursor-pointer rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-cyan-300"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            title="Delete Folder"
+                            onClick={() => { setFolderFeedback(""); setDeletingFolder(folder); }}
+                            className="cursor-pointer rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-rose-400"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-xl border border-dashed border-slate-800 bg-[#060A12]/60 px-4 py-3 text-xs text-slate-400">
+                  No sub-folders here yet. Click{" "}
+                  <span className="font-semibold text-amber-300">+ New Folder</span> to organize by
+                  year (e.g. 2024, 2023) or topic, or use{" "}
+                  <span className="font-semibold text-cyan-300">Move</span> on any question card
+                  below.
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       {accessError && (
         <div className="flex items-center gap-2 rounded-xl border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-xs text-rose-200">
@@ -667,12 +1243,16 @@ export default function QuestionBankSection({
             <ClipboardList className="mx-auto h-9 w-9 text-amber-400/80" />
           )}
           <h3 className="mt-3 text-base font-bold text-white">
-            {mode === "previous_year"
-              ? "No Previous Year Questions Uploaded Yet"
-              : "No CT Questions Uploaded Yet"}
+            {viewMode === "folders" && activeFolderId
+              ? "This Folder Has No Questions Yet"
+              : mode === "previous_year"
+                ? "No Previous Year Questions Uploaded Yet"
+                : "No CT Questions Uploaded Yet"}
           </h3>
           <p className="mx-auto mt-1 max-w-md text-xs text-slate-400">
-            Have the question paper or photos? Upload them directly—photos are automatically converted into a clean A4 PDF for everyone in your batch &amp; department.
+            {viewMode === "folders" && activeFolderId
+              ? "Upload a question directly into this folder or move existing questions here from the subject root."
+              : "Have the question paper or photos? Upload them directly—photos are automatically converted into a clean A4 PDF for everyone in your batch & department."}
           </p>
           <button
             type="button"
@@ -680,57 +1260,85 @@ export default function QuestionBankSection({
             className="mt-4 inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-cyan-400 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-cyan-300"
           >
             <Plus className="h-4 w-4" />
-            <span>Upload First Question</span>
+            <span>{activeFolderId ? "Upload into This Folder" : "Upload First Question"}</span>
           </button>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredItems.map((item) => {
+          {visibleGridItems.map((item) => {
             const subj = subjects.find(
               (s) => s.id === item.subject_id || (s.subject_code === item.subject_code && s.term_id === item.term_id),
             );
             const isViewing = loadingAccessId === `${item.id}:view`;
             const isDownloading = loadingAccessId === `${item.id}:download`;
+            const currentFolderObj = item.folder_id
+              ? localFolders.find((f) => f.id === item.folder_id)
+              : null;
 
             return (
               <div
-                  id={`q-card-${item.id}`}
-                  key={item.id}
-                  className={`flex flex-col justify-between rounded-2xl border bg-[#0A1020] p-4 transition ${
-                    pulsingId === item.id
-                      ? "border-emerald-400 ring-2 ring-emerald-400/70 shadow-[0_0_30px_rgba(16,185,129,0.45)] animate-pulse"
-                      : "border-slate-800/90 hover:border-cyan-500/40"
-                  }`}
-                >
+                id={`q-card-${item.id}`}
+                key={item.id}
+                className={`flex flex-col justify-between rounded-2xl border bg-[#0A1020] p-4 transition ${
+                  pulsingId === item.id
+                    ? "border-emerald-400 ring-2 ring-emerald-400/70 shadow-[0_0_30px_rgba(16,185,129,0.45)] animate-pulse"
+                    : "border-slate-800/90 hover:border-cyan-500/40"
+                }`}
+              >
                 <div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 font-mono text-[11px] font-bold text-cyan-300">
                       {item.subject_code}
                     </span>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                        item.question_type === "previous_year"
-                          ? "bg-violet-500/20 text-violet-300"
-                          : "bg-amber-500/20 text-amber-300"
-                      }`}
-                    >
-                      {item.question_type === "previous_year"
-                        ? `Year ${item.exam_year}`
-                        : `CT-${item.ct_number}`}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        title="Move to Folder"
+                        onClick={() => {
+                          setFolderFeedback("");
+                          setMovingItem(item);
+                          setTargetMoveFolderId(item.folder_id ?? "");
+                        }}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-700/90 bg-slate-900/90 px-2 py-0.5 text-[10px] font-semibold text-slate-300 transition hover:border-amber-400/50 hover:text-amber-200"
+                      >
+                        <FolderInput className="h-3 w-3 text-amber-400" />
+                        <span>Move</span>
+                      </button>
+
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                          item.question_type === "previous_year"
+                            ? "bg-violet-500/20 text-violet-300"
+                            : "bg-amber-500/20 text-amber-300"
+                        }`}
+                      >
+                        {item.question_type === "previous_year"
+                          ? `Year ${item.exam_year}`
+                          : `CT-${item.ct_number}`}
+                      </span>
+                    </div>
                   </div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     {item.source_label && (
-                      <p
-                        className={`mt-2 inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold ${
+                      <span
+                        className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold ${
                           item.is_own_dept
                             ? "border-emerald-500/35 bg-emerald-500/15 text-emerald-200"
                             : "border-cyan-500/30 bg-cyan-500/10 text-cyan-200"
                         }`}
                       >
                         {item.source_label}
-                      </p>
+                      </span>
                     )}
 
+                    {currentFolderObj && (
+                      <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-200">
+                        <Folder className="h-2.5 w-2.5" />
+                        {currentFolderObj.name}
+                      </span>
+                    )}
+                  </div>
 
                   <h3 className="mt-2.5 text-sm font-bold text-white">
                     {subj?.subject_name || item.subject_code}
@@ -747,38 +1355,38 @@ export default function QuestionBankSection({
                     </p>
                   )}
                 </div>
-                  {item.uploader && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveUploaderProfile(item.uploader ?? null)}
-                      className="mt-3 flex w-full cursor-pointer items-center gap-2 rounded-xl border border-slate-800/90 bg-slate-900/60 px-2.5 py-1.5 text-left transition hover:border-cyan-500/40 hover:bg-slate-900"
-                    >
-                      {item.uploader.avatar_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={item.uploader.avatar_url}
-                          alt={item.uploader.full_name}
-                          className="h-6 w-6 shrink-0 rounded-full object-cover"
-                        />
-                      ) : (
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-[10px] font-bold text-cyan-200">
-                          {item.uploader.full_name.charAt(0).toUpperCase()}
+
+                {item.uploader && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveUploaderProfile(item.uploader ?? null)}
+                    className="mt-3 flex w-full cursor-pointer items-center gap-2 rounded-xl border border-slate-800/90 bg-slate-900/60 px-2.5 py-1.5 text-left transition hover:border-cyan-500/40 hover:bg-slate-900"
+                  >
+                    {item.uploader.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={item.uploader.avatar_url}
+                        alt={item.uploader.full_name}
+                        className="h-6 w-6 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-[10px] font-bold text-cyan-200">
+                        {item.uploader.full_name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[11px] font-semibold text-slate-200">
+                        {item.uploader.full_name}
+                      </span>
+                      {item.uploader.student_id && (
+                        <span className="block truncate font-mono text-[10px] text-slate-400">
+                          ID: {item.uploader.student_id}
                         </span>
                       )}
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[11px] font-semibold text-slate-200">
-                          {item.uploader.full_name}
-                        </span>
-                        {item.uploader.student_id && (
-                          <span className="block truncate font-mono text-[10px] text-slate-400">
-                            ID: {item.uploader.student_id}
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-[10px] font-medium text-cyan-300">Profile</span>
-                    </button>
-                  )}
-
+                    </span>
+                    <span className="text-[10px] font-medium text-cyan-300">Profile</span>
+                  </button>
+                )}
 
                 <div className="mt-4 space-y-2.5 border-t border-slate-800/80 pt-3">
                   <div className="flex items-center justify-between text-[11px] text-slate-400">
@@ -822,6 +1430,206 @@ export default function QuestionBankSection({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Create / Rename Folder Modal */}
+      {folderModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+          onClick={() => setFolderModal(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-slate-700/80 bg-[#0A1020] p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <FolderPlus className="h-4 w-4 text-amber-400" />
+                <h3 className="text-sm font-bold text-white">
+                  {folderModal.mode === "create" ? "Create New Folder" : "Rename Folder"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFolderModal(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveFolderModal} className="mt-4 space-y-4">
+              <div>
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  Folder Name (e.g. 2024, 2023, Part-A, Solved)
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  maxLength={80}
+                  value={folderNameInput}
+                  onChange={(e) => setFolderNameInput(e.target.value)}
+                  placeholder="Enter folder name..."
+                  className="h-10 w-full rounded-xl border border-slate-700 bg-[#060A12] px-3 text-xs font-semibold text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFolderModal(null)}
+                  className="rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={folderBusy || !folderNameInput.trim()}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-amber-400 px-4 py-2 text-xs font-bold text-slate-950 transition hover:bg-amber-300 disabled:opacity-50"
+                >
+                  {folderBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  <span>{folderModal.mode === "create" ? "Create Folder" : "Save Name"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Move Question to Folder Modal */}
+      {movingItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+          onClick={() => setMovingItem(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-slate-700/80 bg-[#0A1020] p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <FolderInput className="h-4 w-4 text-amber-400" />
+                <h3 className="text-sm font-bold text-white">Move Question to Folder</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMovingItem(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleMoveItemSubmit} className="mt-4 space-y-4">
+              <div>
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  Destination Folder ({movingItem.subject_code})
+                </label>
+                <select
+                  value={targetMoveFolderId}
+                  onChange={(e) => setTargetMoveFolderId(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-slate-700 bg-[#060A12] px-3 text-xs font-semibold text-white focus:border-amber-400 focus:outline-none"
+                >
+                  <option value="">{movingItem.subject_code} (Subject Root)</option>
+                  {moveTargetFolderOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                {moveTargetFolderOptions.length === 0 && (
+                  <p className="mt-1.5 text-[11px] text-slate-400">
+                    Open the subject folder first and click &ldquo;+ New Folder&rdquo; to create folders.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMovingItem(null)}
+                  className="rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={folderBusy}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-cyan-400 px-4 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-300 disabled:opacity-50"
+                >
+                  {folderBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  <span>Move Here</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Folder Confirmation Modal */}
+      {deletingFolder && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+          onClick={() => !folderBusy && setDeletingFolder(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-slate-700/80 bg-[#0A1020] p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-rose-500/35 bg-rose-500/15 text-rose-400">
+                  <Trash2 className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Delete Folder</h3>
+                  <p className="text-[11px] text-slate-400">Safe folder removal</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={folderBusy}
+                onClick={() => setDeletingFolder(null)}
+                className="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2.5">
+              <p className="text-xs leading-relaxed text-slate-200">
+                Are you sure you want to delete folder{" "}
+                <span className="rounded bg-slate-800 px-1.5 py-0.5 font-bold text-amber-300">
+                  {deletingFolder.name}
+                </span>
+                ?
+              </p>
+              <p className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[11px] leading-relaxed text-emerald-200">
+                Any questions or sub-folders inside will be moved safely up to the parent folder—nothing will be deleted.
+              </p>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={folderBusy}
+                onClick={() => setDeletingFolder(null)}
+                className="cursor-pointer rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={folderBusy}
+                onClick={confirmDeleteFolder}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-rose-500 px-4 py-2 text-xs font-bold text-white shadow-[0_0_20px_rgba(244,63,94,0.3)] transition hover:bg-rose-400 disabled:opacity-50"
+              >
+                {folderBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                <span>{folderBusy ? "Deleting..." : "Delete Folder"}</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

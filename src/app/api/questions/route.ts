@@ -75,6 +75,7 @@ export async function POST(request: Request) {
     const ctNumber = body?.ct_number ? Number(body.ct_number) : null;
     const batchLabel = String(body?.batch_label ?? "").trim().slice(0, 60) || null;
     const notes = String(body?.notes ?? "").trim().slice(0, 500) || null;
+    const folderId = typeof body?.folder_id === "string" && body.folder_id.trim() ? body.folder_id.trim() : null;
     const fileSize = Number(body?.file_size ?? 0);
     const fileName = String(body?.file_name ?? "question.pdf").trim();
 
@@ -189,6 +190,7 @@ export async function POST(request: Request) {
         ct_number: questionType === "ct" ? ctNumber : null,
         batch_label: batchLabel,
         notes,
+        folder_id: folderId,
         file_path: filePath,
         file_type: "application/pdf",
         file_size_bytes: fileSize,
