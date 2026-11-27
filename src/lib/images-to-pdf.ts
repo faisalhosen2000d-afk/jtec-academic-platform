@@ -64,7 +64,7 @@ type RichSegment =
   | { kind: "frac"; num: string; den: string }
   | { kind: "bar"; text: string }
   | { kind: "sum" }
-  | { kind: "neq" };
+  | { kind: "neq" } | { kind: "geq" } | { kind: "leq" };
 
 function parseInlineScripts(chunk: string): RichSegment[] {
   const segs: RichSegment[] = [];
@@ -99,7 +99,7 @@ function parseRichSegments(line: string): RichSegment[] {
   const cleanLine = line.replace(/[\r\n]+/g, " ");
   const result: RichSegment[] = [];
   const tokenRegex =
-    /\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}|\\bar\s*\{([^{}]+)\}|\\sum(?![a-zA-Z])(?:_\{([^}]+)\}|_([A-Za-z0-9=+-]+))?(?:\^\{([^}]+)\}|\^([A-Za-z0-9+-]))?|!=/g;
+    /\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}|\\bar\s*\{([^{}]+)\}|\\sum(?![a-zA-Z])(?:_\{([^}]+)\}|_([A-Za-z0-9=+-]+))?(?:\^\{([^}]+)\}|\^([A-Za-z0-9+-]))?|!=|>=|<=/g;
   let lastIdx = 0;
   let m: RegExpExecArray | null;
   while ((m = tokenRegex.exec(cleanLine)) !== null) {
@@ -119,6 +119,10 @@ function parseRichSegments(line: string): RichSegment[] {
       });
     } else if (m[0] === "!=") {
       result.push({ kind: "neq" });
+    } else if (m[0] === ">=") {
+      result.push({ kind: "geq" });
+    } else if (m[0] === "<=") {
+      result.push({ kind: "leq" });
     } else {
       result.push({ kind: "sum" });
       const subText = m[4] ?? m[5];
@@ -149,6 +153,8 @@ function measureRichTextWidth(line: string, font: PDFFont, size: number): number
       total += size * 0.85;
     } else if (seg.kind === "neq") {
       total += font.widthOfTextAtSize("=", size) + 2;
+    } else if (seg.kind === "geq" || seg.kind === "leq") {
+      total += font.widthOfTextAtSize(">", size) + 1.5;
     } else {
       total += font.widthOfTextAtSize(seg.text, seg.kind === "normal" ? size : subSize);
     }
@@ -255,6 +261,24 @@ function drawRichTextLine(
         color: opts.color,
       });
       cursorX += eqW + 2;
+      continue;
+    }
+    if (seg.kind === "geq" || seg.kind === "leq") {
+      const gw = opts.font.widthOfTextAtSize(">", opts.size);
+      drawSafeText(page, seg.kind === "geq" ? ">" : "<", {
+        x: cursorX + 0.5,
+        y: opts.y + opts.size * 0.12,
+        size: opts.size,
+        font: opts.font,
+        color: opts.color,
+      });
+      page.drawLine({
+        start: { x: cursorX + 0.8, y: opts.y + opts.size * 0.01 },
+        end: { x: cursorX + gw + 0.2, y: opts.y + opts.size * 0.01 },
+        thickness: 0.65,
+        color: opts.color,
+      });
+      cursorX += gw + 1.5;
       continue;
     }
     const drawSize = seg.kind === "normal" ? opts.size : subSize;
