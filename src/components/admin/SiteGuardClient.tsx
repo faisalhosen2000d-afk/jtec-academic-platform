@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Noto_Sans_Bengali } from "next/font/google";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -11,12 +10,6 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-
-const notoBengali = Noto_Sans_Bengali({
-  subsets: ["bengali"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
 
 interface SupportTicketRow {
   id: string;
@@ -202,7 +195,8 @@ export function SiteGuardClient() {
   });
 
   return (
-    <div className={`${notoBengali.className} space-y-5`}>
+    <div className="site-guard-bn space-y-5">
+      <style>{`@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap"); .site-guard-bn { font-family: "Noto Sans Bengali", ui-sans-serif, system-ui, sans-serif; }`}</style>
       <div className="flex flex-col gap-3 rounded-2xl border border-violet-500/30 bg-[#0A1020] p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-violet-500/40 bg-violet-500/15 text-violet-300">
