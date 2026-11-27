@@ -5,6 +5,7 @@ import MaterialFileActions from "./MaterialFileActions";
 import MaterialBookmarkButton from "./MaterialBookmarkButton";
 import MaterialRating from "@/components/materials/MaterialRating";
 import MaterialAiAssistant from "@/components/materials/MaterialAiAssistant";
+import MaterialInlineReader from "./MaterialInlineReader";
 
 type Material = {
   id: string;
@@ -322,6 +323,15 @@ export default async function MaterialDetailsPage({
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Inline Portrait Reader */}
+              <div className="dash-stagger-3">
+                <MaterialInlineReader
+                  materialId={materialData.id}
+                  title={materialData.title}
+                  fileType={materialData.file_type}
+                />
               </div>
 
               {/* AI Study Assistant */}
