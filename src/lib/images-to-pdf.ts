@@ -49,7 +49,7 @@ function normalizeMathScripts(raw: string): string {
     .replace(/\\pm/g, "\u00B1")
     .replace(/\\leq?/g, "<=")
     .replace(/\\geq?/g, ">=")
-    .replace(/\\neq/g, "!=")
+    .replace(/\\neq|\\ne/g, "!=").replace(/\\&/g, "&").replace(/\\overline\s*\{([^{}]+)\}/g, "\\bar{$1}")
     .replace(/\\circ/g, "\u00B0")
     .replace(/\\mu(?![a-zA-Z])|\u03BC/g, "\u00B5")
     .replace(/\\beta(?![a-zA-Z])|\u03B2/g, "\u00DF")
@@ -59,7 +59,10 @@ function normalizeMathScripts(raw: string): string {
 
 type RichSegment =
   | { text: string; kind: "normal" | "sub" | "sup" }
-  | { kind: "frac"; num: string; den: string };
+  | { kind: "frac"; num: string; den: string }
+  | { kind: "bar"; text: string }
+  | { kind: "sum" }
+  | { kind: "neq" };
 
 function parseInlineScripts(chunk: string): RichSegment[] {
   const segs: RichSegment[] = [];
@@ -92,18 +95,29 @@ function parseInlineScripts(chunk: string): RichSegment[] {
 function parseRichSegments(line: string): RichSegment[] {
   const cleanLine = line.replace(/[\r\n]+/g, " ");
   const result: RichSegment[] = [];
-  const fracRegex = /\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g;
+  const tokenRegex = /\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}|\\bar\s*\{([^{}]+)\}|\\sum(?![a-zA-Z])|!=/g;
   let lastIdx = 0;
   let m: RegExpExecArray | null;
-  while ((m = fracRegex.exec(cleanLine)) !== null) {
+  while ((m = tokenRegex.exec(cleanLine)) !== null) {
     if (m.index > lastIdx) {
       result.push(...parseInlineScripts(cleanLine.slice(lastIdx, m.index)));
     }
-    result.push({
-      kind: "frac",
-      num: (m[1] ?? "").trim(),
-      den: (m[2] ?? "").trim(),
-    });
+    if (m[1] !== undefined && m[2] !== undefined) {
+      result.push({
+        kind: "frac",
+        num: m[1].trim(),
+        den: m[2].trim(),
+      });
+    } else if (m[3] !== undefined) {
+      result.push({
+        kind: "bar",
+        text: m[3].trim(),
+      });
+    } else if (m[0] === "!=") {
+      result.push({ kind: "neq" });
+    } else {
+      result.push({ kind: "sum" });
+    }
     lastIdx = m.index + m[0].length;
   }
   if (lastIdx < cleanLine.length) {
@@ -121,6 +135,12 @@ function measureRichTextWidth(line: string, font: PDFFont, size: number): number
       const nw = font.widthOfTextAtSize(seg.num, fracSize);
       const dw = font.widthOfTextAtSize(seg.den, fracSize);
       total += Math.max(nw, dw) + 6;
+    } else if (seg.kind === "bar") {
+      total += font.widthOfTextAtSize(seg.text, size) + 1;
+    } else if (seg.kind === "sum") {
+      total += size * 0.85;
+    } else if (seg.kind === "neq") {
+      total += font.widthOfTextAtSize("=", size) + 2;
     } else {
       total += font.widthOfTextAtSize(seg.text, seg.kind === "normal" ? size : subSize);
     }
@@ -173,6 +193,60 @@ function drawRichTextLine(
         color: opts.color,
       });
       cursorX += boxW + 2;
+      continue;
+    }
+    if (seg.kind === "bar") {
+      const bw = opts.font.widthOfTextAtSize(seg.text, opts.size);
+      drawSafeText(page, seg.text, {
+        x: cursorX,
+        y: opts.y,
+        size: opts.size,
+        font: opts.font,
+        color: opts.color,
+      });
+      const barY = opts.y + opts.size * 0.68;
+      page.drawLine({
+        start: { x: cursorX, y: barY },
+        end: { x: cursorX + bw, y: barY },
+        thickness: 0.65,
+        color: opts.color,
+      });
+      cursorX += bw + 1;
+      continue;
+    }
+    if (seg.kind === "sum") {
+      const s = opts.size;
+      const x0 = cursorX + 0.8;
+      const x1 = x0 + s * 0.66;
+      const xm = x0 + s * 0.36;
+      const yBot = opts.y - s * 0.08;
+      const yTop = opts.y + s * 0.84;
+      const yMid = (yBot + yTop) / 2;
+      page.drawLine({ start: { x: x1, y: yTop }, end: { x: x0, y: yTop }, thickness: 0.85, color: opts.color });
+      page.drawLine({ start: { x: x0, y: yTop }, end: { x: xm, y: yMid }, thickness: 0.85, color: opts.color });
+      page.drawLine({ start: { x: xm, y: yMid }, end: { x: x0, y: yBot }, thickness: 0.85, color: opts.color });
+      page.drawLine({ start: { x: x0, y: yBot }, end: { x: x1, y: yBot }, thickness: 0.85, color: opts.color });
+      page.drawLine({ start: { x: x1, y: yTop }, end: { x: x1, y: yTop - s * 0.14 }, thickness: 0.7, color: opts.color });
+      page.drawLine({ start: { x: x1, y: yBot }, end: { x: x1, y: yBot + s * 0.14 }, thickness: 0.7, color: opts.color });
+      cursorX += s * 0.85;
+      continue;
+    }
+    if (seg.kind === "neq") {
+      const eqW = opts.font.widthOfTextAtSize("=", opts.size);
+      drawSafeText(page, "=", {
+        x: cursorX + 1,
+        y: opts.y,
+        size: opts.size,
+        font: opts.font,
+        color: opts.color,
+      });
+      page.drawLine({
+        start: { x: cursorX + 1.5, y: opts.y + opts.size * 0.05 },
+        end: { x: cursorX + eqW + 0.5, y: opts.y + opts.size * 0.62 },
+        thickness: 0.7,
+        color: opts.color,
+      });
+      cursorX += eqW + 2;
       continue;
     }
     const drawSize = seg.kind === "normal" ? opts.size : subSize;
@@ -313,6 +387,39 @@ function cleanCanvasPaperBackground(
 ): Uint8Array | null {
   const imgData = ctx.getImageData(0, 0, w, h);
   const src = imgData.data;
+
+  // Detect & wipe any yellow sticker region (e.g. student name/ID sticker bleeding into a figure crop)
+  let yelMinX = w, yelMaxX = -1, yelMinY = h, yelMaxY = -1, yelCount = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const o = (y * w + x) * 4;
+      const r = src[o] ?? 255;
+      const g = src[o + 1] ?? 255;
+      const b = src[o + 2] ?? 255;
+      if (r > 175 && g > 165 && b < 130 && r - b > 55 && g - b > 45) {
+        yelCount++;
+        if (x < yelMinX) yelMinX = x;
+        if (x > yelMaxX) yelMaxX = x;
+        if (y < yelMinY) yelMinY = y;
+        if (y > yelMaxY) yelMaxY = y;
+      }
+    }
+  }
+  if (yelCount > 40 && yelMaxX >= yelMinX && yelMaxY >= yelMinY) {
+    const pad = 4;
+    const x1 = Math.max(0, yelMinX - pad);
+    const x2 = Math.min(w - 1, yelMaxX + pad);
+    const y1 = Math.max(0, yelMinY - pad);
+    const y2 = Math.min(h - 1, yelMaxY + pad);
+    for (let y = y1; y <= y2; y++) {
+      for (let x = x1; x <= x2; x++) {
+        const o = (y * w + x) * 4;
+        src[o] = 255;
+        src[o + 1] = 255;
+        src[o + 2] = 255;
+      }
+    }
+  }
 
   const total = w * h;
   const lumBuf = new Float32Array(total);
@@ -784,8 +891,8 @@ export async function buildCleanQuestionPdf(
 
     if (figBytes) {
       const embeddedFig = await pdfDoc.embedPng(figBytes);
-      const maxW = isSingleSheet ? Math.min(contentW - 45, 285) : contentW - 40;
-      const maxH = isSingleSheet ? 96 : 240;
+      const maxW = isSingleSheet ? Math.min(contentW - 45, 275) : Math.min(contentW - 60, 260);
+      const maxH = isSingleSheet ? 96 : 115;
       const scale = Math.min(maxW / embeddedFig.width, maxH / embeddedFig.height, 1.35);
       const drawW = embeddedFig.width * scale;
       const drawH = embeddedFig.height * scale;
