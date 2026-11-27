@@ -396,39 +396,70 @@ function cleanCanvasPaperBackground(
   const imgData = ctx.getImageData(0, 0, w, h);
   const src = imgData.data;
 
-  // Detect & completely wipe any yellow student-sticker bleed (e.g. "ID:" / "II" box)
-  let yelMinX = w;
-  let yelMaxX = -1;
-  let yelMinY = h;
-  let yelMaxY = -1;
-  let yelCount = 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const o = (y * w + x) * 4;
-      const r = src[o] ?? 255;
-      const g = src[o + 1] ?? 255;
-      const b = src[o + 2] ?? 255;
-      if (r > 165 && g > 155 && b < 140 && r - b > 45 && g - b > 40) {
-        yelCount++;
-        if (x < yelMinX) yelMinX = x;
-        if (x > yelMaxX) yelMaxX = x;
-        if (y < yelMinY) yelMinY = y;
-        if (y > yelMaxY) yelMaxY = y;
+  // Surgically wipe ONLY local bright-yellow sticker tiles (never wipes the nearby graph)
+  const tile = 16;
+  const cols = Math.ceil(w / tile);
+  const rows = Math.ceil(h / tile);
+  const yellowMask = new Uint8Array(cols * rows);
+  let hasYellowTile = false;
+
+  for (let gy = 0; gy < rows; gy++) {
+    const y0 = gy * tile;
+    const y1 = Math.min(h, y0 + tile);
+    for (let gx = 0; gx < cols; gx++) {
+      const x0 = gx * tile;
+      const x1 = Math.min(w, x0 + tile);
+      let yCount = 0;
+      let pCount = 0;
+      for (let y = y0; y < y1; y++) {
+        for (let x = x0; x < x1; x++) {
+          pCount++;
+          const o = (y * w + x) * 4;
+          const r = src[o] ?? 255;
+          const g = src[o + 1] ?? 255;
+          const b = src[o + 2] ?? 255;
+          if (r > 195 && g > 180 && b < 115 && r - b > 85 && g - b > 75) {
+            yCount++;
+          }
+        }
+      }
+      if (pCount > 0 && yCount / pCount >= 0.08) {
+        yellowMask[gy * cols + gx] = 1;
+        hasYellowTile = true;
       }
     }
   }
-  if (yelCount > 30 && yelMaxX >= yelMinX && yelMaxY >= yelMinY) {
-    const pad = 8;
-    const x1 = Math.max(0, yelMinX - pad);
-    const x2 = yelMaxX > w * 0.8 ? w - 1 : Math.min(w - 1, yelMaxX + pad);
-    const y1 = yelMinY < h * 0.2 ? 0 : Math.max(0, yelMinY - pad);
-    const y2 = Math.min(h - 1, yelMaxY + pad);
-    for (let y = y1; y <= y2; y++) {
-      for (let x = x1; x <= x2; x++) {
-        const o = (y * w + x) * 4;
-        src[o] = 255;
-        src[o + 1] = 255;
-        src[o + 2] = 255;
+
+  if (hasYellowTile) {
+    const finalMask = new Uint8Array(yellowMask);
+    for (let gy = 0; gy < rows; gy++) {
+      for (let gx = 0; gx < cols; gx++) {
+        const idx = gy * cols + gx;
+        if (yellowMask[idx]) continue;
+        let adj = 0;
+        if (gx > 0 && yellowMask[idx - 1]) adj++;
+        if (gx + 1 < cols && yellowMask[idx + 1]) adj++;
+        if (gy > 0 && yellowMask[idx - cols]) adj++;
+        if (gy + 1 < rows && yellowMask[idx + cols]) adj++;
+        if (adj >= 2) finalMask[idx] = 1;
+      }
+    }
+
+    for (let gy = 0; gy < rows; gy++) {
+      for (let gx = 0; gx < cols; gx++) {
+        if (!finalMask[gy * cols + gx]) continue;
+        const y0 = Math.max(0, gy * tile - 2);
+        const y1 = Math.min(h, (gy + 1) * tile + 2);
+        const x0 = Math.max(0, gx * tile - 2);
+        const x1 = Math.min(w, (gx + 1) * tile + 2);
+        for (let y = y0; y < y1; y++) {
+          for (let x = x0; x < x1; x++) {
+            const o = (y * w + x) * 4;
+            src[o] = 255;
+            src[o + 1] = 255;
+            src[o + 2] = 255;
+          }
+        }
       }
     }
   }
