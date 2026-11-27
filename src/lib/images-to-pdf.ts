@@ -51,8 +51,8 @@ function normalizeMathScripts(raw: string): string {
     .replace(/\\geq?/g, ">=")
     .replace(/\\neq/g, "!=")
     .replace(/\\circ/g, "\u00B0")
-    .replace(/\\mu\b|\u03BC/g, "\u00B5")
-    .replace(/\\beta\b|\u03B2/g, "\u00DF")
+    .replace(/\\mu(?![a-zA-Z])|\u03BC/g, "\u00B5")
+    .replace(/\\beta(?![a-zA-Z])|\u03B2/g, "\u00DF")
     .replace(/\\text\{([^}]*)\}/g, "$1")
     .replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, "\\frac{$1}{$2}");
 }
@@ -63,7 +63,7 @@ type RichSegment =
 
 function parseInlineScripts(chunk: string): RichSegment[] {
   const segs: RichSegment[] = [];
-  const regex = /([A-Za-z0-9)\]\u00B5\u00DF'])(?:_\{([^}]+)\}|_([A-Za-z0-9+-])|\^\{([^}]+)\}|\^([A-Za-z0-9+-]))/g;
+  const regex = /([A-Za-z0-9)\]\u00B5\u00DF'])(?:_\{([^}]+)\}|_([A-Za-z0-9+-])|\^\{([^}]+)\}|\^([A-Za-z0-9+-]))(?:_\{([^}]+)\}|_([A-Za-z0-9+-])|\^\{([^}]+)\}|\^([A-Za-z0-9+-]))?/g;
   let lastIdx = 0;
   let match: RegExpExecArray | null;
   while ((match = regex.exec(chunk)) !== null) {
@@ -73,15 +73,14 @@ function parseInlineScripts(chunk: string): RichSegment[] {
     } else if (baseChar) {
       segs.push({ text: baseChar, kind: "normal" });
     }
-    if (match[2] !== undefined) {
-      segs.push({ text: match[2], kind: "sub" });
-    } else if (match[3] !== undefined) {
-      segs.push({ text: match[3], kind: "sub" });
-    } else if (match[4] !== undefined) {
-      segs.push({ text: match[4], kind: "sup" });
-    } else if (match[5] !== undefined) {
-      segs.push({ text: match[5], kind: "sup" });
-    }
+    const pushScript = (subB?: string, subS?: string, supB?: string, supS?: string) => {
+      if (subB !== undefined) segs.push({ text: subB, kind: "sub" });
+      else if (subS !== undefined) segs.push({ text: subS, kind: "sub" });
+      else if (supB !== undefined) segs.push({ text: supB, kind: "sup" });
+      else if (supS !== undefined) segs.push({ text: supS, kind: "sup" });
+    };
+    pushScript(match[2], match[3], match[4], match[5]);
+    pushScript(match[6], match[7], match[8], match[9]);
     lastIdx = match.index + match[0].length;
   }
   if (lastIdx < chunk.length) {
@@ -729,10 +728,11 @@ export async function buildCleanQuestionPdf(
     }
 
     if (secHeaders.length > 0) {
-      y -= 2.5;
+      y -= 3;
       const partSize = isSingleSheet ? 9.4 : 10.2;
+      const neededForHeaderAndFirstLines = secHeaders.length * (partSize + 3) + lineStep * 3 + 10;
+      ensureSpace(neededForHeaderAndFirstLines);
       for (const sh of secHeaders) {
-        ensureSpace(partSize + 3);
         const sw = fontBold.widthOfTextAtSize(sh, partSize);
         drawSafeText(page, sh, {
           x: Math.max(marginX, (a4W - sw) / 2),
@@ -741,9 +741,9 @@ export async function buildCleanQuestionPdf(
           font: fontBold,
           color: rgb(0.05, 0.05, 0.07),
         });
-        y -= partSize + 2.3;
+        y -= partSize + 2.5;
       }
-      y -= 1;
+      y -= 1.5;
     }
 
     if (!qNum && !qText && !qAfterText && !qAfterTableText && (!q.table || q.table.length === 0) && !q.figureBox && !matchedSnip) continue;
@@ -902,7 +902,7 @@ export async function buildCleanQuestionPdf(
           }
           curTopY = rowBot;
         }
-        y = curTopY - 6;
+        y = curTopY - 12;
         renderedBlockBelowText = true;
       }
     }
