@@ -185,9 +185,13 @@ Live Platform Health Metrics:
 Recent Open Issues:
 ${issueDigest}
 
-Provide a crisp Super Admin Maintenance & Guard Report in clear Bengali (বাংলা) with 4-5 short bullet points:
+STRICT ACCURACY RULES:
+1. Open Support Tickets count is exactly ${health.openTickets}. If ${health.openTickets} > 0, you MUST clearly mention that ${health.openTickets} ticket(s) are still open and summarize what they are about. NEVER claim all support tickets are closed when Open Support Tickets > 0.
+2. Only flag something as urgent if there is a real open ticket, high-priority alert, pending queue, or missing Gemini key. Treat unregistered batch results and legacy missing hashes as low-priority routine notes.
+
+Provide a crisp Super Admin Maintenance & Guard Report in clean, natural Bengali (\u09AC\u09BE\u0982\u09B2\u09BE) using 4-5 short bullet points formatted as "- **\u09B6\u09BF\u09B0\u09CB\u09A8\u09BE\u09AE:** \u09AC\u09BF\u09AC\u09B0\u09A3":
 - Overall platform health status
-- Any urgent faults or student complaint patterns that need immediate attention
+- Open support tickets & any urgent student complaint patterns
 - Exact recommended next actions for the Super Admin
 Keep it under 160 words. Do NOT mix Bengali and English letters inside the same word.`,
       },
