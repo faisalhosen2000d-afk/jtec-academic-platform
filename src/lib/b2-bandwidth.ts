@@ -23,16 +23,51 @@ export async function recordB2BandwidthUsage(
   fileSizeBytes: number,
 ): Promise<void> {
   if (!isB2Path(filePath)) return;
-  const safeBytes = Number.isFinite(fileSizeBytes) && fileSizeBytes > 0
-    ? Math.round(fileSizeBytes)
-    : 0;
+  const safeBytes =
+    Number.isFinite(fileSizeBytes) && fileSizeBytes > 0
+      ? Math.round(fileSizeBytes)
+      : 0;
   if (safeBytes <= 0) return;
 
+  const dayUtc = getTodayUtcDateString();
+
   try {
-    await serviceSupabase.rpc("increment_b2_daily_bandwidth", {
-      p_day_utc: getTodayUtcDateString(),
-      p_bytes: safeBytes,
-    });
+    const { error: rpcError } = await serviceSupabase.rpc(
+      "increment_b2_daily_bandwidth",
+      {
+        p_day_utc: dayUtc,
+        p_bytes: safeBytes,
+      },
+    );
+
+    if (!rpcError) return;
+
+    console.warn("[b2-bandwidth][rpc-fallback]", rpcError.message);
+
+    const { data: existing } = await serviceSupabase
+      .from("b2_daily_bandwidth")
+      .select("bytes_used, requests_count")
+      .eq("day_utc", dayUtc)
+      .maybeSingle();
+
+    const nextBytes = Number(existing?.bytes_used ?? 0) + safeBytes;
+    const nextHits = Number(existing?.requests_count ?? 0) + 1;
+
+    const { error: upsertError } = await serviceSupabase
+      .from("b2_daily_bandwidth")
+      .upsert(
+        {
+          day_utc: dayUtc,
+          bytes_used: nextBytes,
+          requests_count: nextHits,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "day_utc" },
+      );
+
+    if (upsertError) {
+      console.error("[b2-bandwidth][upsert-error]", upsertError.message);
+    }
   } catch (err) {
     console.error("[b2-bandwidth][record]", err);
   }
@@ -57,7 +92,13 @@ export async function getTodayB2BandwidthStatus(): Promise<B2BandwidthStatus> {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!supabaseUrl || !serviceKey) return empty;
 
-    const rawClient = createRawSupabaseClient(supabaseUrl, serviceKey);
+    const rawClient = createRawSupabaseClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: {
+        fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+      },
+    });
+
     const { data, error } = await rawClient
       .from("b2_daily_bandwidth")
       .select("bytes_used, requests_count")
