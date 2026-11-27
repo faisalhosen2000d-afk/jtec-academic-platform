@@ -1,4 +1,6 @@
 "use client";
+import { createPortal } from "react-dom";
+import ContactMethodQr from "./ContactMethodQr";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -7,6 +9,7 @@ import {
   ExternalLink,
   Plus,
   X,
+  Mail,
   UploadCloud,
   CheckCircle2,
   Clock,
@@ -263,6 +266,7 @@ export default function QuestionBankSection({
   const [selectedCtFilter, setSelectedCtFilter] = useState<string>("all");
   const [loadingAccessId, setLoadingAccessId] = useState<string | null>(null);
   const [activeUploaderProfile, setActiveUploaderProfile] = useState<NonNullable<QuestionBankItem["uploader"]> | null>(null);
+  const [uploaderAnchor, setUploaderAnchor] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
   const [pulsingId, setPulsingId] = useState<string | null>(null);
 
   // Google Drive-style Folder State
@@ -1364,7 +1368,12 @@ export default function QuestionBankSection({
                 {item.uploader && (
                   <button
                     type="button"
-                    onClick={() => setActiveUploaderProfile(item.uploader ?? null)}
+                    onClick={(e) => {
+                      const cardEl = (e.currentTarget.closest("div.rounded-2xl") as HTMLElement | null) ?? e.currentTarget;
+                      const rect = cardEl.getBoundingClientRect();
+                      setUploaderAnchor({ top: rect.top, left: rect.left, width: rect.width, height: rect.height });
+                      setActiveUploaderProfile(item.uploader ?? null);
+                    }}
                     className="mt-3 flex w-full cursor-pointer items-center gap-2 rounded-xl border border-slate-800/90 bg-slate-900/60 px-2.5 py-1.5 text-left transition hover:border-cyan-500/40 hover:bg-slate-900"
                   >
                     {item.uploader.avatar_url ? (
@@ -2126,73 +2135,137 @@ export default function QuestionBankSection({
         </div>
       )}
 
-      {/* Uploader Profile Modal */}
-      {activeUploaderProfile && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-          onClick={() => setActiveUploaderProfile(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl border border-slate-800 bg-[#0B1221] p-5 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                {activeUploaderProfile.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={activeUploaderProfile.avatar_url}
-                    alt={activeUploaderProfile.full_name}
-                    className="h-12 w-12 rounded-full border border-cyan-500/30 object-cover"
-                  />
-                ) : (
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/15 text-base font-bold text-cyan-200">
-                    {activeUploaderProfile.full_name.charAt(0).toUpperCase()}
-                  </span>
-                )}
-                <div>
-                  <h3 className="text-sm font-bold text-white">
-                    {activeUploaderProfile.full_name}
-                  </h3>
-                  <p className="text-xs text-slate-400">Question Contributor</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveUploaderProfile(null)}
-                className="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      {/* Uploader Profile Modal (Portal anchored smoothly to clicked card + QR Code) */}
+      {activeUploaderProfile &&
+        typeof document !== "undefined" &&
+        createPortal(
+          (() => {
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const popW = Math.min(380, vw - 24);
+            const estH = 310;
+            const rawLeft = uploaderAnchor
+              ? uploaderAnchor.left + uploaderAnchor.width / 2 - popW / 2
+              : (vw - popW) / 2;
+            const rawTop = uploaderAnchor
+              ? uploaderAnchor.top + uploaderAnchor.height / 2 - estH / 2
+              : (vh - estH) / 2;
+            const left = Math.max(12, Math.min(vw - popW - 12, rawLeft));
+            const top = Math.max(16, Math.min(vh - estH - 16, rawTop));
 
-            <div className="mt-4 space-y-2 rounded-xl border border-slate-800/90 bg-[#070D19] p-3 text-xs">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-slate-400">Student ID</span>
-                <span className="font-mono font-semibold text-white">
-                  {activeUploaderProfile.student_id || "Not set"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-slate-400">Department</span>
-                <span className="font-semibold text-cyan-300">
-                  {activeUploaderProfile.dept_name && activeUploaderProfile.dept_code
-                    ? `${activeUploaderProfile.dept_name} (${activeUploaderProfile.dept_code})`
-                    : activeUploaderProfile.dept_code || activeUploaderProfile.dept_name || "JTEC"}
-                </span>
-              </div>
-              {activeUploaderProfile.email && (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-slate-400">Email</span>
-                  <span className="truncate font-medium text-slate-200">
-                    {activeUploaderProfile.email}
-                  </span>
+            return (
+              <div
+                className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm"
+                onClick={() => {
+                  setActiveUploaderProfile(null);
+                  setUploaderAnchor(null);
+                }}
+              >
+                <style>{`
+                  @keyframes qbCardPop {
+                    from { opacity: 0; transform: scale(0.92) translateY(6px); }
+                    to { opacity: 1; transform: scale(1) translateY(0); }
+                  }
+                `}</style>
+                <div
+                  style={{
+                    position: "fixed",
+                    top: `${Math.round(top)}px`,
+                    left: `${Math.round(left)}px`,
+                    width: `${Math.round(popW)}px`,
+                    animation: "qbCardPop 0.2s cubic-bezier(0.16, 1, 0.3, 1) both",
+                  }}
+                  className="max-h-[88dvh] overflow-y-auto rounded-2xl border border-cyan-500/35 bg-[#0B1221] p-5 shadow-[0_24px_64px_rgba(0,0,0,0.85)]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-start justify-between gap-3 border-b border-slate-800/90 pb-3.5">
+                    <div className="flex min-w-0 items-center gap-3">
+                      {activeUploaderProfile.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={activeUploaderProfile.avatar_url}
+                          alt={activeUploaderProfile.full_name}
+                          className="h-12 w-12 shrink-0 rounded-full border border-cyan-500/35 object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-cyan-500/35 bg-cyan-500/15 text-base font-bold text-cyan-200">
+                          {activeUploaderProfile.full_name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-bold text-white">
+                          {activeUploaderProfile.full_name}
+                        </h3>
+                        <p className="text-xs text-slate-400">Question Contributor</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveUploaderProfile(null);
+                        setUploaderAnchor(null);
+                      }}
+                      className="cursor-pointer rounded-xl border border-slate-800 bg-[#0E172A] p-1.5 text-slate-400 transition hover:border-slate-700 hover:text-white"
+                      title="Close"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="mt-4 space-y-2.5 text-xs">
+                    <div className="space-y-2 rounded-xl border border-slate-800/90 bg-[#070D19] p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-slate-400">Student ID</span>
+                        <span className="font-mono font-semibold text-white">
+                          {activeUploaderProfile.student_id || "Not set"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-slate-400">Department</span>
+                        <span className="font-semibold text-cyan-300">
+                          {activeUploaderProfile.dept_name && activeUploaderProfile.dept_code
+                            ? `${activeUploaderProfile.dept_name} (${activeUploaderProfile.dept_code})`
+                            : activeUploaderProfile.dept_code || activeUploaderProfile.dept_name || "JTEC"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {activeUploaderProfile.email && (
+                      <div className="flex items-center justify-between gap-2.5 rounded-xl border border-slate-800/90 bg-[#0E172A] px-3 py-2.5 transition-colors hover:border-cyan-500/40">
+                        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-700/70 bg-[#0A1020]">
+                            <Mail className="h-3.5 w-3.5 text-rose-400" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <span className="block text-[10px] font-semibold uppercase leading-none text-slate-400">
+                              Email
+                            </span>
+                            <a
+                              href={`mailto:${activeUploaderProfile.email}`}
+                              className="mt-1 block truncate text-xs font-medium text-slate-100 hover:text-cyan-300 hover:underline"
+                              title={activeUploaderProfile.email}
+                            >
+                              {activeUploaderProfile.email}
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0">
+                          <ContactMethodQr
+                            label="Email"
+                            value={activeUploaderProfile.email}
+                            destination={`mailto:${activeUploaderProfile.email}`}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+              </div>
+            );
+          })(),
+          document.body,
+        )}
     </div>
   );
 }
