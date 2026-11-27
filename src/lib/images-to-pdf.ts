@@ -16,6 +16,7 @@ export type ExtractedQuestionPaper = {
     number?: string;
     text?: string;
     textAfterFigure?: string;
+    textAfterTable?: string;
     marks?: string;
     table?: string[][];
     hasFigure?: boolean;
@@ -42,7 +43,7 @@ function normalizeMathScripts(raw: string): string {
   return raw
     .replace(/[\u2080-\u208C]+/g, (m) => "_{" + Array.from(m).map((ch) => subMap[ch] ?? ch).join("") + "}")
     .replace(/[\u2070\u2074-\u207B\u207F]+/g, (m) => "^{" + Array.from(m).map((ch) => supMap[ch] ?? ch).join("") + "}")
-    .replace(/\$([^$\r\n]{1,100})\$/g, (_m, inner: string) => inner.trim())
+    .replace(/\$([^$\r\n]{1,120})\$/g, (_m, inner: string) => inner.trim())
     .replace(/\\times/g, "x")
     .replace(/\\cdot/g, ".")
     .replace(/\\pm/g, "\u00B1")
@@ -50,6 +51,8 @@ function normalizeMathScripts(raw: string): string {
     .replace(/\\geq?/g, ">=")
     .replace(/\\neq/g, "!=")
     .replace(/\\circ/g, "\u00B0")
+    .replace(/\\mu\b|\u03BC/g, "\u00B5")
+    .replace(/\\beta\b|\u03B2/g, "\u00DF")
     .replace(/\\text\{([^}]*)\}/g, "$1")
     .replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, "\\frac{$1}{$2}");
 }
@@ -60,7 +63,7 @@ type RichSegment =
 
 function parseInlineScripts(chunk: string): RichSegment[] {
   const segs: RichSegment[] = [];
-  const regex = /([A-Za-z0-9)\]])(?:_\{([^}]+)\}|_([A-Za-z0-9+-])|\^\{([^}]+)\}|\^([A-Za-z0-9+-]))/g;
+  const regex = /([A-Za-z0-9)\]\u00B5\u00DF'])(?:_\{([^}]+)\}|_([A-Za-z0-9+-])|\^\{([^}]+)\}|\^([A-Za-z0-9+-]))/g;
   let lastIdx = 0;
   let match: RegExpExecArray | null;
   while ((match = regex.exec(chunk)) !== null) {
@@ -88,13 +91,14 @@ function parseInlineScripts(chunk: string): RichSegment[] {
 }
 
 function parseRichSegments(line: string): RichSegment[] {
+  const cleanLine = line.replace(/[\r\n]+/g, " ");
   const result: RichSegment[] = [];
   const fracRegex = /\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g;
   let lastIdx = 0;
   let m: RegExpExecArray | null;
-  while ((m = fracRegex.exec(line)) !== null) {
+  while ((m = fracRegex.exec(cleanLine)) !== null) {
     if (m.index > lastIdx) {
-      result.push(...parseInlineScripts(line.slice(lastIdx, m.index)));
+      result.push(...parseInlineScripts(cleanLine.slice(lastIdx, m.index)));
     }
     result.push({
       kind: "frac",
@@ -103,8 +107,8 @@ function parseRichSegments(line: string): RichSegment[] {
     });
     lastIdx = m.index + m[0].length;
   }
-  if (lastIdx < line.length) {
-    result.push(...parseInlineScripts(line.slice(lastIdx)));
+  if (lastIdx < cleanLine.length) {
+    result.push(...parseInlineScripts(cleanLine.slice(lastIdx)));
   }
   return result;
 }
@@ -125,6 +129,16 @@ function measureRichTextWidth(line: string, font: PDFFont, size: number): number
   return total;
 }
 
+function drawSafeText(
+  page: PDFPage,
+  text: string,
+  opts: { x: number; y: number; size: number; font: PDFFont; color: ReturnType<typeof rgb> },
+): void {
+  const singleLine = text.replace(/[\r\n]+/g, " ");
+  if (!singleLine) return;
+  page.drawText(singleLine, opts);
+}
+
 function drawRichTextLine(
   page: PDFPage,
   line: string,
@@ -139,7 +153,7 @@ function drawRichTextLine(
       const dw = opts.font.widthOfTextAtSize(seg.den, fracSize);
       const boxW = Math.max(nw, dw) + 4;
       const barY = opts.y + opts.size * 0.28;
-      page.drawText(seg.num, {
+      drawSafeText(page, seg.num, {
         x: cursorX + (boxW - nw) / 2,
         y: barY + 2.0,
         size: fracSize,
@@ -152,7 +166,7 @@ function drawRichTextLine(
         thickness: 0.65,
         color: opts.color,
       });
-      page.drawText(seg.den, {
+      drawSafeText(page, seg.den, {
         x: cursorX + (boxW - dw) / 2,
         y: barY - fracSize - 1.0,
         size: fracSize,
@@ -169,7 +183,7 @@ function drawRichTextLine(
         : seg.kind === "sup"
           ? opts.size * 0.35
           : 0;
-    page.drawText(seg.text, {
+    drawSafeText(page, seg.text, {
       x: cursorX,
       y: opts.y + yOffset,
       size: drawSize,
@@ -193,9 +207,13 @@ function sanitizeForWinAnsi(text: string): string {
     .replace(/(\d+)\s*\u00B0\s*([cCfFkK])\b/g, (_, n: string, u: string) => `${n}\u00B0${u.toUpperCase()}`)
     .replace(/(\d+)\s*deg\s*([cCfFkK])\b/gi, (_, n: string, u: string) => `${n}\u00B0${u.toUpperCase()}`)
     .replace(/(\d+)\s*deg\b/gi, "$1\u00B0")
-    .replace(/[^\x20-\x7E\u00B0\u00B1\u00B2\u00B3\n]/g, " ")
+    .replace(/[^\x20-\x7E\u00B0\u00B1\u00B2\u00B3\u00B5\u00DF\n]/g, " ")
     .replace(/[ \t]+/g, " ")
     .trim();
+}
+
+function sanitizeSingleLine(text: string): string {
+  return sanitizeForWinAnsi(text).replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function wrapLines(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
@@ -507,7 +525,11 @@ export async function buildCleanQuestionPdf(
   const isSingleSheet = (sourceFiles?.length ?? 1) <= 1 && !hasTables && questions.length <= 10;
 
   const totalChars = questions.reduce(
-    (sum, q) => sum + (q.text?.length ?? 0) + (q.textAfterFigure?.length ?? 0),
+    (sum, q) =>
+      sum +
+      (q.text?.length ?? 0) +
+      (q.textAfterFigure?.length ?? 0) +
+      (q.textAfterTable?.length ?? 0),
     0,
   );
   const effectiveLoad = totalChars + figureCount * 380;
@@ -520,11 +542,11 @@ export async function buildCleanQuestionPdf(
     : 1;
 
   const marginX = isSingleSheet ? 38 : 50;
-  const marginTop = isSingleSheet ? 36 : 48;
-  const marginBottom = isSingleSheet ? 26 : 44;
+  const marginTop = isSingleSheet ? 36 : 46;
+  const marginBottom = isSingleSheet ? 26 : 42;
   const contentW = a4W - marginX * 2;
-  const bodySize = isSingleSheet ? 9.5 * scaleFactor : 10.5;
-  const lineStep = isSingleSheet ? 11.3 * scaleFactor : 14.5;
+  const bodySize = isSingleSheet ? 9.5 * scaleFactor : 10.2;
+  const lineStep = isSingleSheet ? 11.3 * scaleFactor : 14.0;
   const questionTextMaxW = contentW - 10;
 
   let page = pdfDoc.addPage([a4W, a4H]);
@@ -538,14 +560,14 @@ export async function buildCleanQuestionPdf(
   };
 
   // 1. Centered University / College Headers
-  const headers = (extracted.headers ?? []).map(sanitizeForWinAnsi).filter(Boolean);
+  const headers = (extracted.headers ?? []).map(sanitizeSingleLine).filter(Boolean);
   headers.forEach((line, idx) => {
-    const size = idx === 0 ? (isSingleSheet ? 12.5 : 13.5) : isSingleSheet ? 9.7 : 11;
+    const size = idx === 0 ? (isSingleSheet ? 12.5 : 13.5) : isSingleSheet ? 9.7 : 10.8;
     const wrapped = wrapLines(line, fontBold, size, contentW);
     for (const wLine of wrapped) {
       ensureSpace(size + 3);
       const w = fontBold.widthOfTextAtSize(wLine, size);
-      page.drawText(wLine, {
+      drawSafeText(page, wLine, {
         x: Math.max(marginX, (a4W - w) / 2),
         y,
         size,
@@ -559,13 +581,13 @@ export async function buildCleanQuestionPdf(
   y -= 1.5;
 
   // 2. Time (left) & Full Marks (right)
-  const timeStr = sanitizeForWinAnsi(extracted.time ?? "");
-  const marksStr = sanitizeForWinAnsi(extracted.marks ?? "");
+  const timeStr = sanitizeSingleLine(extracted.time ?? "");
+  const marksStr = sanitizeSingleLine(extracted.marks ?? "");
   if (timeStr || marksStr) {
     ensureSpace(14);
-    const metaSize = isSingleSheet ? 9.5 : 10.5;
+    const metaSize = isSingleSheet ? 9.5 : 10.2;
     if (timeStr) {
-      page.drawText(timeStr, {
+      drawSafeText(page, timeStr, {
         x: marginX,
         y,
         size: metaSize,
@@ -575,7 +597,7 @@ export async function buildCleanQuestionPdf(
     }
     if (marksStr) {
       const mw = fontBold.widthOfTextAtSize(marksStr, metaSize);
-      page.drawText(marksStr, {
+      drawSafeText(page, marksStr, {
         x: a4W - marginX - mw,
         y,
         size: metaSize,
@@ -587,10 +609,10 @@ export async function buildCleanQuestionPdf(
   }
 
   // 3. Centered Bold Exam Instructions
-  const rawInstructions = (extracted.instructions ?? []).map(sanitizeForWinAnsi).filter(Boolean);
+  const rawInstructions = (extracted.instructions ?? []).map(sanitizeSingleLine).filter(Boolean);
   for (const inst of rawInstructions) {
     if (/^part\s*:\s*[a-z]$/i.test(inst)) continue;
-    const instSize = isSingleSheet ? 9.3 : 10.2;
+    const instSize = isSingleSheet ? 9.3 : 10.0;
     const lines = wrapLines(inst, fontBold, instSize, contentW);
     for (const ln of lines) {
       ensureSpace(instSize + 2.5);
@@ -613,7 +635,7 @@ export async function buildCleanQuestionPdf(
       const isBoldNumberPrefix = idx === 0 && qNum.length > 0 && fl.text.startsWith(qNum);
       if (isBoldNumberPrefix) {
         const rest = fl.text.slice(qNum.length);
-        page.drawText(qNum, {
+        drawSafeText(page, qNum, {
           x: marginX + fl.indent,
           y,
           size: bodySize,
@@ -641,22 +663,21 @@ export async function buildCleanQuestionPdf(
     });
   };
 
-  // Track which user-uploaded close-up figure snips have been placed
   const usedSnipIndices = new Set<number>();
 
-  // 4. Questions with Centered Part Headers, Indented Sub-questions, Inline Diagrams, and Bottom-Right Marks
+  // 4. Questions with Centered Part Headers, Indented Sub-questions, Inline Diagrams, Tables, and Bottom-Right Marks
   for (let qIdx = 0; qIdx < questions.length; qIdx++) {
     const q = questions[qIdx]!;
     const secHeaders: string[] = Array.isArray(q.sectionHeader)
-      ? q.sectionHeader.map(sanitizeForWinAnsi).filter(Boolean)
+      ? q.sectionHeader.map(sanitizeSingleLine).filter(Boolean)
       : [];
 
     let qText = sanitizeForWinAnsi(q.text ?? "");
     let qAfterText = sanitizeForWinAnsi(q.textAfterFigure ?? "");
-    const qNum = sanitizeForWinAnsi(q.number ?? "");
-    const qMarks = sanitizeForWinAnsi(q.marks ?? "");
+    const qAfterTableText = sanitizeForWinAnsi(q.textAfterTable ?? "");
+    const qNum = sanitizeSingleLine(q.number ?? "");
+    const qMarks = sanitizeSingleLine(q.marks ?? "");
 
-    // Match user-provided close-up figure snip for this question (by Q# or auto order)
     const qDigits = qNum.replace(/[^0-9]/g, "");
     let matchedSnipIdx = -1;
     if (qDigits) {
@@ -674,7 +695,6 @@ export async function buildCleanQuestionPdf(
     const matchedSnip = matchedSnipIdx >= 0 ? userFigList[matchedSnipIdx] : undefined;
     if (matchedSnipIdx >= 0) usedSnipIndices.add(matchedSnipIdx);
 
-    // Safety fallback: if a question has a figure (AI box OR user snip) and "(b) ..." was kept inside qText after "(a) ... figure:", split it below the figure
     if ((q.figureBox || matchedSnip) && !qAfterText && /\(a\)[\s\S]*?(?:figure|diagram|sketch)[\s\S]*?\n\s*\(b\)/i.test(qText)) {
       const splitMatch = qText.match(/^([\s\S]*?)\n\s*(\(b\)[\s\S]*)$/i);
       if (splitMatch) {
@@ -688,8 +708,8 @@ export async function buildCleanQuestionPdf(
     );
     if (embeddedPartMatch) {
       if (secHeaders.length === 0) {
-        if (embeddedPartMatch[1]) secHeaders.push(embeddedPartMatch[1].trim());
-        if (embeddedPartMatch[2]) secHeaders.push(embeddedPartMatch[2].trim());
+        if (embeddedPartMatch[1]) secHeaders.push(sanitizeSingleLine(embeddedPartMatch[1]));
+        if (embeddedPartMatch[2]) secHeaders.push(sanitizeSingleLine(embeddedPartMatch[2]));
       }
       qText = (embeddedPartMatch[3] ?? "").trim();
     }
@@ -700,8 +720,8 @@ export async function buildCleanQuestionPdf(
     const nextQuestionExtraHeader: string[] = [];
     if (trailingPartMatch) {
       qText = (trailingPartMatch[1] ?? "").trim();
-      if (trailingPartMatch[2]) nextQuestionExtraHeader.push(trailingPartMatch[2].trim());
-      if (trailingPartMatch[3]) nextQuestionExtraHeader.push(trailingPartMatch[3].trim());
+      if (trailingPartMatch[2]) nextQuestionExtraHeader.push(sanitizeSingleLine(trailingPartMatch[2]));
+      if (trailingPartMatch[3]) nextQuestionExtraHeader.push(sanitizeSingleLine(trailingPartMatch[3]));
     }
     if (nextQuestionExtraHeader.length > 0 && questions[qIdx + 1]) {
       const nextQ = questions[qIdx + 1]!;
@@ -710,11 +730,11 @@ export async function buildCleanQuestionPdf(
 
     if (secHeaders.length > 0) {
       y -= 2.5;
-      const partSize = isSingleSheet ? 9.4 : 10.5;
+      const partSize = isSingleSheet ? 9.4 : 10.2;
       for (const sh of secHeaders) {
         ensureSpace(partSize + 3);
         const sw = fontBold.widthOfTextAtSize(sh, partSize);
-        page.drawText(sh, {
+        drawSafeText(page, sh, {
           x: Math.max(marginX, (a4W - sw) / 2),
           y,
           size: partSize,
@@ -726,7 +746,7 @@ export async function buildCleanQuestionPdf(
       y -= 1;
     }
 
-    if (!qNum && !qText && !qAfterText && (!q.table || q.table.length === 0) && !q.figureBox && !matchedSnip) continue;
+    if (!qNum && !qText && !qAfterText && !qAfterTableText && (!q.table || q.table.length === 0) && !q.figureBox && !matchedSnip) continue;
 
     const beforeLines = layoutQuestionParagraphs(
       qNum,
@@ -745,8 +765,9 @@ export async function buildCleanQuestionPdf(
 
     drawQuestionLineBlock(beforeLines, qNum);
     let lastRenderedLines = beforeLines;
+    let renderedBlockBelowText = false;
 
-    // Render diagram: prefer user's high-res close-up screenshot if attached, otherwise AI cropped figureBox
+    // Render diagram if present
     let figBytes: Uint8Array | null = null;
     if (matchedSnip) {
       figBytes = await cleanFullFigureFilePng(matchedSnip.file);
@@ -778,6 +799,7 @@ export async function buildCleanQuestionPdf(
         height: drawH,
       });
       y -= drawH + 5;
+      renderedBlockBelowText = true;
     }
 
     // Render sub-questions that appear BELOW the diagram
@@ -798,6 +820,112 @@ export async function buildCleanQuestionPdf(
       drawQuestionLineBlock(afterLines, "");
       if (afterLines.length > 0) {
         lastRenderedLines = afterLines;
+        renderedBlockBelowText = false;
+      }
+    }
+
+    // Render bordered grid table if present (BEFORE qMarks so marks sit cleanly below table)
+    if (Array.isArray(q.table) && q.table.length > 0) {
+      const cleanRows = q.table
+        .map((row) => row.map((cell) => sanitizeSingleLine(String(cell ?? ""))))
+        .filter((row) => row.some((cell) => cell.length > 0));
+
+      if (cleanRows.length > 0) {
+        const colCount = Math.max(...cleanRows.map((r) => r.length));
+        const tableLeft = marginX + 14;
+        const tableW = contentW - 14;
+        const firstColW = Math.min(155, Math.max(95, tableW * 0.24));
+        const otherColW = colCount > 1 ? (tableW - firstColW) / (colCount - 1) : tableW;
+
+        const getColX = (cIdx: number) =>
+          tableLeft + (cIdx === 0 ? 0 : firstColW + (cIdx - 1) * otherColW);
+        const getColW = (cIdx: number) =>
+          colCount === 1 ? tableW : cIdx === 0 ? firstColW : otherColW;
+
+        const cellFontSize = colCount >= 7 ? 8.8 : 9.4;
+        const cellLineH = cellFontSize + 2.5;
+
+        // Pre-wrap every cell so multi-word headers like "Marks in mathematics" never overflow borders
+        const wrappedGrid = cleanRows.map((row, rIdx) => {
+          let maxLinesInRow = 1;
+          const cells = Array.from({ length: colCount }, (_, cIdx) => {
+            const rawCell = row[cIdx] ?? "";
+            const f = cIdx === 0 || rIdx === 0 ? fontBold : fontRegular;
+            const availW = Math.max(20, getColW(cIdx) - 8);
+            const lines = rawCell ? wrapLines(rawCell, f, cellFontSize, availW) : [];
+            if (lines.length > maxLinesInRow) maxLinesInRow = lines.length;
+            return { lines, font: f };
+          });
+          const rowH = Math.max(18, maxLinesInRow * cellLineH + 6);
+          return { cells, rowH };
+        });
+
+        const totalTableH = wrappedGrid.reduce((acc, r) => acc + r.rowH, 0);
+        ensureSpace(totalTableH + 10);
+
+        let curTopY = y + 1;
+        for (const rObj of wrappedGrid) {
+          const rowBot = curTopY - rObj.rowH;
+          for (let cIdx = 0; cIdx < colCount; cIdx++) {
+            const cellX = getColX(cIdx);
+            const cellW = getColW(cIdx);
+            const cell = rObj.cells[cIdx]!;
+
+            page.drawRectangle({
+              x: cellX,
+              y: rowBot,
+              width: cellW,
+              height: rObj.rowH,
+              borderColor: rgb(0.15, 0.17, 0.22),
+              borderWidth: 0.7,
+            });
+
+            if (cell.lines.length > 0) {
+              const blockH = cell.lines.length * cellLineH;
+              let textY = rowBot + (rObj.rowH + blockH) / 2 - cellFontSize + 1;
+              for (const ln of cell.lines) {
+                const tw = cell.font.widthOfTextAtSize(ln, cellFontSize);
+                const tx =
+                  cIdx === 0
+                    ? cellX + 5
+                    : cellX + Math.max(3, (cellW - tw) / 2);
+                drawSafeText(page, ln, {
+                  x: tx,
+                  y: textY,
+                  size: cellFontSize,
+                  font: cell.font,
+                  color: rgb(0.05, 0.05, 0.07),
+                });
+                textY -= cellLineH;
+              }
+            }
+          }
+          curTopY = rowBot;
+        }
+        y = curTopY - 6;
+        renderedBlockBelowText = true;
+      }
+    }
+
+    // Render text that appears BELOW a table (e.g. Q3(c) "Find out the value..." or Q8(c) "(Where the tabulated...")
+    if (qAfterTableText) {
+      const afterTblLines = layoutQuestionParagraphs(
+        "",
+        qAfterTableText,
+        fontRegular,
+        bodySize,
+        questionTextMaxW,
+        true,
+      );
+      const afterTblH = afterTblLines.reduce(
+        (acc, fl) => acc + (fl.hasFrac ? lineStep + 5 : lineStep),
+        0,
+      );
+      ensureSpace(Math.max(14, afterTblH));
+      drawQuestionLineBlock(afterTblLines, "");
+      if (afterTblLines.length > 0) {
+        lastRenderedLines = afterTblLines;
+        renderedBlockBelowText = false;
       }
     }
 
@@ -808,9 +936,10 @@ export async function buildCleanQuestionPdf(
       const lastLineEndX = lastLine
         ? marginX + lastLine.indent + measureRichTextWidth(lastLine.text, fontRegular, bodySize)
         : 0;
-      const fitsOnLastLine = lastLine && lastLineEndX + 14 < a4W - marginX - mw;
+      const fitsOnLastLine =
+        !renderedBlockBelowText && lastLine && lastLineEndX + 14 < a4W - marginX - mw;
       const markY = fitsOnLastLine ? y + lineStep : y + 1.5;
-      page.drawText(qMarks, {
+      drawSafeText(page, qMarks, {
         x: a4W - marginX - mw,
         y: markY,
         size: bodySize,
@@ -822,75 +951,15 @@ export async function buildCleanQuestionPdf(
       }
     }
 
-    y -= isSingleSheet ? 6.5 : 9;
-
-    // Render bordered grid table if present
-    if (Array.isArray(q.table) && q.table.length > 0) {
-      const cleanRows = q.table
-        .map((row) => row.map((cell) => sanitizeForWinAnsi(String(cell ?? ""))))
-        .filter((row) => row.some((cell) => cell.length > 0));
-
-      if (cleanRows.length > 0) {
-        const colCount = Math.max(...cleanRows.map((r) => r.length));
-        const rowH = 21;
-        const tableH = cleanRows.length * rowH;
-        ensureSpace(tableH + 12);
-
-        const firstColW = Math.min(165, Math.max(115, contentW * 0.28));
-        const otherColW = colCount > 1 ? (contentW - firstColW) / (colCount - 1) : contentW;
-
-        const getColX = (cIdx: number) =>
-          marginX + (cIdx === 0 ? 0 : firstColW + (cIdx - 1) * otherColW);
-        const getColW = (cIdx: number) =>
-          colCount === 1 ? contentW : cIdx === 0 ? firstColW : otherColW;
-
-        const topY = y + 2;
-        for (let rIdx = 0; rIdx < cleanRows.length; rIdx++) {
-          const rowTop = topY - rIdx * rowH;
-          const rowBot = rowTop - rowH;
-          const row = cleanRows[rIdx] ?? [];
-
-          for (let cIdx = 0; cIdx < colCount; cIdx++) {
-            const cellX = getColX(cIdx);
-            const cellW = getColW(cIdx);
-            const cellText = row[cIdx] ?? "";
-            const f = cIdx === 0 || rIdx === 0 ? fontBold : fontRegular;
-            const fontSize = cellW < 45 ? 9.5 : 10;
-
-            page.drawRectangle({
-              x: cellX,
-              y: rowBot,
-              width: cellW,
-              height: rowH,
-              borderColor: rgb(0.2, 0.22, 0.28),
-              borderWidth: 0.75,
-            });
-
-            if (cellText) {
-              const tw = f.widthOfTextAtSize(cellText, fontSize);
-              const tx = cellX + Math.max(4, (cellW - tw) / 2);
-              const ty = rowBot + (rowH - fontSize) / 2 + 1.5;
-              page.drawText(cellText, {
-                x: tx,
-                y: ty,
-                size: fontSize,
-                font: f,
-                color: rgb(0.06, 0.06, 0.08),
-              });
-            }
-          }
-        }
-        y = topY - tableH - 10;
-      }
-    }
+    y -= isSingleSheet ? 6.5 : 8.5;
   }
 
   // Optional centered footer
-  const footerStr = sanitizeForWinAnsi(extracted.footer ?? "");
+  const footerStr = sanitizeSingleLine(extracted.footer ?? "");
   if (footerStr) {
     const fw = fontBold.widthOfTextAtSize(footerStr, 9.5);
     const footerY = Math.max(16, y - 2);
-    page.drawText(footerStr, {
+    drawSafeText(page, footerStr, {
       x: Math.max(marginX, (a4W - fw) / 2),
       y: footerY,
       size: 9.5,

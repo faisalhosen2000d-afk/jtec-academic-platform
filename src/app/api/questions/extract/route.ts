@@ -30,7 +30,10 @@ LAYOUT & FORMATTING RULES:
    - Write stacked fractions using \frac{numerator}{denominator}, e.g. \frac{24x27}{65x60}.
    - Write subscripts as D_{7}, H_{2}O and superscripts as mm^{2}, m^{2}, 10^{-3}.
    - Use proper degree symbols like °C or °F and standard symbols (-, +, x, =, <=, >=, %). Do NOT wrap formulas in $...$ delimiters.
-8. If a question contains any data table / chart of numbers, put it in the "table" 2D array (rows of cells) on that question object.
+8. Data Tables:
+   - If a question contains a data table / chart of numbers, put it in the "table" 2D array (rows of cells) on that question object (do NOT put "\n" inside table cells).
+   - If a sub-question or sentence appears BELOW the table (e.g. "Find out the value of Standard Deviation..." or "(Where the tabulated chi-squared value...)"), put it in "textAfterTable" on that question object!
+   - Preserve Greek symbols like \mu and \beta (e.g. \mu'_{4}, \beta_{1}, \beta_{2}).
 9. "footer": If there is a centered ending mark at the bottom (e.g. "** ** ** **"), include it; otherwise omit.
 
 Return strictly valid JSON with this exact structure:
