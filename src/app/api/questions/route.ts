@@ -6,29 +6,17 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import {
   createB2UploadPresignedUrl,
-  isB2Configured,
+  createR2UploadPresignedUrl,
   removeMaterialObject,
+  resolveTargetStorageProvider,
 } from "@/lib/material-storage";
+import { getActivePlatformSettings } from "@/lib/platform-settings";
+import { getTodayB2BandwidthStatus } from "@/lib/b2-bandwidth";
 
 function getRawClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   return createRawSupabaseClient(url, key);
-}
-
-async function getStorageProvider(): Promise<"b2" | "supabase"> {
-  try {
-    const raw = getRawClient();
-    const { data } = await raw
-      .from("platform_settings")
-      .select("material_storage_provider")
-      .eq("id", 1)
-      .maybeSingle();
-    const prov = (data as { material_storage_provider?: string } | null)?.material_storage_provider;
-    return prov === "supabase" ? "supabase" : "b2";
-  } catch {
-    return "b2";
-  }
 }
 
 export async function POST(request: Request) {
@@ -148,8 +136,33 @@ export async function POST(request: Request) {
     const filePath = String(body?.file_path ?? "").trim() || defaultPath;
 
     if (action === "prepare") {
-      const storageProvider = await getStorageProvider();
-      if (storageProvider === "b2" && isB2Configured()) {
+      const [platformSettings, b2Bandwidth] = await Promise.all([
+        getActivePlatformSettings(),
+        getTodayB2BandwidthStatus().catch(() => null),
+      ]);
+
+      const resolved = await resolveTargetStorageProvider({
+        rule: platformSettings.storage_routing_rules.questions,
+        fileSizeBytes: fileSize,
+        b2DailyBandwidthPercent: b2Bandwidth?.percentUsed ?? 0,
+      });
+
+      if (resolved.provider === "r2") {
+        const r2Prep = await createR2UploadPresignedUrl(defaultPath, "application/pdf");
+        if (r2Prep) {
+          return NextResponse.json({
+            success: true,
+            itemId,
+            filePath: r2Prep.storagePath,
+            uploadUrl: r2Prep.uploadUrl,
+            storageProvider: "r2",
+            routingReason: resolved.reason,
+            fallbackTriggered: resolved.fallbackTriggered,
+          });
+        }
+      }
+
+      if (resolved.provider === "b2") {
         const b2Prep = await createB2UploadPresignedUrl(defaultPath, "application/pdf");
         if (b2Prep) {
           return NextResponse.json({
@@ -158,6 +171,8 @@ export async function POST(request: Request) {
             filePath: b2Prep.storagePath,
             uploadUrl: b2Prep.uploadUrl,
             storageProvider: "b2",
+            routingReason: resolved.reason,
+            fallbackTriggered: resolved.fallbackTriggered,
           });
         }
       }
@@ -167,11 +182,17 @@ export async function POST(request: Request) {
         itemId,
         filePath: defaultPath,
         storageProvider: "supabase",
+        routingReason: resolved.reason,
+        fallbackTriggered: resolved.fallbackTriggered,
       });
     }
 
     const expectedPrefix = `questions/${subject.department_id}/${subject.term_id}/${subject.id}/${itemId}/`;
-    if (!filePath.startsWith(expectedPrefix) && !filePath.startsWith(`b2://${expectedPrefix}`)) {
+    if (
+      !filePath.startsWith(expectedPrefix) &&
+      !filePath.startsWith(`b2://${expectedPrefix}`) &&
+      !filePath.startsWith(`r2://${expectedPrefix}`)
+    ) {
       return NextResponse.json({ error: "Invalid question file path." }, { status: 400 });
     }
 

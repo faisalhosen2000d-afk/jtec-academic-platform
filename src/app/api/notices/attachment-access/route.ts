@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createMaterialSignedUrl } from "@/lib/material-storage";
+import { recordB2BandwidthUsage } from "@/lib/b2-bandwidth";
 
 type AttachmentAccessRequest = {
   attachmentId: string;
@@ -47,67 +49,45 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Authentication is required.",
-        },
+        { success: false, error: "Authentication is required." },
         { status: 401 },
       );
     }
 
     let body: unknown;
-
     try {
       body = await request.json();
     } catch {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid JSON request body.",
-        },
+        { success: false, error: "Invalid JSON request body." },
         { status: 400 },
       );
     }
 
     if (!isValidRequest(body)) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid attachment access request.",
-        },
+        { success: false, error: "Invalid attachment access request." },
         { status: 400 },
       );
     }
 
     const serviceSupabase = createServiceRoleClient();
 
-    const { data: profile, error: profileError } =
-      await serviceSupabase
-        .from("profiles")
-        .select("id, role, is_verified")
-        .eq("id", user.id)
-        .maybeSingle();
+    const { data: profile, error: profileError } = await serviceSupabase
+      .from("profiles")
+      .select("id, role, is_verified")
+      .eq("id", user.id)
+      .maybeSingle();
 
     if (profileError) {
-      console.error(
-        "[api/notices/attachment-access][profile]",
-        profileError,
-      );
-
+      console.error("[api/notices/attachment-access][profile]", profileError);
       return NextResponse.json(
-        {
-          success: false,
-          error: "Unable to verify your account.",
-        },
+        { success: false, error: "Unable to verify your account." },
         { status: 500 },
       );
     }
 
-    if (
-      !profile ||
-      profile.role !== "student" ||
-      profile.is_verified !== true
-    ) {
+    if (!profile || profile.role !== "student" || profile.is_verified !== true) {
       return NextResponse.json(
         {
           success: false,
@@ -117,59 +97,38 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: attachment, error: attachmentError } =
-      await serviceSupabase
-        .from("notice_attachments")
-        .select(
-          "id, notice_id, file_path, file_type, file_size_bytes",
-        )
-        .eq("id", body.attachmentId)
-        .maybeSingle();
+    const { data: attachment, error: attachmentError } = await serviceSupabase
+      .from("notice_attachments")
+      .select("id, notice_id, file_path, file_type, file_size_bytes")
+      .eq("id", body.attachmentId)
+      .maybeSingle();
 
     if (attachmentError) {
-      console.error(
-        "[api/notices/attachment-access][attachment]",
-        attachmentError,
-      );
-
+      console.error("[api/notices/attachment-access][attachment]", attachmentError);
       return NextResponse.json(
-        {
-          success: false,
-          error: "Unable to load the notice attachment.",
-        },
+        { success: false, error: "Unable to load the notice attachment." },
         { status: 500 },
       );
     }
 
     if (!attachment) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Notice attachment could not be found.",
-        },
+        { success: false, error: "Notice attachment could not be found." },
         { status: 404 },
       );
     }
 
-    const { data: visibleNotice, error: noticeError } =
-      await supabase
-        .from("notices")
-        .select("id")
-        .eq("id", attachment.notice_id)
-        .eq("is_archived", false)
-        .maybeSingle();
+    const { data: visibleNotice, error: noticeError } = await supabase
+      .from("notices")
+      .select("id")
+      .eq("id", attachment.notice_id)
+      .eq("is_archived", false)
+      .maybeSingle();
 
     if (noticeError) {
-      console.error(
-        "[api/notices/attachment-access][notice]",
-        noticeError,
-      );
-
+      console.error("[api/notices/attachment-access][notice]", noticeError);
       return NextResponse.json(
-        {
-          success: false,
-          error: "Unable to verify notice access.",
-        },
+        { success: false, error: "Unable to verify notice access." },
         { status: 500 },
       );
     }
@@ -184,17 +143,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: signedUrlData, error: signedUrlError } =
-      await serviceSupabase.storage
-        .from("notice-attachments")
-        .createSignedUrl(attachment.file_path, 300);
+    const signedUrl = await createMaterialSignedUrl(
+      serviceSupabase,
+      attachment.file_path,
+      300,
+      { supabaseBucket: "notice-attachments" },
+    );
 
-    if (signedUrlError || !signedUrlData?.signedUrl) {
-      console.error(
-        "[api/notices/attachment-access][signed-url]",
-        signedUrlError,
-      );
-
+    if (!signedUrl) {
+      console.error("[api/notices/attachment-access][signed-url]", {
+        attachmentId: attachment.id,
+      });
       return NextResponse.json(
         {
           success: false,
@@ -204,63 +163,49 @@ export async function POST(request: Request) {
       );
     }
 
+    await recordB2BandwidthUsage(
+      serviceSupabase,
+      attachment.file_path,
+      Number(attachment.file_size_bytes ?? 0),
+    );
+
     if (body.action === "download") {
-      const fileResponse = await fetch(signedUrlData.signedUrl);
+      const fileResponse = await fetch(signedUrl);
 
       if (!fileResponse.ok || !fileResponse.body) {
         console.error(
           "[api/notices/attachment-access][download]",
           fileResponse.status,
         );
-
         return NextResponse.json(
-          {
-            success: false,
-            error: "Unable to download the notice attachment.",
-          },
+          { success: false, error: "Unable to download the notice attachment." },
           { status: 500 },
         );
       }
 
       const fileName = getFileName(attachment.file_path);
-
       const headers = new Headers();
-
       headers.set(
         "Content-Type",
         attachment.file_type || "application/octet-stream",
       );
-
-      headers.set(
-        "Content-Disposition",
-        `attachment; filename="${fileName}"`,
-      );
-
+      headers.set("Content-Disposition", `attachment; filename="${fileName}"`);
       headers.set("Cache-Control", "private, no-store");
 
       const contentLength = fileResponse.headers.get("content-length");
-
       if (contentLength) {
         headers.set("Content-Length", contentLength);
       }
 
-      return new Response(fileResponse.body, {
-        status: 200,
-        headers,
-      });
+      return new Response(fileResponse.body, { status: 200, headers });
     }
 
     return NextResponse.json(
-      {
-        success: true,
-        action: body.action,
-        url: signedUrlData.signedUrl,
-      },
+      { success: true, action: body.action, url: signedUrl },
       { status: 200 },
     );
   } catch (error) {
     console.error("[api/notices/attachment-access]", error);
-
     return NextResponse.json(
       {
         success: false,

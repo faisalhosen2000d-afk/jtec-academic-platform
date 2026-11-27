@@ -353,11 +353,68 @@ export async function createR2UploadPresignedUrl(
   };
 }
 
+export async function uploadBufferToStorage(
+  serviceSupabase: SupabaseClient,
+  params: {
+    objectKey: string;
+    buffer: Buffer;
+    contentType: string;
+    provider: ResolvedStorageProvider;
+    supabaseBucket?: string;
+  },
+): Promise<{ storagePath: string } | null> {
+  const { objectKey, buffer, contentType, provider, supabaseBucket = SUPABASE_BUCKET } = params;
+  const cleanKey = normalizeMaterialKey(objectKey);
+
+  if (provider === "r2") {
+    const r2 = getR2Client();
+    if (!r2) return null;
+    await r2.client.send(
+      new PutObjectCommand({
+        Bucket: r2.bucket,
+        Key: cleanKey,
+        Body: buffer,
+        ContentType: contentType || "application/octet-stream",
+      }),
+    );
+    invalidateR2UsageCache();
+    return { storagePath: `${R2_PREFIX}${cleanKey}` };
+  }
+
+  if (provider === "b2") {
+    const b2 = getB2Client();
+    if (!b2) return null;
+    await b2.client.send(
+      new PutObjectCommand({
+        Bucket: b2.bucket,
+        Key: cleanKey,
+        Body: buffer,
+        ContentType: contentType || "application/octet-stream",
+      }),
+    );
+    return { storagePath: `${B2_PREFIX}${cleanKey}` };
+  }
+
+  const { error } = await serviceSupabase.storage
+    .from(supabaseBucket)
+    .upload(cleanKey, buffer, {
+      contentType: contentType || "application/octet-stream",
+      upsert: false,
+    });
+
+  if (error) {
+    console.error(`[storage] Supabase upload error (${supabaseBucket}):`, error);
+    return null;
+  }
+
+  return { storagePath: cleanKey };
+}
+
 export async function createMaterialSignedUrl(
   serviceSupabase: SupabaseClient,
   filePath: string,
   expiresInSeconds = 300,
-  options?: { download?: boolean },
+  options?: { download?: boolean; supabaseBucket?: string },
 ): Promise<string | null> {
   if (isR2Path(filePath)) {
     const r2 = getR2Client();
@@ -398,8 +455,9 @@ export async function createMaterialSignedUrl(
   }
 
   const normalizedPath = normalizeMaterialKey(filePath);
+  const bucket = options?.supabaseBucket || SUPABASE_BUCKET;
   const { data, error } = await serviceSupabase.storage
-    .from(SUPABASE_BUCKET)
+    .from(bucket)
     .createSignedUrl(normalizedPath, expiresInSeconds, {
       ...(options?.download ? { download: true } : {}),
     });
@@ -411,6 +469,7 @@ export async function createMaterialSignedUrl(
 export async function downloadMaterialBuffer(
   serviceSupabase: SupabaseClient,
   filePath: string,
+  supabaseBucket = SUPABASE_BUCKET,
 ): Promise<Buffer | null> {
   if (isR2Path(filePath)) {
     const r2 = getR2Client();
@@ -448,7 +507,7 @@ export async function downloadMaterialBuffer(
 
   const normalizedPath = normalizeMaterialKey(filePath);
   const { data: fileBlob, error } = await serviceSupabase.storage
-    .from(SUPABASE_BUCKET)
+    .from(supabaseBucket)
     .download(normalizedPath);
 
   if (error || !fileBlob) return null;
@@ -458,6 +517,7 @@ export async function downloadMaterialBuffer(
 export async function removeMaterialObject(
   serviceSupabase: SupabaseClient,
   filePath: string,
+  supabaseBucket = SUPABASE_BUCKET,
 ): Promise<void> {
   if (!filePath) return;
 
@@ -521,12 +581,13 @@ export async function removeMaterialObject(
   }
 
   const normalizedPath = normalizeMaterialKey(filePath);
-  await serviceSupabase.storage.from(SUPABASE_BUCKET).remove([normalizedPath]);
+  await serviceSupabase.storage.from(supabaseBucket).remove([normalizedPath]);
 }
 
 export async function checkMaterialObjectExists(
   serviceSupabase: SupabaseClient,
   filePath: string,
+  supabaseBucket = SUPABASE_BUCKET,
 ): Promise<boolean> {
   if (!filePath) return false;
 
@@ -574,7 +635,7 @@ export async function checkMaterialObjectExists(
     ? cleanPath.slice(cleanPath.lastIndexOf("/") + 1)
     : cleanPath;
   const { data: listed } = await serviceSupabase.storage
-    .from(SUPABASE_BUCKET)
+    .from(supabaseBucket)
     .list(folder, { search: fileName, limit: 5 });
 
   return Boolean(listed && listed.some((f) => f.name === fileName));

@@ -4,6 +4,13 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { getActivePlatformSettings } from "@/lib/platform-settings";
+import { getTodayB2BandwidthStatus } from "@/lib/b2-bandwidth";
+import {
+  removeMaterialObject,
+  resolveTargetStorageProvider,
+  uploadBufferToStorage,
+} from "@/lib/material-storage";
 
 export type NoticeActionResult =
   | {
@@ -26,10 +33,6 @@ export async function publishNotice(
   try {
     const supabase = await createClient();
 
-    // --------------------------------------------------
-    // 1. Authentication
-    // --------------------------------------------------
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -40,10 +43,6 @@ export async function publishNotice(
         error: "You must be logged in to publish a notice.",
       };
     }
-
-    // --------------------------------------------------
-    // 2. Get current user's role
-    // --------------------------------------------------
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -65,7 +64,6 @@ export async function publishNotice(
       };
     }
 
-    // --------------------------------------------------
     let publisherDepartmentName: string | null = null;
 
     if (profile.department_id) {
@@ -78,86 +76,29 @@ export async function publishNotice(
       publisherDepartmentName = publisherDepartment?.name ?? null;
     }
 
-    // 3. Read form fields
-    // --------------------------------------------------
-
     const title = String(formData.get("title") ?? "").trim();
     const content = String(formData.get("content") ?? "").trim();
-
-    const categoryId = nullableValue(
-      formData.get("category_id"),
-    );
-
-    const customCategoryName = nullableValue(
-      formData.get("custom_category"),
-    );
-
-    const departmentId = nullableValue(
-      formData.get("target_department_id"),
-    );
-
-    const batchId = nullableValue(
-      formData.get("target_batch_id"),
-    );
-
-    const levelId = nullableValue(
-      formData.get("target_level_id"),
-    );
-
-    const termId = nullableValue(
-      formData.get("target_term_id"),
-    );
-
-    const isPinned =
-      formData.get("is_pinned") === "on";
-
+    const categoryId = nullableValue(formData.get("category_id"));
+    const customCategoryName = nullableValue(formData.get("custom_category"));
+    const departmentId = nullableValue(formData.get("target_department_id"));
+    const batchId = nullableValue(formData.get("target_batch_id"));
+    const levelId = nullableValue(formData.get("target_level_id"));
+    const termId = nullableValue(formData.get("target_term_id"));
+    const isPinned = formData.get("is_pinned") === "on";
     const attachmentEntry = formData.get("attachment");
 
     const attachment =
-      attachmentEntry instanceof File &&
-      attachmentEntry.size > 0
+      attachmentEntry instanceof File && attachmentEntry.size > 0
         ? attachmentEntry
         : null;
 
-    // --------------------------------------------------
-    // 4. Basic validation
-    // --------------------------------------------------
-
-    if (!title) {
-      return {
-        success: false,
-        error: "Notice title is required.",
-      };
-    }
-
-    if (title.length > 300) {
-      return {
-        success: false,
-        error: "Notice title is too long.",
-      };
-    }
-
-    if (!content) {
-      return {
-        success: false,
-        error: "Notice content is required.",
-      };
-    }
-
-    if (content.length > 20000) {
-      return {
-        success: false,
-        error: "Notice content is too long.",
-      };
-    }
-
-    // --------------------------------------------------
-    // 4A. Validate Attachment
-    // --------------------------------------------------
+    if (!title) return { success: false, error: "Notice title is required." };
+    if (title.length > 300) return { success: false, error: "Notice title is too long." };
+    if (!content) return { success: false, error: "Notice content is required." };
+    if (content.length > 20000) return { success: false, error: "Notice content is too long." };
 
     if (attachment) {
       const maxAttachmentSize = 100 * 1024 * 1024;
-
       const allowedMimeTypes = new Set([
         "application/pdf",
         "image/jpeg",
@@ -165,7 +106,6 @@ export async function publishNotice(
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ]);
-
       const allowedExtensions = new Set([
         ".pdf",
         ".jpg",
@@ -198,73 +138,37 @@ export async function publishNotice(
         };
       }
     }
-    // --------------------------------------------------
-    // 5. Determine target scope
-    // --------------------------------------------------
 
-    /*
-     * Approved architecture:
-     *
-     * All Students:
-     *   department = null
-     *   batch = null
-     *   level = null
-     *   term = null
-     *
-     * Department targeting:
-     *   department is required
-     *   batch/level/term are optional filters
-     *
-     * Level/Term are never college-wide on their own.
-     */
+    const targetScope = departmentId ? "department" : "all";
 
-    const targetScope = departmentId
-      ? "department"
-      : "all";
-
-    if (
-      targetScope === "all" &&
-      (batchId || levelId || termId)
-    ) {
+    if (targetScope === "all" && (batchId || levelId || termId)) {
       return {
         success: false,
-        error:
-          "Batch, Level, or Term targeting requires a Department.",
+        error: "Batch, Level, or Term targeting requires a Department.",
       };
     }
 
-    // --------------------------------------------------
-    // 6. Permission check
-    // --------------------------------------------------
-
-    const { data: allowed, error: permissionError } =
-      await supabase.rpc("can_publish_notices", {
+    const { data: allowed, error: permissionError } = await supabase.rpc(
+      "can_publish_notices",
+      {
         p_department_id: departmentId ?? undefined,
-      });
+      },
+    );
 
     if (permissionError) {
-      console.error(
-        "Notice permission check error:",
-        permissionError,
-      );
-
+      console.error("Notice permission check error:", permissionError);
       return {
         success: false,
-        error:
-          "Notice publishing permission could not be verified.",
+        error: "Notice publishing permission could not be verified.",
       };
     }
 
     if (!allowed) {
       return {
         success: false,
-        error:
-          "You do not have permission to publish notices.",
+        error: "You do not have permission to publish notices.",
       };
     }
-    // --------------------------------------------------
-    // 7. Validate Department
-    // --------------------------------------------------
 
     if (departmentId) {
       const { data: department, error } = await supabase
@@ -272,18 +176,10 @@ export async function publishNotice(
         .select("id")
         .eq("id", departmentId)
         .single();
-
       if (error || !department) {
-        return {
-          success: false,
-          error: "Selected department was not found.",
-        };
+        return { success: false, error: "Selected department was not found." };
       }
     }
-
-    // --------------------------------------------------
-    // 8. Validate Batch
-    // --------------------------------------------------
 
     if (batchId) {
       const { data: batch, error } = await supabase
@@ -291,18 +187,10 @@ export async function publishNotice(
         .select("id")
         .eq("id", batchId)
         .single();
-
       if (error || !batch) {
-        return {
-          success: false,
-          error: "Selected batch was not found.",
-        };
+        return { success: false, error: "Selected batch was not found." };
       }
     }
-
-    // --------------------------------------------------
-    // 9. Validate Level
-    // --------------------------------------------------
 
     if (levelId) {
       const { data: level, error } = await supabase
@@ -310,18 +198,10 @@ export async function publishNotice(
         .select("id")
         .eq("id", levelId)
         .single();
-
       if (error || !level) {
-        return {
-          success: false,
-          error: "Selected level was not found.",
-        };
+        return { success: false, error: "Selected level was not found." };
       }
     }
-
-    // --------------------------------------------------
-    // 10. Validate Term
-    // --------------------------------------------------
 
     if (termId) {
       const { data: term, error } = await supabase
@@ -329,139 +209,97 @@ export async function publishNotice(
         .select("id, level_id")
         .eq("id", termId)
         .single();
-
       if (error || !term) {
-        return {
-          success: false,
-          error: "Selected term was not found.",
-        };
+        return { success: false, error: "Selected term was not found." };
       }
-
-      /*
-       * If both Level and Term are selected, the Term must
-       * belong to that Level.
-       */
       if (levelId && term.level_id !== levelId) {
         return {
           success: false,
-          error:
-            "The selected term does not belong to the selected level.",
+          error: "The selected term does not belong to the selected level.",
         };
       }
     }
 
-    // --------------------------------------------------
-    // --------------------------------------------------
-    // 11. Validate Category
-    // --------------------------------------------------
-
     let finalCategoryId = categoryId;
+    let resolvedCategoryName = customCategoryName ?? "";
 
     if (!categoryId) {
+      return { success: false, error: "Please select a notice category." };
+    }
+
+    const { data: category, error: categoryLookupError } = await supabase
+      .from("notice_categories")
+      .select("id, name")
+      .eq("id", categoryId)
+      .single();
+
+    if (categoryLookupError || !category) {
       return {
         success: false,
-        error: "Please select a notice category.",
+        error: "Selected notice category was not found.",
       };
     }
 
-    if (categoryId) {
-      const { data: category, error } = await supabase
-        .from("notice_categories")
-        .select("id, name")
-        .eq("id", categoryId)
-        .single();
+    resolvedCategoryName = category.name;
 
-      if (error || !category) {
+    if (category.name === "Others") {
+      if (!customCategoryName) {
+        return { success: false, error: "Please enter a custom category." };
+      }
+      if (customCategoryName.length > 100) {
+        return { success: false, error: "Custom category name is too long." };
+      }
+      resolvedCategoryName = customCategoryName;
+
+      const { data: existingCustomCategory, error: existingCustomCategoryError } =
+        await supabase
+          .from("notice_categories")
+          .select("id")
+          .eq("is_custom", true)
+          .ilike("name", customCategoryName)
+          .maybeSingle();
+
+      if (existingCustomCategoryError) {
+        console.error("Custom category lookup error:", existingCustomCategoryError);
         return {
           success: false,
-          error: "Selected notice category was not found.",
+          error: "Custom category could not be verified.",
         };
       }
 
-      if (category.name === "Others") {
-        if (!customCategoryName) {
-          return {
-            success: false,
-            error: "Please enter a custom category.",
-          };
-        }
-
-        if (customCategoryName.length > 100) {
-          return {
-            success: false,
-            error: "Custom category name is too long.",
-          };
-        }
-
-        const { data: existingCustomCategory, error: existingCustomCategoryError } =
-          await supabase
+      if (existingCustomCategory) {
+        finalCategoryId = existingCustomCategory.id;
+      } else {
+        const serviceSupabase = createServiceRoleClient();
+        const { data: customCategory, error: customCategoryError } =
+          await serviceSupabase
             .from("notice_categories")
+            .insert({
+              name: customCategoryName,
+              is_custom: true,
+              created_by: user.id,
+            })
             .select("id")
-            .eq("is_custom", true)
-            .ilike("name", customCategoryName)
-            .maybeSingle();
+            .single();
 
-        if (existingCustomCategoryError) {
-          console.error(
-            "Custom category lookup error:",
-            existingCustomCategoryError,
-          );
-
+        if (customCategoryError || !customCategory) {
+          console.error("Custom category creation error:", customCategoryError);
           return {
             success: false,
-            error: "Custom category could not be verified.",
+            error:
+              customCategoryError?.message ??
+              "Custom category could not be created.",
           };
         }
 
-        if (existingCustomCategory) {
-          finalCategoryId = existingCustomCategory.id;
-        } else {
-          const serviceSupabase = createServiceRoleClient();
-
-          const { data: customCategory, error: customCategoryError } =
-            await serviceSupabase
-              .from("notice_categories")
-              .insert({
-                name: customCategoryName,
-                is_custom: true,
-                created_by: user.id,
-              })
-              .select("id")
-              .single();
-
-          if (customCategoryError || !customCategory) {
-            console.error(
-              "Custom category creation error:",
-              customCategoryError,
-            );
-
-            return {
-              success: false,
-              error:
-                customCategoryError?.message ??
-                "Custom category could not be created.",
-            };
-          }
-
-          finalCategoryId = customCategory.id;
-        }
-      } else if (customCategoryName) {
-        return {
-          success: false,
-          error:
-            "Custom category can only be used with the Others category.",
-        };
+        finalCategoryId = customCategory.id;
       }
     } else if (customCategoryName) {
       return {
         success: false,
-        error:
-          "Please select Others before entering a custom category.",
+        error: "Custom category can only be used with the Others category.",
       };
     }
-
-    // 12. Insert notice
-    // --------------------------------------------------
 
     const { data: notice, error: insertError } = await supabase
       .from("notices")
@@ -469,72 +307,66 @@ export async function publishNotice(
         title,
         content,
         category_id: finalCategoryId ?? undefined,
-
         target_scope: targetScope,
-
         target_department_id: departmentId,
         target_batch_id: batchId,
         target_level_id: levelId,
         target_term_id: termId,
-
         is_pinned: isPinned,
         pinned_by: isPinned ? user.id : null,
         is_archived: false,
-
         created_by: user.id,
       })
       .select("id")
       .single();
 
     if (insertError || !notice) {
-      console.error(
-        "Notice insert error:",
-        insertError,
-      );
-
+      console.error("Notice insert error:", insertError);
       return {
         success: false,
-        error:
-          insertError?.message ??
-          "Notice could not be published.",
+        error: insertError?.message ?? "Notice could not be published.",
       };
     }
-    // --------------------------------------------------
-    // 12A. Upload Notice Attachment + Save Metadata
-    // --------------------------------------------------
 
     if (attachment) {
       const serviceSupabase = createServiceRoleClient();
-
       const safeFileName = attachment.name
         .trim()
         .replace(/[^a-zA-Z0-9._-]/g, "_");
+      const basePath = `${notice.id}/${crypto.randomUUID()}-${safeFileName}`;
+      const fileBuffer = Buffer.from(await attachment.arrayBuffer());
 
-      const filePath = `${notice.id}/${crypto.randomUUID()}-${safeFileName}`;
+      const [platformSettings, b2Bandwidth] = await Promise.all([
+        getActivePlatformSettings(),
+        getTodayB2BandwidthStatus().catch(() => null),
+      ]);
 
-      const fileBuffer = Buffer.from(
-        await attachment.arrayBuffer(),
+      const isScheduleNotice = /schedule|routine|exam\s*routine|class\s*routine/i.test(
+        `${resolvedCategoryName} ${title}`,
       );
+      const sectionRule = isScheduleNotice
+        ? platformSettings.storage_routing_rules.schedules
+        : platformSettings.storage_routing_rules.notices;
 
-      const { error: uploadError } =
-        await serviceSupabase.storage
-          .from("notice-attachments")
-          .upload(filePath, fileBuffer, {
-            contentType: attachment.type,
-            upsert: false,
-          });
+      const resolved = await resolveTargetStorageProvider({
+        rule: sectionRule,
+        fileSizeBytes: attachment.size,
+        b2DailyBandwidthPercent: b2Bandwidth?.percentUsed ?? 0,
+      });
 
-      if (uploadError) {
-        console.error(
-          "Notice attachment upload error:",
-          uploadError,
-        );
+      const objectKey =
+        resolved.provider === "supabase" ? basePath : `notices/${basePath}`;
 
-        await serviceSupabase
-          .from("notices")
-          .delete()
-          .eq("id", notice.id);
+      const uploaded = await uploadBufferToStorage(serviceSupabase, {
+        objectKey,
+        buffer: fileBuffer,
+        contentType: attachment.type,
+        provider: resolved.provider,
+        supabaseBucket: "notice-attachments",
+      });
 
+      if (!uploaded) {
+        await serviceSupabase.from("notices").delete().eq("id", notice.id);
         return {
           success: false,
           error:
@@ -542,31 +374,23 @@ export async function publishNotice(
         };
       }
 
-      const { error: attachmentInsertError } =
-        await serviceSupabase
-          .from("notice_attachments")
-          .insert({
-            notice_id: notice.id,
-            file_path: filePath,
-            file_type: attachment.type,
-            file_size_bytes: attachment.size,
-          });
+      const { error: attachmentInsertError } = await serviceSupabase
+        .from("notice_attachments")
+        .insert({
+          notice_id: notice.id,
+          file_path: uploaded.storagePath,
+          file_type: attachment.type,
+          file_size_bytes: attachment.size,
+        });
 
       if (attachmentInsertError) {
-        console.error(
-          "Notice attachment metadata error:",
-          attachmentInsertError,
+        console.error("Notice attachment metadata error:", attachmentInsertError);
+        await removeMaterialObject(
+          serviceSupabase,
+          uploaded.storagePath,
+          "notice-attachments",
         );
-
-        await serviceSupabase.storage
-          .from("notice-attachments")
-          .remove([filePath]);
-
-        await serviceSupabase
-          .from("notices")
-          .delete()
-          .eq("id", notice.id);
-
+        await serviceSupabase.from("notices").delete().eq("id", notice.id);
         return {
           success: false,
           error:
@@ -575,81 +399,41 @@ export async function publishNotice(
       }
     }
 
-    // --------------------------------------------------
-    // --------------------------------------------------
-    // 13. Create Student Notifications
-    // --------------------------------------------------
-
     const notificationService = createServiceRoleClient();
-
     let studentQuery = notificationService
       .from("profiles")
       .select("id, full_name, email")
       .eq("role", "student")
       .eq("is_verified", true);
 
-    if (departmentId) {
-      studentQuery = studentQuery.eq(
-        "department_id",
-        departmentId,
-      );
-    }
+    if (departmentId) studentQuery = studentQuery.eq("department_id", departmentId);
+    if (batchId) studentQuery = studentQuery.eq("batch_id", batchId);
+    if (levelId) studentQuery = studentQuery.eq("current_level_id", levelId);
+    if (termId) studentQuery = studentQuery.eq("current_term_id", termId);
 
-    if (batchId) {
-      studentQuery = studentQuery.eq(
-        "batch_id",
-        batchId,
-      );
-    }
-
-    if (levelId) {
-      studentQuery = studentQuery.eq(
-        "current_level_id",
-        levelId,
-      );
-    }
-
-    if (termId) {
-      studentQuery = studentQuery.eq(
-        "current_term_id",
-        termId,
-      );
-    }
-
-    const {
-      data: targetedStudents,
-      error: targetedStudentsError,
-    } = await studentQuery;
+    const { data: targetedStudents, error: targetedStudentsError } =
+      await studentQuery;
 
     if (targetedStudentsError) {
-      console.error(
-        "Targeted student lookup error:",
-        targetedStudentsError,
-      );
+      console.error("Targeted student lookup error:", targetedStudentsError);
+      const { data: attachmentRows } = await notificationService
+        .from("notice_attachments")
+        .select("file_path")
+        .eq("notice_id", notice.id);
 
-      const { data: attachmentRows } =
-        await notificationService
-          .from("notice_attachments")
-          .select("file_path")
-          .eq("notice_id", notice.id);
-
-      if (attachmentRows && attachmentRows.length > 0) {
-        await notificationService.storage
-          .from("notice-attachments")
-          .remove(
-            attachmentRows.map((row) => row.file_path),
-          );
+      for (const row of attachmentRows ?? []) {
+        await removeMaterialObject(
+          notificationService,
+          row.file_path,
+          "notice-attachments",
+        );
       }
 
       await notificationService
         .from("notice_attachments")
         .delete()
         .eq("notice_id", notice.id);
-
-      await notificationService
-        .from("notices")
-        .delete()
-        .eq("id", notice.id);
+      await notificationService.from("notices").delete().eq("id", notice.id);
 
       return {
         success: false,
@@ -658,58 +442,44 @@ export async function publishNotice(
       };
     }
 
-    const recipientIds =
-      targetedStudents?.map((student) => student.id) ?? [];
-
+    const recipientIds = targetedStudents?.map((student) => student.id) ?? [];
     const recipientEmails =
       targetedStudents?.map((student) => student.email).filter(Boolean) ?? [];
 
     if (recipientIds.length > 0) {
-      const notificationRows = recipientIds.map(
-        (recipientId) => ({
-          recipient_id: recipientId,
-          type: "notice",
-          title,
-          body: content,
-          link_url: `/notices/${notice.id}`,
-          is_read: false,
-        }),
-      );
+      const notificationRows = recipientIds.map((recipientId) => ({
+        recipient_id: recipientId,
+        type: "notice",
+        title,
+        body: content,
+        link_url: `/notices/${notice.id}`,
+        is_read: false,
+      }));
 
-      const { error: notificationInsertError } =
-        await notificationService
-          .from("notifications")
-          .insert(notificationRows);
+      const { error: notificationInsertError } = await notificationService
+        .from("notifications")
+        .insert(notificationRows);
 
       if (notificationInsertError) {
-        console.error(
-          "Notification insert error:",
-          notificationInsertError,
-        );
+        console.error("Notification insert error:", notificationInsertError);
+        const { data: attachmentRows } = await notificationService
+          .from("notice_attachments")
+          .select("file_path")
+          .eq("notice_id", notice.id);
 
-        const { data: attachmentRows } =
-          await notificationService
-            .from("notice_attachments")
-            .select("file_path")
-            .eq("notice_id", notice.id);
-
-        if (attachmentRows && attachmentRows.length > 0) {
-          await notificationService.storage
-            .from("notice-attachments")
-            .remove(
-              attachmentRows.map((row) => row.file_path),
-            );
+        for (const row of attachmentRows ?? []) {
+          await removeMaterialObject(
+            notificationService,
+            row.file_path,
+            "notice-attachments",
+          );
         }
 
         await notificationService
           .from("notice_attachments")
           .delete()
           .eq("notice_id", notice.id);
-
-        await notificationService
-          .from("notices")
-          .delete()
-          .eq("id", notice.id);
+        await notificationService.from("notices").delete().eq("id", notice.id);
 
         return {
           success: false,
@@ -719,16 +489,9 @@ export async function publishNotice(
       }
     }
 
-    // --------------------------------------------------
-    // 13. Send Email Notifications
-    // --------------------------------------------------
-
     if (recipientEmails.length > 0) {
-      const emailFunctionUrl =
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-notice-email`;
-
-      const emailSecret =
-        process.env.NOTICE_EMAIL_SECRET;
+      const emailFunctionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-notice-email`;
+      const emailSecret = process.env.NOTICE_EMAIL_SECRET;
 
       if (emailSecret) {
         try {
@@ -756,10 +519,7 @@ export async function publishNotice(
             );
           }
         } catch (emailError) {
-          console.error(
-            "Notice email request error:",
-            emailError,
-          );
+          console.error("Notice email request error:", emailError);
         }
       } else {
         console.error(
@@ -767,15 +527,11 @@ export async function publishNotice(
         );
       }
     }
-    // 13. Refresh notice pages
-    // --------------------------------------------------
 
     revalidatePath("/admin/notices");
     revalidatePath("/admin");
-
     revalidatePath("/super-admin");
     revalidatePath("/super-admin/system-settings");
-
     revalidatePath("/dashboard");
     revalidatePath("/notifications");
 
@@ -784,44 +540,31 @@ export async function publishNotice(
       noticeId: notice.id,
     };
   } catch (error) {
-    console.error(
-      "Unexpected notice publishing error:",
-      error,
-    );
-
+    console.error("Unexpected notice publishing error:", error);
     return {
       success: false,
-      error:
-        "An unexpected error occurred while publishing the notice.",
+      error: "An unexpected error occurred while publishing the notice.",
     };
   }
 }
 
-
-
-
-
 export async function toggleNoticePinForm(formData: FormData): Promise<void> {
-  console.log("[toggleNoticePinForm] EXECUTED");
   const noticeId = String(formData.get("notice_id") ?? "").trim();
-
   if (!noticeId) {
     console.error("Notice pin error: notice_id is missing.");
     return;
   }
-
   const result = await toggleNoticePin(noticeId);
-
   if (!result.success) {
     console.error("Notice pin error:", result.error);
   }
 }
+
 export async function toggleNoticePin(
   noticeId: string,
 ): Promise<NoticeActionResult> {
   try {
     const supabase = await createClient();
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -839,10 +582,7 @@ export async function toggleNoticePin(
       .eq("id", user.id)
       .single();
 
-    if (
-      !profile ||
-      !["admin", "super_admin"].includes(profile.role)
-    ) {
+    if (!profile || !["admin", "super_admin"].includes(profile.role)) {
       return {
         success: false,
         error: "You are not authorized to pin or unpin notices.",
@@ -856,14 +596,10 @@ export async function toggleNoticePin(
       .single();
 
     if (noticeError || !notice) {
-      return {
-        success: false,
-        error: "Notice could not be found.",
-      };
+      return { success: false, error: "Notice could not be found." };
     }
 
     const nextPinnedState = !notice.is_pinned;
-
     const serviceSupabase = createServiceRoleClient();
 
     const { error: updateError } = await serviceSupabase
@@ -876,12 +612,9 @@ export async function toggleNoticePin(
 
     if (updateError) {
       console.error("Notice pin update error:", updateError);
-
       return {
         success: false,
-        error:
-          updateError.message ??
-          "Notice pin status could not be updated.",
+        error: updateError.message ?? "Notice pin status could not be updated.",
       };
     }
 
@@ -889,30 +622,23 @@ export async function toggleNoticePin(
     revalidatePath("/dashboard");
     revalidatePath("/notifications");
 
-    return {
-      success: true,
-      noticeId,
-    };
+    return { success: true, noticeId };
   } catch (error) {
     console.error("Unexpected notice pin error:", error);
-
     return {
       success: false,
-      error:
-        "An unexpected error occurred while updating the notice pin status.",
+      error: "An unexpected error occurred while updating the notice pin status.",
     };
   }
 }
+
 export async function deleteNoticeForm(formData: FormData): Promise<void> {
   const noticeId = String(formData.get("notice_id") ?? "").trim();
-
   if (!noticeId) {
     console.error("Notice delete error: notice_id is missing.");
     return;
   }
-
   const result = await deleteNotice(noticeId);
-
   if (!result.success) {
     console.error("Notice delete error:", result.error);
   }
@@ -923,7 +649,6 @@ export async function deleteNotice(
 ): Promise<NoticeActionResult> {
   try {
     const supabase = await createClient();
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -942,10 +667,7 @@ export async function deleteNotice(
       .single();
 
     if (!profile) {
-      return {
-        success: false,
-        error: "Your profile could not be verified.",
-      };
+      return { success: false, error: "Your profile could not be verified." };
     }
 
     if (profile.role === "admin") {
@@ -969,6 +691,7 @@ export async function deleteNotice(
         error: "You are not authorized to permanently delete notices.",
       };
     }
+
     const serviceSupabase = createServiceRoleClient();
 
     const { data: notice, error: noticeError } = await serviceSupabase
@@ -978,10 +701,7 @@ export async function deleteNotice(
       .single();
 
     if (noticeError || !notice) {
-      return {
-        success: false,
-        error: "Notice could not be found.",
-      };
+      return { success: false, error: "Notice could not be found." };
     }
 
     const { data: attachmentRows, error: attachmentLookupError } =
@@ -991,34 +711,19 @@ export async function deleteNotice(
         .eq("notice_id", noticeId);
 
     if (attachmentLookupError) {
-      console.error(
-        "Notice attachment lookup error:",
-        attachmentLookupError,
-      );
-
+      console.error("Notice attachment lookup error:", attachmentLookupError);
       return {
         success: false,
         error: "Notice attachments could not be prepared for deletion.",
       };
     }
 
-    if (attachmentRows && attachmentRows.length > 0) {
-      const { error: storageDeleteError } =
-        await serviceSupabase.storage
-          .from("notice-attachments")
-          .remove(attachmentRows.map((row) => row.file_path));
-
-      if (storageDeleteError) {
-        console.error(
-          "Notice attachment storage delete error:",
-          storageDeleteError,
-        );
-
-        return {
-          success: false,
-          error: "Notice attachment files could not be deleted.",
-        };
-      }
+    for (const row of attachmentRows ?? []) {
+      await removeMaterialObject(
+        serviceSupabase,
+        row.file_path,
+        "notice-attachments",
+      );
     }
 
     const { error: deleteError } = await serviceSupabase
@@ -1028,7 +733,6 @@ export async function deleteNotice(
 
     if (deleteError) {
       console.error("Notice permanent delete error:", deleteError);
-
       return {
         success: false,
         error: deleteError.message ?? "Notice could not be deleted.",
@@ -1039,22 +743,15 @@ export async function deleteNotice(
     revalidatePath("/dashboard");
     revalidatePath("/notifications");
 
-    return {
-      success: true,
-      noticeId,
-    };
+    return { success: true, noticeId };
   } catch (error) {
     console.error("Unexpected notice permanent delete error:", error);
-
     return {
       success: false,
       error: "An unexpected error occurred while deleting the notice.",
     };
   }
 }
-
-
-
 
 export type BulkNoticeDeleteResult =
   | {
@@ -1087,9 +784,7 @@ export async function previewBulkDeleteNotices(
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) {
-      return { success: false, error: "You must be logged in." };
-    }
+    if (!user) return { success: false, error: "You must be logged in." };
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -1097,9 +792,7 @@ export async function previewBulkDeleteNotices(
       .eq("id", user.id)
       .single();
 
-    if (!profile) {
-      return { success: false, error: "Profile not verified." };
-    }
+    if (!profile) return { success: false, error: "Profile not verified." };
 
     if (profile.role === "admin") {
       const { data: deleteScope } = await supabase
@@ -1110,9 +803,7 @@ export async function previewBulkDeleteNotices(
         .limit(1)
         .maybeSingle();
 
-      if (!deleteScope) {
-        return { success: false, error: "No delete permission." };
-      }
+      if (!deleteScope) return { success: false, error: "No delete permission." };
     } else if (profile.role !== "super_admin") {
       return { success: false, error: "Unauthorized." };
     }
@@ -1167,13 +858,13 @@ export async function previewBulkDeleteNotices(
     return { success: false, error: "Failed to load preview." };
   }
 }
+
 export async function bulkDeleteNotices(
   fromDate: string,
   toDate: string,
 ): Promise<BulkNoticeDeleteResult> {
   try {
     const supabase = await createClient();
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -1192,10 +883,7 @@ export async function bulkDeleteNotices(
       .single();
 
     if (!profile) {
-      return {
-        success: false,
-        error: "Your profile could not be verified.",
-      };
+      return { success: false, error: "Your profile could not be verified." };
     }
 
     if (profile.role === "admin") {
@@ -1221,14 +909,10 @@ export async function bulkDeleteNotices(
     }
 
     if (!fromDate || !toDate || fromDate > toDate) {
-      return {
-        success: false,
-        error: "Please provide a valid date range.",
-      };
+      return { success: false, error: "Please provide a valid date range." };
     }
 
     const serviceSupabase = createServiceRoleClient();
-
     const startDate = `${fromDate}T00:00:00`;
     const endDate = `${toDate}T23:59:59.999`;
 
@@ -1240,7 +924,6 @@ export async function bulkDeleteNotices(
 
     if (noticesError) {
       console.error("Bulk notice lookup error:", noticesError);
-
       return {
         success: false,
         error: "Notices could not be prepared for deletion.",
@@ -1248,10 +931,7 @@ export async function bulkDeleteNotices(
     }
 
     if (!notices || notices.length === 0) {
-      return {
-        success: true,
-        deletedCount: 0,
-      };
+      return { success: true, deletedCount: 0 };
     }
 
     const noticeIds = notices.map((notice) => notice.id);
@@ -1263,33 +943,19 @@ export async function bulkDeleteNotices(
         .in("notice_id", noticeIds);
 
     if (attachmentLookupError) {
-      console.error(
-        "Bulk notice attachment lookup error:",
-        attachmentLookupError,
-      );
-
+      console.error("Bulk notice attachment lookup error:", attachmentLookupError);
       return {
         success: false,
         error: "Notice attachments could not be prepared for deletion.",
       };
     }
 
-    if (attachmentRows && attachmentRows.length > 0) {
-      const { error: storageDeleteError } = await serviceSupabase.storage
-        .from("notice-attachments")
-        .remove(attachmentRows.map((row) => row.file_path));
-
-      if (storageDeleteError) {
-        console.error(
-          "Bulk notice attachment storage delete error:",
-          storageDeleteError,
-        );
-
-        return {
-          success: false,
-          error: "Notice attachment files could not be deleted.",
-        };
-      }
+    for (const row of attachmentRows ?? []) {
+      await removeMaterialObject(
+        serviceSupabase,
+        row.file_path,
+        "notice-attachments",
+      );
     }
 
     const { error: deleteError } = await serviceSupabase
@@ -1299,7 +965,6 @@ export async function bulkDeleteNotices(
 
     if (deleteError) {
       console.error("Bulk notice permanent delete error:", deleteError);
-
       return {
         success: false,
         error: deleteError.message ?? "Notices could not be deleted.",
@@ -1316,11 +981,17 @@ export async function bulkDeleteNotices(
     };
   } catch (error) {
     console.error("Unexpected bulk notice delete error:", error);
-
     return {
       success: false,
       error: "An unexpected error occurred while deleting notices.",
     };
   }
 }
-export async function bulkDeleteNoticesForm(formData: FormData): Promise<BulkNoticeDeleteResult> { const fromDate = String(formData.get("from_date") ?? ""); const toDate = String(formData.get("to_date") ?? ""); return bulkDeleteNotices(fromDate, toDate); }
+
+export async function bulkDeleteNoticesForm(
+  formData: FormData,
+): Promise<BulkNoticeDeleteResult> {
+  const fromDate = String(formData.get("from_date") ?? "");
+  const toDate = String(formData.get("to_date") ?? "");
+  return bulkDeleteNotices(fromDate, toDate);
+}

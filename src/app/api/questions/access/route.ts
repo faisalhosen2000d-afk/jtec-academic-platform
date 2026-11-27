@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import { createMaterialSignedUrl } from "@/lib/material-storage";
+import { recordB2BandwidthUsage } from "@/lib/b2-bandwidth";
 
 export async function POST(request: Request) {
   try {
@@ -46,13 +47,14 @@ export async function POST(request: Request) {
 
     const { data: item } = await raw
       .from("question_bank_items")
-      .select("id, file_path, status, views_count, downloads_count")
+      .select("id, file_path, file_size_bytes, status, views_count, downloads_count")
       .eq("id", itemId)
       .maybeSingle();
 
     const row = item as {
       id: string;
       file_path: string;
+      file_size_bytes?: number | null;
       status: string;
       views_count: number;
       downloads_count: number;
@@ -74,6 +76,12 @@ export async function POST(request: Request) {
     if (!signedUrl) {
       return NextResponse.json({ error: "Could not generate file URL." }, { status: 500 });
     }
+
+    await recordB2BandwidthUsage(
+      serviceSupabase,
+      row.file_path,
+      Number(row.file_size_bytes ?? 0),
+    );
 
     await raw
       .from("question_bank_items")

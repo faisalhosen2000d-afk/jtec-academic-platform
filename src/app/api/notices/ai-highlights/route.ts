@@ -2,6 +2,7 @@ import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { downloadMaterialBuffer } from "@/lib/material-storage";
 import { callGemini, type GeminiPart } from "@/lib/gemini";
 
 export const maxDuration = 60;
@@ -55,15 +56,15 @@ export async function POST(request: Request) {
     let attachedCount = 0;
 
     if (attachments && attachments.length > 0) {
-      const bucket = serviceSupabase.storage.from("notice-attachments");
+      
       for (const att of attachments.slice(0, 2)) {
         const ft = (att.file_type || "").toLowerCase();
         const isSupported = ft.includes("pdf") || ft.startsWith("image/");
         if (!isSupported || att.file_size_bytes > 4 * 1024 * 1024) continue;
 
-        const { data: fileBlob } = await bucket.download(att.file_path);
-        if (!fileBlob) continue;
-        const buf = Buffer.from(await fileBlob.arrayBuffer());
+        const buf = await downloadMaterialBuffer(serviceSupabase, att.file_path, "notice-attachments");
+        if (!buf) continue;
+        
         const mime = ft.includes("pdf") ? "application/pdf" : ft;
         parts.push({ inlineData: { mimeType: mime, data: buf.toString("base64") } });
         attachedCount++;
