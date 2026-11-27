@@ -322,6 +322,12 @@ export default function SettingsForm({ initialSettings, b2Configured = true, b2B
               />
             </div>
 
+            {b2Bandwidth.debugError && (
+              <p className="mt-2 font-mono text-[11px] text-rose-400">
+                Tracker notice: {b2Bandwidth.debugError}
+              </p>
+            )}
+
             {b2Bandwidth.percentUsed >= 80 && materialStorageProvider === "b2" && (
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
                 <span>

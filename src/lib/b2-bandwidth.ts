@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isB2Path } from "@/lib/material-storage";
 
 export const B2_DAILY_LIMIT_BYTES = 1024 * 1024 * 1024; // 1 GB daily free tier
@@ -12,6 +11,7 @@ export interface B2BandwidthStatus {
   percentUsed: number;
   requestsCount: number;
   status: "ok" | "warning" | "exceeded";
+  debugError?: string;
 }
 
 type BandwidthRow = {
@@ -21,6 +21,19 @@ type BandwidthRow = {
 
 export function getTodayUtcDateString(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function getFreshAdminClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) return null;
+
+  return createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: {
+      fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+    },
+  });
 }
 
 export async function recordB2BandwidthUsage(
@@ -36,10 +49,10 @@ export async function recordB2BandwidthUsage(
   if (safeBytes <= 0) return;
 
   const dayUtc = getTodayUtcDateString();
-  const untypedClient = serviceSupabase as unknown as SupabaseClient;
+  const client = getFreshAdminClient() ?? (serviceSupabase as unknown as SupabaseClient);
 
   try {
-    const { error: rpcError } = await untypedClient.rpc(
+    const { error: rpcError } = await client.rpc(
       "increment_b2_daily_bandwidth",
       {
         p_day_utc: dayUtc,
@@ -49,7 +62,7 @@ export async function recordB2BandwidthUsage(
 
     if (!rpcError) return;
 
-    const { data: existing } = await untypedClient
+    const { data: existing } = await client
       .from("b2_daily_bandwidth")
       .select("bytes_used, requests_count")
       .eq("day_utc", dayUtc)
@@ -58,7 +71,7 @@ export async function recordB2BandwidthUsage(
     const nextBytes = Number(existing?.bytes_used ?? 0) + safeBytes;
     const nextHits = Number(existing?.requests_count ?? 0) + 1;
 
-    await untypedClient.from("b2_daily_bandwidth").upsert(
+    await client.from("b2_daily_bandwidth").upsert(
       {
         day_utc: dayUtc,
         bytes_used: nextBytes,
@@ -85,16 +98,19 @@ export async function getTodayB2BandwidthStatus(): Promise<B2BandwidthStatus> {
   };
 
   try {
-    const serviceSupabase = createServiceRoleClient() as unknown as SupabaseClient;
-    const { data, error } = await serviceSupabase
+    const adminClient = getFreshAdminClient();
+    if (!adminClient) {
+      return { ...empty, debugError: "Missing SUPABASE_SERVICE_ROLE_KEY" };
+    }
+
+    const { data, error } = await adminClient
       .from("b2_daily_bandwidth")
       .select("bytes_used, requests_count")
       .eq("day_utc", dayUtc)
       .maybeSingle<BandwidthRow>();
 
     if (error) {
-      console.error("[b2-bandwidth][read]", error.message);
-      return empty;
+      return { ...empty, debugError: error.message };
     }
 
     if (!data) return empty;
@@ -119,7 +135,9 @@ export async function getTodayB2BandwidthStatus(): Promise<B2BandwidthStatus> {
       status,
     };
   } catch (err) {
-    console.error("[b2-bandwidth][read-catch]", err);
-    return empty;
+    return {
+      ...empty,
+      debugError: err instanceof Error ? err.message : "Unknown read error",
+    };
   }
 }
