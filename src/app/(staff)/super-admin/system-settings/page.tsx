@@ -4,6 +4,7 @@ import { ArrowLeft, Settings2, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getActivePlatformSettings } from "@/lib/platform-settings";
 import { isB2Configured } from "@/lib/material-storage";
+import { getTodayB2BandwidthStatus } from "@/lib/b2-bandwidth";
 import SettingsForm from "./SettingsForm";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,10 @@ export default async function SystemSettingsPage() {
     redirect("/dashboard");
   }
 
-  const activeSettings = await getActivePlatformSettings();
+  const [activeSettings, b2Bandwidth] = await Promise.all([
+    getActivePlatformSettings(),
+    getTodayB2BandwidthStatus(),
+  ]);
 
   return (
     <div className="min-h-screen bg-[#060A12] text-slate-100">
@@ -85,6 +89,7 @@ export default async function SystemSettingsPage() {
             updated_at: new Date().toISOString(),
           }}
           b2Configured={isB2Configured()}
+          b2Bandwidth={b2Bandwidth}
         />
 
         <section className="flex items-start gap-3 rounded-2xl border border-slate-800/80 bg-[#0A1020]/70 px-5 py-4 text-xs text-slate-400">

@@ -14,6 +14,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { savePlatformSettings } from "./actions";
+import type { B2BandwidthStatus } from "@/lib/b2-bandwidth";
 import { ModernDateTimePicker } from "@/components/ui/ModernDateTimePicker";
 
 type SettingsFormProps = {
@@ -29,6 +30,7 @@ type SettingsFormProps = {
     updated_at: string;
   };
   b2Configured?: boolean;
+  b2Bandwidth?: B2BandwidthStatus;
 };
 
 const UPLOAD_OPTIONS = [
@@ -87,7 +89,7 @@ function ToggleSwitch({
   );
 }
 
-export default function SettingsForm({ initialSettings, b2Configured = true }: SettingsFormProps) {
+export default function SettingsForm({ initialSettings, b2Configured = true, b2Bandwidth }: SettingsFormProps) {
   const [registrationOpen, setRegistrationOpen] = useState(
     initialSettings.registration_open,
   );
@@ -283,6 +285,59 @@ export default function SettingsForm({ initialSettings, b2Configured = true }: S
             </p>
           </button>
         </div>
+        {b2Bandwidth && (
+          <div className="mt-4 rounded-xl border border-slate-800/90 bg-[#060A12] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-200">
+                  Backblaze B2 Daily Free Bandwidth (UTC Day: {b2Bandwidth.dayUtc})
+                </span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    b2Bandwidth.status === "exceeded"
+                      ? "bg-rose-500/20 text-rose-300"
+                      : b2Bandwidth.status === "warning"
+                        ? "bg-amber-500/20 text-amber-300"
+                        : "bg-emerald-500/20 text-emerald-300"
+                  }`}
+                >
+                  {b2Bandwidth.percentUsed}% Used
+                </span>
+              </div>
+              <span className="font-mono text-[11px] text-slate-400">
+                {(b2Bandwidth.bytesUsed / (1024 * 1024)).toFixed(1)} MB / 1024 MB · {b2Bandwidth.requestsCount} hits · Resets 6:00 AM BDT
+              </span>
+            </div>
+
+            <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-slate-800">
+              <div
+                style={{ width: `${Math.min(100, b2Bandwidth.percentUsed)}%` }}
+                className={`h-full rounded-full transition-all duration-300 ${
+                  b2Bandwidth.status === "exceeded"
+                    ? "bg-rose-500"
+                    : b2Bandwidth.status === "warning"
+                      ? "bg-amber-400"
+                      : "bg-gradient-to-r from-emerald-400 to-cyan-400"
+                }`}
+              />
+            </div>
+
+            {b2Bandwidth.percentUsed >= 80 && materialStorageProvider === "b2" && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+                <span>
+                  Students are currently seeing the B2 bandwidth warning banner. You can switch new uploads to Supabase backup if needed.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMaterialStorageProvider("supabase")}
+                  className="cursor-pointer rounded-lg bg-amber-400 px-2.5 py-1 text-[11px] font-bold text-slate-950 hover:bg-amber-300"
+                >
+                  Select Supabase Backup
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {error ? (
@@ -521,68 +576,6 @@ export default function SettingsForm({ initialSettings, b2Configured = true }: S
           </p>
         </div>
       </section>
-
-      {/* Active Material Storage Provider Card */}
-      <div className="rounded-2xl border border-slate-800/80 bg-[#0A1020] p-5 shadow-lg">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-base font-semibold text-white">
-              Active Material Storage Provider
-            </h2>
-            <p className="mt-1 text-xs leading-relaxed text-slate-400">
-              Choose where new student uploads are stored. Existing files in both Backblaze B2 and Supabase remain readable at all times.
-            </p>
-          </div>
-          <span className="rounded-full border border-cyan-500/40 bg-cyan-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-300">
-            {materialStorageProvider === "b2" ? "Backblaze B2 Active" : "Supabase Active"}
-          </span>
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            disabled={!b2Configured}
-            onClick={() => setMaterialStorageProvider("b2")}
-            className={`cursor-pointer rounded-xl border p-3.5 text-left transition ${
-              materialStorageProvider === "b2"
-                ? "border-cyan-400/70 bg-cyan-500/15 text-white shadow-[0_0_20px_rgba(34,211,238,0.12)]"
-                : "border-slate-800 bg-[#060A12] text-slate-300 hover:border-slate-700"
-            } disabled:cursor-not-allowed disabled:opacity-50`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold">Backblaze B2 Cloud</span>
-              <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-bold text-cyan-300">
-                10 GB Free
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-slate-400">
-              {b2Configured
-                ? "Recommended for PDFs & large files (~30 GB/mo bandwidth)."
-                : "Configure B2_* env vars in Vercel to enable."}
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMaterialStorageProvider("supabase")}
-            className={`cursor-pointer rounded-xl border p-3.5 text-left transition ${
-              materialStorageProvider === "supabase"
-                ? "border-emerald-400/70 bg-emerald-500/15 text-white shadow-[0_0_20px_rgba(16,185,129,0.12)]"
-                : "border-slate-800 bg-[#060A12] text-slate-300 hover:border-slate-700"
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold">Supabase Storage</span>
-              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                1 GB Free
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-slate-400">
-              Built-in Supabase bucket (5 GB/mo bandwidth).
-            </p>
-          </button>
-        </div>
-      </div>
 
       <div className="flex justify-end">
         <button

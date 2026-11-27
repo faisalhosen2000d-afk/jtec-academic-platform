@@ -1,9 +1,10 @@
-﻿import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
+import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createMaterialSignedUrl } from "@/lib/material-storage";
+import { recordB2BandwidthUsage } from "@/lib/b2-bandwidth";
 
 type FileAccessRequest = {
   materialId: string;
@@ -141,7 +142,7 @@ export async function POST(request: Request) {
      */
     const { data: material, error: materialError } = await serviceSupabase
       .from("materials")
-      .select("id, status, file_path")
+      .select("id, status, file_path, file_size_bytes")
       .eq("id", body.materialId)
       .maybeSingle();
 

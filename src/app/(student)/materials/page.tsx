@@ -5,6 +5,8 @@ import { getAcademicTermNavigation } from "@/lib/academic-terms";
 import { redirect } from "next/navigation";
 import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import MaterialsVaultClient from "@/components/student/MaterialsVaultClient";
+import B2BandwidthBanner from "@/components/student/B2BandwidthBanner";
+import { getTodayB2BandwidthStatus } from "@/lib/b2-bandwidth";
 import type { QuestionBankFolder, QuestionBankItem } from "@/components/student/QuestionBankSection";
 
 type Material = {
@@ -457,6 +459,8 @@ export default async function MaterialsPage() {
     // Gracefully fall back if table is not migrated yet
   }
 
+  const b2Bandwidth = await getTodayB2BandwidthStatus();
+
   return (
     <div className="min-h-full bg-[#060A12] text-slate-100">
       <style>{`
@@ -510,6 +514,9 @@ export default async function MaterialsPage() {
                   </Link>
                 </div>
               </section>
+
+              {/* Smart B2 Bandwidth Notice (Visible only at >=80%) */}
+              <B2BandwidthBanner status={b2Bandwidth} />
 
               {/* Materials Search & Grid */}
               <MaterialsVaultClient
