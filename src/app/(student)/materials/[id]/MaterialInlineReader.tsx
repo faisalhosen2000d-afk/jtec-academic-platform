@@ -11,6 +11,7 @@ import {
   Maximize2,
   Minimize2,
   Monitor,
+  Play,
   RefreshCw,
   Smartphone,
   ZoomIn,
@@ -21,9 +22,19 @@ type MaterialInlineReaderProps = {
   materialId: string;
   title: string;
   fileType: string;
+  fileSizeBytes: number;
 };
 
 type FileKind = "pdf" | "image" | "office" | "other";
+
+const LARGE_FILE_THRESHOLD_BYTES = 10 * 1024 * 1024; // 10 MB
+const GOOGLE_VIEWER_MAX_BYTES = 15 * 1024 * 1024; // 15 MB
+
+function formatSize(bytes: number): string {
+  if (!bytes || bytes <= 0) return "0 B";
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function detectFileKind(fileType: string, title: string): FileKind {
   const ft = (fileType || "").toLowerCase();
@@ -65,12 +76,19 @@ export default function MaterialInlineReader({
   materialId,
   title,
   fileType,
+  fileSizeBytes,
 }: MaterialInlineReaderProps) {
   const fileKind = detectFileKind(fileType, title);
   const badge = getShortBadge(fileType, title);
+  const isLargeFile = fileSizeBytes > LARGE_FILE_THRESHOLD_BYTES;
+  const canUseAltViewer =
+    (fileKind === "pdf" || fileKind === "office") &&
+    fileSizeBytes <= GOOGLE_VIEWER_MAX_BYTES;
 
+  const [hasRequestedLoad, setHasRequestedLoad] = useState(!isLargeFile);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isLargeFile);
+  const [frameReady, setFrameReady] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
 
@@ -81,7 +99,9 @@ export default function MaterialInlineReader({
   const [useGoogleViewer, setUseGoogleViewer] = useState(false);
 
   const fetchPreviewUrl = useCallback(async () => {
+    setHasRequestedLoad(true);
     setLoading(true);
+    setFrameReady(false);
     setError("");
     try {
       const response = await fetch("/api/materials/file-access", {
@@ -104,8 +124,10 @@ export default function MaterialInlineReader({
   }, [materialId]);
 
   useEffect(() => {
-    void fetchPreviewUrl();
-  }, [fetchPreviewUrl]);
+    if (!isLargeFile) {
+      void fetchPreviewUrl();
+    }
+  }, [isLargeFile, fetchPreviewUrl]);
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -148,16 +170,44 @@ export default function MaterialInlineReader({
     }
   }
 
+  async function handleOpenNewTab() {
+    if (fileUrl) {
+      window.open(fileUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    const popup = window.open("about:blank", "_blank");
+    try {
+      const response = await fetch("/api/materials/file-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ materialId, action: "open" }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success || !data.url) {
+        throw new Error(data.error || "Could not open file.");
+      }
+      if (popup) {
+        popup.opener = null;
+        popup.location.href = String(data.url);
+      } else {
+        window.open(String(data.url), "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      if (popup && !popup.closed) popup.close();
+      setError(err instanceof Error ? err.message : "Could not open file.");
+    }
+  }
+
   const embedSrc = (() => {
     if (!fileUrl) return "";
     if (fileKind === "pdf") {
-      if (useGoogleViewer) {
+      if (useGoogleViewer && canUseAltViewer) {
         return `https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`;
       }
       return `${fileUrl}#view=FitH&toolbar=1&navpanes=0`;
     }
     if (fileKind === "office") {
-      if (useGoogleViewer) {
+      if (useGoogleViewer && canUseAltViewer) {
         return `https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`;
       }
       return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
@@ -189,6 +239,9 @@ export default function MaterialInlineReader({
               <span className="rounded-md border border-cyan-500/30 bg-cyan-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-cyan-300">
                 {badge}
               </span>
+              <span className="hidden rounded-md border border-slate-700/80 bg-[#060A12] px-1.5 py-0.5 font-mono text-[10px] text-slate-400 sm:inline">
+                {formatSize(fileSizeBytes)}
+              </span>
             </div>
             {isFullscreen && (
               <p className="truncate text-[11px] text-slate-400">{title}</p>
@@ -198,7 +251,7 @@ export default function MaterialInlineReader({
 
         {/* Controls */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {!isCollapsed && fileKind !== "other" && (
+          {!isCollapsed && hasRequestedLoad && fileKind !== "other" && (
             <>
               {/* Portrait / Wide Toggle */}
               <div className="inline-flex rounded-lg border border-slate-700/80 bg-[#060A12] p-0.5">
@@ -260,11 +313,14 @@ export default function MaterialInlineReader({
                 </button>
               </div>
 
-              {/* Mobile/Compatibility Viewer Switch for PDF & Office */}
-              {(fileKind === "pdf" || fileKind === "office") && (
+              {/* Alt Viewer only when <= 15 MB (Google Viewer rejects larger files) */}
+              {canUseAltViewer && (
                 <button
                   type="button"
-                  onClick={() => setUseGoogleViewer((v) => !v)}
+                  onClick={() => {
+                    setFrameReady(false);
+                    setUseGoogleViewer((v) => !v);
+                  }}
                   className={`cursor-pointer rounded-lg border px-2 py-1 text-[11px] font-semibold transition ${
                     useGoogleViewer
                       ? "border-violet-400/60 bg-violet-500/20 text-violet-200"
@@ -279,36 +335,35 @@ export default function MaterialInlineReader({
           )}
 
           {/* Refresh */}
-          <button
-            type="button"
-            onClick={() => void fetchPreviewUrl()}
-            disabled={loading}
-            className="cursor-pointer rounded-lg border border-slate-700/80 bg-[#060A12] p-1.5 text-slate-300 transition hover:border-slate-600 hover:text-white disabled:opacity-50"
-            title="Reload Preview"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          </button>
+          {hasRequestedLoad && (
+            <button
+              type="button"
+              onClick={() => void fetchPreviewUrl()}
+              disabled={loading}
+              className="cursor-pointer rounded-lg border border-slate-700/80 bg-[#060A12] p-1.5 text-slate-300 transition hover:border-slate-600 hover:text-white disabled:opacity-50"
+              title="Reload Preview"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          )}
 
           {/* Open in New Tab */}
-          {fileUrl && (
-            <a
-              href={fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-700/80 bg-[#060A12] px-2 py-1.5 text-[11px] font-semibold text-slate-200 transition hover:border-cyan-400/50 hover:text-cyan-300"
-              title="Open in New Tab"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              <span className="hidden md:inline">New Tab</span>
-            </a>
-          )}
+          <button
+            type="button"
+            onClick={() => void handleOpenNewTab()}
+            className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-700/80 bg-[#060A12] px-2 py-1.5 text-[11px] font-semibold text-slate-200 transition hover:border-cyan-400/50 hover:text-cyan-300"
+            title="Open in New Tab"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">New Tab</span>
+          </button>
 
           {/* Download */}
           <button
             type="button"
             onClick={() => void handleDownload()}
             disabled={downloading}
-            className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-emerald-500/20 border border-emerald-400/40 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-300 transition hover:bg-emerald-500/30 disabled:opacity-50"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-emerald-400/40 bg-emerald-500/20 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-300 transition hover:bg-emerald-500/30 disabled:opacity-50"
             title="Download File"
           >
             <Download className="h-3.5 w-3.5" />
@@ -318,7 +373,7 @@ export default function MaterialInlineReader({
           </button>
 
           {/* Fullscreen */}
-          {!isCollapsed && fileKind !== "other" && (
+          {!isCollapsed && hasRequestedLoad && fileKind !== "other" && (
             <button
               type="button"
               onClick={() => setIsFullscreen((f) => !f)}
@@ -333,7 +388,7 @@ export default function MaterialInlineReader({
             </button>
           )}
 
-          {/* Collapse / Expand (when not fullscreen) */}
+          {/* Collapse / Expand */}
           {!isFullscreen && (
             <button
               type="button"
@@ -364,15 +419,48 @@ export default function MaterialInlineReader({
             isFullscreen ? "flex-1" : ""
           }`}
         >
-          {loading ? (
-            <div className="flex h-[460px] flex-col items-center justify-center gap-3 text-slate-400">
+          {!hasRequestedLoad ? (
+            <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-emerald-500/30 bg-[#0A1020]/70 px-6 py-12 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-300">
+                <BookOpen className="h-7 w-7" />
+              </div>
+              <div className="max-w-md space-y-1.5">
+                <p className="text-sm font-bold text-white sm:text-base">
+                  Large {badge} Ready ({formatSize(fileSizeBytes)})
+                </p>
+                <p className="text-xs leading-relaxed text-slate-400">
+                  ডাটা ও লোডিং সময় বাঁচাতে ১০ MB-এর বড় ফাইল অটোমেটিক লোড করা হয়নি। পেজের ভেতরেই পড়তে নিচের বাটনে ক্লিক করুন, অথবা সরাসরি ডাউনলোড করুন।
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => void fetchPreviewUrl()}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-emerald-400 px-5 py-2.5 text-xs font-bold text-slate-950 shadow-[0_0_24px_rgba(52,211,153,0.3)] transition hover:bg-emerald-300"
+                >
+                  <Play className="h-3.5 w-3.5 fill-current" />
+                  Load Portrait Reader ({formatSize(fileSizeBytes)})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDownload()}
+                  disabled={downloading}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-700 bg-[#0B1222] px-4 py-2.5 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/50 hover:text-cyan-300 disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {downloading ? "Preparing..." : "Download"}
+                </button>
+              </div>
+            </div>
+          ) : loading ? (
+            <div className="flex h-[420px] flex-col items-center justify-center gap-3 text-slate-400">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-400/30 border-t-emerald-400" />
               <p className="text-xs font-medium">
-                Preparing inline portrait reader...
+                Preparing inline portrait reader ({formatSize(fileSizeBytes)})...
               </p>
             </div>
           ) : error ? (
-            <div className="flex h-[300px] flex-col items-center justify-center gap-3 rounded-xl border border-rose-500/25 bg-rose-500/5 p-6 text-center">
+            <div className="flex h-[280px] flex-col items-center justify-center gap-3 rounded-xl border border-rose-500/25 bg-rose-500/5 p-6 text-center">
               <p className="text-sm font-semibold text-rose-300">{error}</p>
               <button
                 type="button"
@@ -410,26 +498,50 @@ export default function MaterialInlineReader({
                       : `${Math.min(100, Math.max(75, zoom))}%`,
                   maxWidth: "100%",
                 }}
-                className={`overflow-hidden rounded-xl border border-slate-800 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.7)] transition-all duration-200 ${
+                className={`relative overflow-hidden rounded-xl border border-slate-800 bg-[#0B1222] shadow-[0_20px_50px_rgba(0,0,0,0.7)] transition-all duration-200 ${
                   isFullscreen
                     ? "h-[calc(100vh-110px)]"
                     : "h-[68vh] min-h-[520px] sm:h-[78vh] sm:min-h-[640px]"
                 }`}
               >
+                {!frameReady && (
+                  <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2.5 bg-[#070C17]/90 px-4 text-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-400/30 border-t-emerald-400" />
+                    <p className="text-xs font-semibold text-slate-200">
+                      Loading {badge} ({formatSize(fileSizeBytes)})...
+                    </p>
+                    {isLargeFile && (
+                      <p className="max-w-xs text-[11px] text-slate-400">
+                        বড় ফাইল হওয়ায় প্রথমবার লোড হতে কয়েক সেকেন্ড সময় লাগতে পারে।
+                      </p>
+                    )}
+                  </div>
+                )}
                 <iframe
                   key={embedSrc}
                   src={embedSrc}
                   title={title}
-                  className="h-full w-full border-0"
+                  onLoad={() => setFrameReady(true)}
+                  className="h-full w-full border-0 bg-white"
                   allow="fullscreen"
                 />
               </div>
               <p className="mt-2.5 text-center text-[11px] text-slate-500">
-                মোবাইলে প্রিভিউ লোড না হলে উপরের{" "}
-                <span className="font-semibold text-slate-300">Alt Viewer</span>{" "}
-                বা{" "}
-                <span className="font-semibold text-cyan-300">New Tab</span>{" "}
-                ক্লিক করুন।
+                {canUseAltViewer ? (
+                  <>
+                    মোবাইলে প্রিভিউ লোড না হলে উপরের{" "}
+                    <span className="font-semibold text-slate-300">Alt Viewer</span>{" "}
+                    বা{" "}
+                    <span className="font-semibold text-cyan-300">New Tab</span>{" "}
+                    ক্লিক করুন।
+                  </>
+                ) : (
+                  <>
+                    ফাইলটি বড় ({formatSize(fileSizeBytes)}) হওয়ায় নেটিভ ব্রাউজার ভিউয়ার ব্যবহার করা হচ্ছে—মোবাইলে দ্রুত পড়তে{" "}
+                    <span className="font-semibold text-cyan-300">Download</span>{" "}
+                    করতে পারেন।
+                  </>
+                )}
               </p>
             </div>
           ) : (
@@ -446,17 +558,14 @@ export default function MaterialInlineReader({
                 </p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
-                {fileUrl && (
-                  <a
-                    href={fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-[#0B1222] px-4 py-2 text-xs font-semibold text-slate-200 hover:border-cyan-400/50 hover:text-cyan-300"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    Open in Browser
-                  </a>
-                )}
+                <button
+                  type="button"
+                  onClick={() => void handleOpenNewTab()}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-700 bg-[#0B1222] px-4 py-2 text-xs font-semibold text-slate-200 hover:border-cyan-400/50 hover:text-cyan-300"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open in Browser
+                </button>
                 <button
                   type="button"
                   onClick={() => void handleDownload()}

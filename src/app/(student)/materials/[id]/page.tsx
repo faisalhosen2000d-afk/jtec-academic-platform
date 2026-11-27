@@ -331,6 +331,7 @@ export default async function MaterialDetailsPage({
                   materialId={materialData.id}
                   title={materialData.title}
                   fileType={materialData.file_type}
+                  fileSizeBytes={materialData.file_size_bytes}
                 />
               </div>
 
