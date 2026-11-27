@@ -10,6 +10,7 @@ import {
   Plus,
   X,
   Mail,
+  Cloud,
   UploadCloud,
   CheckCircle2,
   Clock,
@@ -107,6 +108,54 @@ type QuestionBankSectionProps = {
   terms: QuestionTermOption[];
   currentTermId: string;
 };
+
+type CloudProviderKey = "r2" | "b2" | "supabase";
+
+const CLOUD_NODES: Array<{
+  key: CloudProviderKey;
+  name: string;
+  tag: string;
+  activeBorder: string;
+  activeBg: string;
+  activeGlow: string;
+  dotColor: string;
+  pingColor: string;
+  textColor: string;
+}> = [
+  {
+    key: "r2",
+    name: "Cloudflare R2",
+    tag: "High-Speed",
+    activeBorder: "border-orange-400/80",
+    activeBg: "bg-orange-500/15",
+    activeGlow: "shadow-[0_0_20px_rgba(251,146,60,0.42)]",
+    dotColor: "bg-orange-400",
+    pingColor: "bg-orange-400",
+    textColor: "text-orange-200",
+  },
+  {
+    key: "b2",
+    name: "Backblaze B2",
+    tag: "Compact",
+    activeBorder: "border-cyan-400/80",
+    activeBg: "bg-cyan-500/15",
+    activeGlow: "shadow-[0_0_20px_rgba(34,211,238,0.42)]",
+    dotColor: "bg-cyan-400",
+    pingColor: "bg-cyan-400",
+    textColor: "text-cyan-200",
+  },
+  {
+    key: "supabase",
+    name: "Supabase",
+    tag: "Backup",
+    activeBorder: "border-emerald-400/80",
+    activeBg: "bg-emerald-500/15",
+    activeGlow: "shadow-[0_0_20px_rgba(16,185,129,0.42)]",
+    dotColor: "bg-emerald-400",
+    pingColor: "bg-emerald-400",
+    textColor: "text-emerald-200",
+  },
+];
 
 function formatBytes(bytes: number): string {
   if (!bytes || bytes <= 0) return "0 KB";
@@ -356,7 +405,9 @@ export default function QuestionBankSection({
     percent: number;
     loadedBytes: number;
     totalBytes: number;
-  }>({ step: 0, percent: 0, loadedBytes: 0, totalBytes: 0 });
+    provider?: CloudProviderKey | null;
+    providerLabel?: string;
+  }>({ step: 0, percent: 0, loadedBytes: 0, totalBytes: 0, provider: null });
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
 
@@ -731,8 +782,8 @@ export default function QuestionBankSection({
           ? activeFolderId
           : null;
 
-      setUploadProgress({ step: 3, percent: 65, loadedBytes: 0, totalBytes: pdfFile.size });
-      setUploadStatus("Preparing secure cloud upload...");
+      setUploadProgress({ step: 3, percent: 65, loadedBytes: 0, totalBytes: pdfFile.size, provider: null });
+      setUploadStatus("Smart Router analyzing PDF size...");
       const prepRes = await fetch("/api/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -754,7 +805,29 @@ export default function QuestionBankSection({
         throw new Error(prepData?.error || "Could not prepare question upload.");
       }
 
-      setUploadStatus("Uploading PDF to Cloud Storage...");
+      const resolvedProvider: CloudProviderKey =
+        prepData.storageProvider === "r2"
+          ? "r2"
+          : prepData.storageProvider === "b2"
+            ? "b2"
+            : "supabase";
+      const providerLabel =
+        resolvedProvider === "r2"
+          ? "Cloudflare R2"
+          : resolvedProvider === "b2"
+            ? "Backblaze B2"
+            : "Supabase Storage";
+
+      setUploadStatus(`Uploading PDF to ${providerLabel}...`);
+      setUploadProgress({
+        step: 3,
+        percent: 68,
+        loadedBytes: 0,
+        totalBytes: pdfFile.size,
+        provider: resolvedProvider,
+        providerLabel,
+      });
+
       if (typeof prepData.uploadUrl === "string" && prepData.uploadUrl.length > 0) {
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
@@ -765,9 +838,11 @@ export default function QuestionBankSection({
             const frac = ev.loaded / ev.total;
             setUploadProgress({
               step: 3,
-              percent: Math.min(92, Math.round(65 + frac * 27)),
+              percent: Math.min(92, Math.round(68 + frac * 24)),
               loadedBytes: ev.loaded,
               totalBytes: ev.total,
+              provider: resolvedProvider,
+              providerLabel,
             });
           };
           xhr.onload = () => {
@@ -788,7 +863,14 @@ export default function QuestionBankSection({
         if (sbErr) throw new Error(sbErr.message || "Storage upload failed.");
       }
 
-      setUploadProgress({ step: 4, percent: 96, loadedBytes: pdfFile.size, totalBytes: pdfFile.size });
+      setUploadProgress({
+        step: 4,
+        percent: 96,
+        loadedBytes: pdfFile.size,
+        totalBytes: pdfFile.size,
+        provider: resolvedProvider,
+        providerLabel,
+      });
       setUploadStatus("Saving question record...");
       const finRes = await fetch("/api/questions", {
         method: "POST",
@@ -813,7 +895,14 @@ export default function QuestionBankSection({
         throw new Error(finData?.error || "Could not save question paper.");
       }
 
-      setUploadProgress({ step: 4, percent: 100, loadedBytes: pdfFile.size, totalBytes: pdfFile.size });
+      setUploadProgress({
+        step: 4,
+        percent: 100,
+        loadedBytes: pdfFile.size,
+        totalBytes: pdfFile.size,
+        provider: resolvedProvider,
+        providerLabel,
+      });
       setUploadSuccess(finData.message || "Question submitted!");
       setSelectedFiles([]);
     setFigureSnips((prev) => { prev.forEach((s) => URL.revokeObjectURL(s.previewUrl)); return []; });
@@ -2055,7 +2144,84 @@ export default function QuestionBankSection({
                 </div>
               )}
               {(uploading || uploadProgress.percent === 100) && uploadProgress.step > 0 && (
-                <div className="rounded-xl border border-cyan-500/35 bg-[#060A12] p-3">
+                <div className="space-y-3 rounded-xl border border-cyan-500/35 bg-[#060A12] p-3.5 shadow-[0_0_24px_rgba(34,211,238,0.08)]">
+                  <style>{`
+                    @keyframes qbShimmer {
+                      100% { transform: translateX(100%); }
+                    }
+                  `}</style>
+
+                  {/* 3-Node Live Cloud Routing Visualizer */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {CLOUD_NODES.map((node) => {
+                      const isRouting = uploadProgress.step === 3 && !uploadProgress.provider;
+                      const isActive = uploadProgress.provider === node.key;
+                      const isUploadingNow = isActive && uploadProgress.percent < 100;
+                      const isSaved = isActive && uploadProgress.percent === 100;
+
+                      return (
+                        <div
+                          key={node.key}
+                          className={`relative overflow-hidden rounded-lg border px-2 py-1.5 transition-all duration-300 ${
+                            isActive
+                              ? `${node.activeBorder} ${node.activeBg} ${node.activeGlow} scale-[1.02]`
+                              : isRouting
+                                ? "border-slate-700/80 bg-[#0E172A] animate-pulse"
+                                : "border-slate-800/80 bg-[#0A1020]/70 opacity-45"
+                          }`}
+                        >
+                          {isUploadingNow && (
+                            <div className="pointer-events-none absolute inset-0 -translate-x-full animate-[qbShimmer_1.4s_infinite] bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+                          )}
+                          <div className="relative flex items-center justify-between gap-1">
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <span className="relative flex h-2 w-2 shrink-0 items-center justify-center">
+                                {isUploadingNow && (
+                                  <span
+                                    className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-80 ${node.pingColor}`}
+                                  />
+                                )}
+                                <span
+                                  className={`relative inline-flex h-1.5 w-1.5 rounded-full ${
+                                    isActive
+                                      ? node.dotColor
+                                      : isRouting
+                                        ? "bg-slate-400"
+                                        : "bg-slate-600"
+                                  }`}
+                                />
+                              </span>
+                              <span
+                                className={`truncate text-[10px] font-bold ${
+                                  isActive ? node.textColor : "text-slate-400"
+                                }`}
+                              >
+                                {node.name}
+                              </span>
+                            </div>
+                            <Cloud
+                              className={`hidden h-3 w-3 shrink-0 sm:block ${
+                                isActive ? node.textColor : "text-slate-600"
+                              }`}
+                            />
+                          </div>
+                          <div className="relative mt-0.5 flex items-center justify-between text-[9px]">
+                            <span className={isActive ? "font-semibold text-slate-200" : "text-slate-500"}>
+                              {isSaved
+                                ? "Saved ✓"
+                                : isUploadingNow
+                                  ? "Active · Uploading"
+                                  : isRouting
+                                    ? "Routing..."
+                                    : "Standby"}
+                            </span>
+                            <span className="hidden text-slate-500 sm:inline">{node.tag}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   <div className="flex items-center justify-between text-xs">
                     <span className="inline-flex items-center gap-1.5 font-semibold text-cyan-200">
                       {uploadProgress.percent === 100 ? (
@@ -2063,23 +2229,31 @@ export default function QuestionBankSection({
                       ) : (
                         <Loader2 className="h-3.5 w-3.5 animate-spin text-cyan-400" />
                       )}
-                      <span>{uploadStatus || "Completed!"}</span>
+                      <span>
+                        {uploadProgress.percent === 100
+                          ? `Completed via ${uploadProgress.providerLabel ?? "Cloud"}!`
+                          : uploadStatus || "Processing..."}
+                      </span>
                     </span>
                     <span className="font-mono font-bold text-cyan-300">{uploadProgress.percent}%</span>
                   </div>
 
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-800">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${
                         uploadProgress.percent === 100
                           ? "bg-emerald-400"
-                          : "bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-400"
+                          : uploadProgress.provider === "r2"
+                            ? "bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-300"
+                            : uploadProgress.provider === "b2"
+                              ? "bg-gradient-to-r from-cyan-400 via-sky-400 to-teal-300"
+                              : "bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-400"
                       }`}
                       style={{ width: `${uploadProgress.percent}%` }}
                     />
                   </div>
 
-                  <div className="mt-2.5 grid grid-cols-4 gap-1 text-center text-[10px] font-semibold">
+                  <div className="grid grid-cols-4 gap-1 text-center text-[10px] font-semibold">
                     {[
                       { s: 1, label: "1. AI Read" },
                       { s: 2, label: "2. Build PDF" },
@@ -2106,7 +2280,7 @@ export default function QuestionBankSection({
                   </div>
 
                   {uploadProgress.totalBytes > 0 && (
-                    <div className="mt-1.5 text-right text-[10px] text-slate-400">
+                    <div className="text-right text-[10px] text-slate-400">
                       {formatBytes(uploadProgress.loadedBytes)} / {formatBytes(uploadProgress.totalBytes)}
                     </div>
                   )}
