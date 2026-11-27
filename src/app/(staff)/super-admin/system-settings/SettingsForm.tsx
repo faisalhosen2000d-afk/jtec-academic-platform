@@ -6,22 +6,33 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  Cloud,
   HardDrive,
   Loader2,
   Save,
   ShieldAlert,
+  ShieldCheck,
+  Sparkles,
   UserPlus,
   Wrench,
 } from "lucide-react";
 import { savePlatformSettings } from "./actions";
 import type { B2BandwidthStatus } from "@/lib/b2-bandwidth";
+import type { R2UsageStats } from "@/lib/material-storage";
+import {
+  DEFAULT_STORAGE_ROUTING_RULES,
+  type StorageProviderMode,
+  type StorageRoutingRules,
+  type StorageSectionKey,
+} from "@/lib/platform-settings";
 import { ModernDateTimePicker } from "@/components/ui/ModernDateTimePicker";
 
 type SettingsFormProps = {
   initialSettings: {
     registration_open: boolean;
     max_upload_size_mb: number;
-    material_storage_provider?: "b2" | "supabase";
+    material_storage_provider?: "b2" | "supabase" | "r2" | "smart_auto";
+    storage_routing_rules?: StorageRoutingRules;
     maintenance_mode: boolean;
     maintenance_message: string;
     maintenance_start_time: string | null;
@@ -30,7 +41,9 @@ type SettingsFormProps = {
     updated_at: string;
   };
   b2Configured?: boolean;
+  r2Configured?: boolean;
   b2Bandwidth?: B2BandwidthStatus;
+  r2Usage?: R2UsageStats;
 };
 
 const UPLOAD_OPTIONS = [
@@ -40,6 +53,52 @@ const UPLOAD_OPTIONS = [
   { value: 100, label: "100 MB per file (Recommended Standard)" },
   { value: 200, label: "200 MB per file (Large Archives)" },
 ];
+
+const CUTOFF_OPTIONS = [1, 1.5, 2, 3, 5];
+
+const STORAGE_SECTIONS: Array<{
+  key: StorageSectionKey;
+  title: string;
+  subtitle: string;
+}> = [
+  {
+    key: "materials",
+    title: "Study Materials",
+    subtitle: "PDF notes, books, slides & student uploads",
+  },
+  {
+    key: "questions",
+    title: "Question Bank",
+    subtitle: "Previous year question papers & exam sets",
+  },
+  {
+    key: "notices",
+    title: "Notices & Circulars",
+    subtitle: "Official notice PDFs & image attachments",
+  },
+  {
+    key: "schedules",
+    title: "Schedules & Routines",
+    subtitle: "Class routines & exam schedules",
+  },
+];
+
+const MODE_OPTIONS: Array<{
+  value: StorageProviderMode;
+  label: string;
+}> = [
+  { value: "smart_auto", label: "Smart Auto" },
+  { value: "r2", label: "R2 Only" },
+  { value: "b2", label: "B2 Only" },
+  { value: "supabase", label: "Supabase" },
+];
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function toLocalInputString(isoStr: string | null | undefined): string {
   if (!isoStr) return "";
@@ -89,11 +148,19 @@ function ToggleSwitch({
   );
 }
 
-export default function SettingsForm({ initialSettings, b2Configured = true, b2Bandwidth }: SettingsFormProps) {
+export default function SettingsForm({
+  initialSettings,
+  b2Configured = true,
+  r2Configured = false,
+  b2Bandwidth,
+  r2Usage,
+}: SettingsFormProps) {
   const [registrationOpen, setRegistrationOpen] = useState(
     initialSettings.registration_open,
   );
-  const [materialStorageProvider, setMaterialStorageProvider] = useState<"b2" | "supabase">(initialSettings.material_storage_provider === "supabase" ? "supabase" : "b2");
+  const [routingRules, setRoutingRules] = useState<StorageRoutingRules>(
+    initialSettings.storage_routing_rules ?? DEFAULT_STORAGE_ROUTING_RULES,
+  );
   const [maxUploadSizeMb, setMaxUploadSizeMb] = useState(
     initialSettings.max_upload_size_mb || 25,
   );
@@ -141,6 +208,20 @@ export default function SettingsForm({ initialSettings, b2Configured = true, b2B
     };
   }, []);
 
+  function updateSectionMode(section: StorageSectionKey, mode: StorageProviderMode) {
+    setRoutingRules((prev) => ({
+      ...prev,
+      [section]: { ...prev[section], mode },
+    }));
+  }
+
+  function updateSectionCutoff(section: StorageSectionKey, cutoff_mb: number) {
+    setRoutingRules((prev) => ({
+      ...prev,
+      [section]: { ...prev[section], cutoff_mb },
+    }));
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -162,7 +243,7 @@ export default function SettingsForm({ initialSettings, b2Configured = true, b2B
     const result = await savePlatformSettings({
       registration_open: registrationOpen,
       max_upload_size_mb: Number(maxUploadSizeMb),
-      material_storage_provider: materialStorageProvider,
+      storage_routing_rules: routingRules,
       maintenance_mode: maintenanceMode,
       maintenance_message: maintenanceMessage,
       maintenance_start_time: startTime || null,
@@ -225,125 +306,229 @@ export default function SettingsForm({ initialSettings, b2Configured = true, b2B
         </div>
       </section>
 
-      {/* Active Material Storage Provider Card */}
-      <div className="rounded-2xl border border-slate-800/80 bg-[#0A1020] p-5 shadow-lg">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-base font-semibold text-white">
-              Active Material Storage Provider
-            </h2>
-            <p className="mt-1 text-xs leading-relaxed text-slate-400">
-              Choose where new student uploads are stored. Existing files in both Backblaze B2 and Supabase remain readable at all times.
-            </p>
+      {/* Dynamic Multi-Cloud Storage Router */}
+      <div className="space-y-5 rounded-2xl border border-slate-800/80 bg-[#0A1020] p-6 shadow-xl">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-800/80 pb-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-500/35 bg-cyan-500/15 text-cyan-300">
+              <Cloud className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="font-serif text-lg font-bold text-white">
+                Dynamic Section-Wise Storage Router
+              </h2>
+              <p className="mt-0.5 text-xs leading-relaxed text-slate-400">
+                Route files dynamically between Cloudflare R2 (10 GB free, unlimited downloads), Backblaze B2 (10 GB free, 1 GB/day bandwidth), and Supabase. Existing files stay 100% readable regardless of rule changes.
+              </p>
+            </div>
           </div>
-          <span className="rounded-full border border-cyan-500/40 bg-cyan-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-300">
-            {materialStorageProvider === "b2" ? "Backblaze B2 Active" : "Supabase Active"}
-          </span>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
+                r2Configured
+                  ? "border-orange-400/40 bg-orange-500/15 text-orange-300"
+                  : "border-slate-700 bg-slate-800/80 text-slate-400"
+              }`}
+            >
+              R2: {r2Configured ? "Connected" : "Not Configured"}
+            </span>
+            <span
+              className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
+                b2Configured
+                  ? "border-cyan-400/40 bg-cyan-500/15 text-cyan-300"
+                  : "border-slate-700 bg-slate-800/80 text-slate-400"
+              }`}
+            >
+              B2: {b2Configured ? "Connected" : "Not Configured"}
+            </span>
+          </div>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            disabled={!b2Configured}
-            onClick={() => setMaterialStorageProvider("b2")}
-            className={`cursor-pointer rounded-xl border p-3.5 text-left transition ${
-              materialStorageProvider === "b2"
-                ? "border-cyan-400/70 bg-cyan-500/15 text-white shadow-[0_0_20px_rgba(34,211,238,0.12)]"
-                : "border-slate-800 bg-[#060A12] text-slate-300 hover:border-slate-700"
-            } disabled:cursor-not-allowed disabled:opacity-50`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold">Backblaze B2 Cloud</span>
-              <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-bold text-cyan-300">
-                10 GB Free
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-slate-400">
-              {b2Configured
-                ? "Recommended for PDFs & large files (~30 GB/mo bandwidth)."
-                : "Configure B2_* env vars in Vercel to enable."}
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMaterialStorageProvider("supabase")}
-            className={`cursor-pointer rounded-xl border p-3.5 text-left transition ${
-              materialStorageProvider === "supabase"
-                ? "border-emerald-400/70 bg-emerald-500/15 text-white shadow-[0_0_20px_rgba(16,185,129,0.12)]"
-                : "border-slate-800 bg-[#060A12] text-slate-300 hover:border-slate-700"
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold">Supabase Storage</span>
-              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                1 GB Free
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-slate-400">
-              Built-in Supabase bucket (5 GB/mo bandwidth).
-            </p>
-          </button>
-        </div>
-        {b2Bandwidth && (
-          <div className="mt-4 rounded-xl border border-slate-800/90 bg-[#060A12] p-4">
+        {/* Live Cloud Health Meters */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Cloudflare R2 Live Storage Meter */}
+          <div className="rounded-xl border border-slate-800/90 bg-[#060A12] p-4">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-slate-200">
-                  Backblaze B2 Daily Free Bandwidth (UTC Day: {b2Bandwidth.dayUtc})
+                  Cloudflare R2 Storage
                 </span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                    b2Bandwidth.status === "exceeded"
+                    r2Usage?.hardLimitReached
                       ? "bg-rose-500/20 text-rose-300"
-                      : b2Bandwidth.status === "warning"
+                      : (r2Usage?.percentOfFreeTier ?? 0) >= 80
                         ? "bg-amber-500/20 text-amber-300"
                         : "bg-emerald-500/20 text-emerald-300"
                   }`}
                 >
-                  {b2Bandwidth.percentUsed}% Used
+                  {r2Usage?.hardLimitReached
+                    ? "9.5 GB Lock Active"
+                    : `${r2Usage?.percentOfFreeTier ?? 0}% Used`}
                 </span>
               </div>
               <span className="font-mono text-[11px] text-slate-400">
-                {(b2Bandwidth.bytesUsed / (1024 * 1024)).toFixed(1)} MB / 1024 MB · {b2Bandwidth.requestsCount} hits · Resets 6:00 AM BDT
+                {formatBytes(r2Usage?.usedBytes ?? 0)} / 10.0 GB · {r2Usage?.objectCount ?? 0} files
               </span>
             </div>
 
             <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-slate-800">
               <div
-                style={{ width: `${Math.min(100, b2Bandwidth.percentUsed)}%` }}
+                style={{ width: `${Math.min(100, r2Usage?.percentOfFreeTier ?? 0)}%` }}
                 className={`h-full rounded-full transition-all duration-300 ${
-                  b2Bandwidth.status === "exceeded"
+                  r2Usage?.hardLimitReached
                     ? "bg-rose-500"
-                    : b2Bandwidth.status === "warning"
+                    : (r2Usage?.percentOfFreeTier ?? 0) >= 80
                       ? "bg-amber-400"
-                      : "bg-gradient-to-r from-emerald-400 to-cyan-400"
+                      : "bg-gradient-to-r from-orange-400 to-amber-300"
                 }`}
               />
             </div>
 
-            {b2Bandwidth.debugError && (
-              <p className="mt-2 font-mono text-[11px] text-rose-400">
-                Tracker notice: {b2Bandwidth.debugError}
-              </p>
-            )}
-
-            {b2Bandwidth.percentUsed >= 80 && materialStorageProvider === "b2" && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
-                <span>
-                  Students are currently seeing the B2 bandwidth warning banner. You can switch new uploads to Supabase backup if needed.
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setMaterialStorageProvider("supabase")}
-                  className="cursor-pointer rounded-lg bg-amber-400 px-2.5 py-1 text-[11px] font-bold text-slate-950 hover:bg-amber-300"
-                >
-                  Select Supabase Backup
-                </button>
-              </div>
-            )}
+            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+              <span>
+                Card-Safe Hard Lock at <strong className="text-slate-200">9.5 GB</strong> (auto-failover to B2 before $0 free tier ends).
+              </span>
+            </div>
           </div>
-        )}
+
+          {/* Backblaze B2 Daily Bandwidth Meter */}
+          {b2Bandwidth && (
+            <div className="rounded-xl border border-slate-800/90 bg-[#060A12] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-200">
+                    Backblaze B2 Daily Bandwidth ({b2Bandwidth.dayUtc})
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      b2Bandwidth.status === "exceeded"
+                        ? "bg-rose-500/20 text-rose-300"
+                        : b2Bandwidth.status === "warning"
+                          ? "bg-amber-500/20 text-amber-300"
+                          : "bg-emerald-500/20 text-emerald-300"
+                    }`}
+                  >
+                    {b2Bandwidth.percentUsed}% Used
+                  </span>
+                </div>
+                <span className="font-mono text-[11px] text-slate-400">
+                  {(b2Bandwidth.bytesUsed / (1024 * 1024)).toFixed(1)} MB / 1024 MB · {b2Bandwidth.requestsCount} hits
+                </span>
+              </div>
+
+              <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-slate-800">
+                <div
+                  style={{ width: `${Math.min(100, b2Bandwidth.percentUsed)}%` }}
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    b2Bandwidth.status === "exceeded"
+                      ? "bg-rose-500"
+                      : b2Bandwidth.status === "warning"
+                        ? "bg-amber-400"
+                        : "bg-gradient-to-r from-emerald-400 to-cyan-400"
+                  }`}
+                />
+              </div>
+
+              <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                <span>Auto-failover to R2 at 80% daily usage.</span>
+                <span className="font-mono">Resets 6:00 AM BDT</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Per-Section Routing Rules */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+            <span>Per-Section Upload Routing Rules</span>
+          </div>
+
+          <div className="grid gap-3">
+            {STORAGE_SECTIONS.map((sec) => {
+              const rule = routingRules[sec.key];
+              return (
+                <div
+                  key={sec.key}
+                  className="flex flex-col justify-between gap-3 rounded-xl border border-slate-800 bg-[#060A12] p-4 lg:flex-row lg:items-center"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-white">
+                        {sec.title}
+                      </span>
+                      {rule.mode === "smart_auto" && (
+                        <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-300">
+                          &lt; {rule.cutoff_mb} MB → B2 · ≥ {rule.cutoff_mb} MB → R2
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-400">{sec.subtitle}</p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex rounded-lg border border-slate-800 bg-[#0A1020] p-1">
+                      {MODE_OPTIONS.map((opt) => {
+                        const active = rule.mode === opt.value;
+                        const disabled =
+                          (opt.value === "r2" && !r2Configured) ||
+                          (opt.value === "b2" && !b2Configured);
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => updateSectionMode(sec.key, opt.value)}
+                            className={`cursor-pointer rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
+                              active
+                                ? opt.value === "smart_auto"
+                                  ? "bg-cyan-500/20 text-cyan-300 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.4)]"
+                                  : opt.value === "r2"
+                                    ? "bg-orange-500/20 text-orange-300 shadow-[inset_0_0_0_1px_rgba(251,146,60,0.4)]"
+                                    : opt.value === "b2"
+                                      ? "bg-sky-500/20 text-sky-300 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.4)]"
+                                      : "bg-emerald-500/20 text-emerald-300 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.4)]"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {rule.mode === "smart_auto" && (
+                      <div className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-[#0A1020] px-2.5 py-1">
+                        <span className="text-[11px] text-slate-400">Cutoff:</span>
+                        <select
+                          aria-label={`${sec.title} Smart Auto Cutoff`}
+                          value={rule.cutoff_mb}
+                          onChange={(e) =>
+                            updateSectionCutoff(sec.key, Number(e.target.value))
+                          }
+                          className="cursor-pointer bg-transparent text-xs font-semibold text-cyan-300 focus:outline-none"
+                        >
+                          {CUTOFF_OPTIONS.map((mb) => (
+                            <option
+                              key={mb}
+                              value={mb}
+                              className="bg-[#0A1020] text-slate-200"
+                            >
+                              {mb} MB
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {error ? (

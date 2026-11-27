@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { analyzePdfForAi } from "@/lib/pdf-sampler";
+import { compressFileForUpload } from "@/lib/client-file-compressor";
 
 type Subject = {
   id: string;
@@ -63,6 +64,12 @@ export default function UploadForm({
   const [description, setDescription] = useState("");
   const [topic, setTopic] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [optimizingFile, setOptimizingFile] = useState(false);
+  const [compressionInfo, setCompressionInfo] = useState<{
+    originalSize: number;
+    finalSize: number;
+    savedPercent: number;
+  } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
@@ -73,6 +80,7 @@ export default function UploadForm({
     totalBytes: number;
     speedBps: number;
     etaSeconds: number | null;
+    providerLabel?: string;
   }>({
     stage: "idle",
     percent: 0,
@@ -121,6 +129,30 @@ export default function UploadForm({
       document.removeEventListener("keydown", handleEscape);
     };
   }, []);
+
+  const handleFileSelect = async (picked: File | null) => {
+    setCompressionInfo(null);
+    setAiSourceNote(null);
+    if (!picked) {
+      setFile(null);
+      return;
+    }
+
+    setOptimizingFile(true);
+    try {
+      const result = await compressFileForUpload(picked);
+      setFile(result.file);
+      if (result.compressed) {
+        setCompressionInfo({
+          originalSize: result.originalSize,
+          finalSize: result.finalSize,
+          savedPercent: result.savedPercent,
+        });
+      }
+    } finally {
+      setOptimizingFile(false);
+    }
+  };
 
   const termOptionsList = useMemo(
     () => [
@@ -311,6 +343,13 @@ export default function UploadForm({
         );
       }
 
+      const providerLabel =
+        prepareData.storageProvider === "r2"
+          ? "Cloudflare R2"
+          : prepareData.storageProvider === "b2"
+            ? "Backblaze B2"
+            : "Supabase Storage";
+
       setUploadProgress({
         stage: "uploading",
         percent: 6,
@@ -318,6 +357,7 @@ export default function UploadForm({
         totalBytes: file.size,
         speedBps: 0,
         etaSeconds: null,
+        providerLabel,
       });
 
       if (typeof prepareData.uploadUrl === "string" && prepareData.uploadUrl.length > 0) {
@@ -344,6 +384,7 @@ export default function UploadForm({
               totalBytes: ev.total,
               speedBps,
               etaSeconds,
+              providerLabel,
             });
           };
 
@@ -422,6 +463,7 @@ export default function UploadForm({
         totalBytes: file.size,
         speedBps: 0,
         etaSeconds: 0,
+        providerLabel,
       });
 
       setMessage("Material uploaded successfully and submitted for admin approval!");
@@ -431,6 +473,7 @@ export default function UploadForm({
       setDescription("");
       setTopic("");
       setFile(null);
+      setCompressionInfo(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -758,11 +801,18 @@ export default function UploadForm({
           ref={fileInputRef}
           id="material-file"
           type="file"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          onChange={(e) => {
+            void handleFileSelect(e.target.files?.[0] || null);
+          }}
           className="hidden"
         />
 
-        {file ? (
+        {optimizingFile ? (
+          <div className="flex items-center gap-3 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-3 text-xs text-cyan-200">
+            <Loader2 className="h-4 w-4 animate-spin text-cyan-300" />
+            <span>Optimizing file size for faster upload...</span>
+          </div>
+        ) : file ? (
           <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/30 bg-[#0A1020] text-emerald-400">
@@ -772,15 +822,21 @@ export default function UploadForm({
                 <p className="truncate text-xs sm:text-sm font-semibold text-white">
                   {file.name}
                 </p>
-                <p className="text-[11px] text-emerald-300">
-                  {formatBytes(file.size)} &middot; Ready to upload
-                </p>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-emerald-300">
+                  <span>{formatBytes(file.size)} &middot; Ready to upload</span>
+                  {compressionInfo && (
+                    <span className="rounded-full border border-cyan-400/40 bg-cyan-500/15 px-2 py-0.5 text-[10px] font-semibold text-cyan-200">
+                      Auto-compressed {formatBytes(compressionInfo.originalSize)} → {formatBytes(compressionInfo.finalSize)} (-{compressionInfo.savedPercent}%)
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <button
               type="button"
               onClick={() => {
                 setFile(null);
+                setCompressionInfo(null);
                 if (fileInputRef.current) {
                   fileInputRef.current.value = "";
                 }
@@ -811,7 +867,7 @@ export default function UploadForm({
               e.preventDefault();
               setIsDragging(false);
               const dropped = e.dataTransfer.files?.[0];
-              if (dropped) setFile(dropped);
+              if (dropped) void handleFileSelect(dropped);
             }}
             className={`flex cursor-pointer flex-col gap-3 rounded-xl border border-dashed px-4 py-4 transition sm:flex-row sm:items-center sm:justify-between ${
               isDragging
@@ -828,7 +884,7 @@ export default function UploadForm({
                   Click to choose or drag &amp; drop file
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  PDF, DOCX, PPTX, XLSX, Images &middot; Max {maxUploadSizeMb} MB
+                  PDF, DOCX, PPTX, Images (auto-compressed) &middot; Max {maxUploadSizeMb} MB
                 </p>
               </div>
             </div>
@@ -853,7 +909,7 @@ export default function UploadForm({
                 {uploadProgress.stage === "preparing"
                   ? "1/3 Preparing secure upload..."
                   : uploadProgress.stage === "uploading"
-                    ? "2/3 Uploading to Cloud Storage..."
+                    ? `2/3 Uploading to ${uploadProgress.providerLabel ?? "Cloud Storage"}...`
                     : uploadProgress.stage === "finalizing"
                       ? "3/3 Saving material record..."
                       : "Upload Complete (100%)"}
@@ -909,7 +965,7 @@ export default function UploadForm({
       <div className="flex justify-end pt-1">
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || optimizingFile}
           className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-emerald-400 px-6 py-2.5 text-sm font-bold text-slate-950 shadow-[0_0_24px_rgba(52,211,153,0.3)] transition hover:bg-emerald-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55"
         >
           {submitting ? (

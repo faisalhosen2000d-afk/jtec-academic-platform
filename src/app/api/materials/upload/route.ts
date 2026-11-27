@@ -1,9 +1,15 @@
-﻿import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
+import { checkRateLimit, rateLimitExceededResponse } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { createB2UploadPresignedUrl, isB2Configured, removeMaterialObject } from "@/lib/material-storage";
+import {
+  createB2UploadPresignedUrl,
+  createR2UploadPresignedUrl,
+  removeMaterialObject,
+  resolveTargetStorageProvider,
+} from "@/lib/material-storage";
+import { getActivePlatformSettings } from "@/lib/platform-settings";
+import { getTodayB2BandwidthStatus } from "@/lib/b2-bandwidth";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
 
 const ALLOWED_EXTENSIONS = new Set([
@@ -42,9 +48,11 @@ function isSafeStoragePath(filePath: string, expectedPrefix: string): boolean {
     return false;
   }
 
-  const normalizedPath = filePath.startsWith("b2://")
-    ? filePath.slice("b2://".length)
-    : filePath;
+  const normalizedPath = filePath.startsWith("r2://")
+    ? filePath.slice("r2://".length)
+    : filePath.startsWith("b2://")
+      ? filePath.slice("b2://".length)
+      : filePath;
 
   const prefixWithSlash = `${expectedPrefix}/`;
   if (!normalizedPath.startsWith(prefixWithSlash)) {
@@ -53,7 +61,6 @@ function isSafeStoragePath(filePath: string, expectedPrefix: string): boolean {
 
   const fileNamePart = normalizedPath.slice(prefixWithSlash.length);
 
-  // Must be a single flat filename inside expectedPrefix (no extra folders)
   if (!fileNamePart || fileNamePart.includes("/")) {
     return false;
   }
@@ -74,42 +81,6 @@ function jsonError(error: string, status = 400) {
   return NextResponse.json({ error }, { status });
 }
 
-async function getUploadSettings(): Promise<{
-  maxBytes: number;
-  maxMb: number;
-  storageProvider: "b2" | "supabase";
-}> {
-  const rawClient = createRawSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-  const { data, error } = await rawClient
-    .from("platform_settings")
-    .select("max_upload_size_mb, material_storage_provider")
-    .eq("id", 1)
-    .maybeSingle();
-
-  if (!error && data) {
-    const settings = data as {
-      max_upload_size_mb?: number;
-      material_storage_provider?: string;
-    };
-    const mb = settings.max_upload_size_mb ?? 100;
-    const storageProvider =
-      settings.material_storage_provider === "supabase" ? "supabase" : "b2";
-    return { maxBytes: mb * 1024 * 1024, maxMb: mb, storageProvider };
-  }
-
-  const { data: fallback } = await rawClient
-    .from("platform_settings")
-    .select("max_upload_size_mb")
-    .eq("id", 1)
-    .maybeSingle();
-
-  const mb = (fallback as { max_upload_size_mb?: number } | null)?.max_upload_size_mb ?? 100;
-  return { maxBytes: mb * 1024 * 1024, maxMb: mb, storageProvider: "b2" };
-}
-
 async function getVerifiedStudent() {
   const supabase = await createClient();
 
@@ -118,12 +89,24 @@ async function getVerifiedStudent() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { supabase, user: null, error: jsonError("You must be logged in to upload a material.", 401) };
+    return {
+      supabase,
+      user: null,
+      error: jsonError("You must be logged in to upload a material.", 401),
+    };
   }
 
-  const rl = await checkRateLimit({ key: `materials-upload:${user.id}`, limit: 25, windowSeconds: 60 });
+  const rl = await checkRateLimit({
+    key: `materials-upload:${user.id}`,
+    limit: 25,
+    windowSeconds: 60,
+  });
   if (!rl.allowed) {
-    return { supabase, user: null, error: rateLimitExceededResponse(rl.retryAfterSeconds) };
+    return {
+      supabase,
+      user: null,
+      error: rateLimitExceededResponse(rl.retryAfterSeconds),
+    };
   }
 
   const { data: profile, error: profileError } = await supabase
@@ -133,22 +116,37 @@ async function getVerifiedStudent() {
     .single();
 
   if (profileError || !profile) {
-    return { supabase, user: null, error: jsonError("Student profile could not be found.", 403) };
+    return {
+      supabase,
+      user: null,
+      error: jsonError("Student profile could not be found.", 403),
+    };
   }
 
   if (profile.role !== "student") {
-    return { supabase, user: null, error: jsonError("Only students can use this upload form.", 403) };
+    return {
+      supabase,
+      user: null,
+      error: jsonError("Only students can use this upload form.", 403),
+    };
   }
 
   if (!profile.is_verified) {
-    return { supabase, user: null, error: jsonError("Your student account is not verified yet.", 403) };
+    return {
+      supabase,
+      user: null,
+      error: jsonError("Your student account is not verified yet.", 403),
+    };
   }
 
   if (profile.upload_disabled) {
     return {
       supabase,
       user: null,
-      error: jsonError("Material upload is currently disabled for your account.", 403),
+      error: jsonError(
+        "Material upload is currently disabled for your account.",
+        403,
+      ),
     };
   }
 
@@ -230,7 +228,6 @@ export async function POST(request: Request) {
     const action = body?.action ?? "prepare";
 
     const auth = await getVerifiedStudent();
-
     if (auth.error || !auth.user) {
       return auth.error;
     }
@@ -246,33 +243,27 @@ export async function POST(request: Request) {
     const descriptionValue = String(body.description ?? "").trim();
     const topicValue = String(body.topic ?? "").trim();
     const fileName = String(body.file_name ?? "").trim();
-    const fileType = String(body.file_type ?? "").trim() || "application/octet-stream";
+    const fileType =
+      String(body.file_type ?? "").trim() || "application/octet-stream";
     const fileSize = Number(body.file_size ?? 0);
     const fileHash = String(body.file_hash ?? "").trim().toLowerCase();
 
-    if (!subjectId) {
-      return jsonError("Please select a subject.");
-    }
+    if (!subjectId) return jsonError("Please select a subject.");
+    if (!title) return jsonError("Material title is required.");
+    if (title.length > 200) return jsonError("Material title is too long.");
+    if (descriptionValue.length > 5000) return jsonError("Description is too long.");
+    if (topicValue.length > 300) return jsonError("Topic is too long.");
 
-    if (!title) {
-      return jsonError("Material title is required.");
-    }
+    const platformSettings = await getActivePlatformSettings();
+    const maxMb = platformSettings.max_upload_size_mb || 100;
+    const maxBytes = maxMb * 1024 * 1024;
 
-    if (title.length > 200) {
-      return jsonError("Material title is too long.");
-    }
-
-    if (descriptionValue.length > 5000) {
-      return jsonError("Description is too long.");
-    }
-
-    if (topicValue.length > 300) {
-      return jsonError("Topic is too long.");
-    }
-
-    const { maxBytes, maxMb, storageProvider } = await getUploadSettings();
-    const fileValidationError = validateFileMetadata(fileName, fileSize, maxBytes, maxMb);
-
+    const fileValidationError = validateFileMetadata(
+      fileName,
+      fileSize,
+      maxBytes,
+      maxMb,
+    );
     if (fileValidationError) {
       return jsonError(fileValidationError);
     }
@@ -291,7 +282,6 @@ export async function POST(request: Request) {
     let filePath: string;
 
     if (action === "prepare") {
-      // Server always generates a fresh UUID and safe storage path
       materialId = randomUUID();
       filePath = createStoragePath(subject, materialId, fileName);
     } else {
@@ -333,18 +323,47 @@ export async function POST(request: Request) {
 
       if (existingDuplicate) {
         return NextResponse.json(
-          { error: `This exact file has already been uploaded ("${existingDuplicate.title}"). Duplicate files are not allowed.` },
+          {
+            error: `This exact file has already been uploaded ("${existingDuplicate.title}"). Duplicate files are not allowed.`,
+          },
           { status: 409 },
         );
       }
     }
 
     if (action === "prepare") {
-      if (storageProvider === "b2" && isB2Configured()) {
+      const b2Bandwidth = await getTodayB2BandwidthStatus().catch(() => null);
+      const resolved = await resolveTargetStorageProvider({
+        rule: platformSettings.storage_routing_rules.materials,
+        fileSizeBytes: fileSize,
+        b2DailyBandwidthPercent: b2Bandwidth?.percentUsed ?? 0,
+      });
+
+      if (resolved.provider === "r2") {
+        const r2Prep = await createR2UploadPresignedUrl(filePath, fileType);
+        if (!r2Prep) {
+          return NextResponse.json(
+            { error: "Cloudflare R2 could not prepare upload URL." },
+            { status: 500 },
+          );
+        }
+        return NextResponse.json({
+          success: true,
+          materialId,
+          filePath: r2Prep.storagePath,
+          uploadUrl: r2Prep.uploadUrl,
+          storageProvider: "r2",
+          routingReason: resolved.reason,
+          fallbackTriggered: resolved.fallbackTriggered,
+          message: "Upload preparation successful.",
+        });
+      }
+
+      if (resolved.provider === "b2") {
         const b2Prep = await createB2UploadPresignedUrl(filePath, fileType);
         if (!b2Prep) {
           return NextResponse.json(
-            { error: "Storage service could not prepare upload URL." },
+            { error: "Backblaze B2 could not prepare upload URL." },
             { status: 500 },
           );
         }
@@ -354,6 +373,8 @@ export async function POST(request: Request) {
           filePath: b2Prep.storagePath,
           uploadUrl: b2Prep.uploadUrl,
           storageProvider: "b2",
+          routingReason: resolved.reason,
+          fallbackTriggered: resolved.fallbackTriggered,
           message: "Upload preparation successful.",
         });
       }
@@ -363,6 +384,8 @@ export async function POST(request: Request) {
         materialId,
         filePath,
         storageProvider: "supabase",
+        routingReason: resolved.reason,
+        fallbackTriggered: resolved.fallbackTriggered,
         message: "Upload preparation successful.",
       });
     }
@@ -391,7 +414,6 @@ export async function POST(request: Request) {
 
     if (materialError || !material) {
       console.error("Material database insert error:", materialError);
-
       await removeMaterialObject(createServiceRoleClient(), filePath);
 
       return NextResponse.json(

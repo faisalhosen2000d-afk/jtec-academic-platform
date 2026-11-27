@@ -3,7 +3,11 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, Settings2, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getActivePlatformSettings } from "@/lib/platform-settings";
-import { isB2Configured } from "@/lib/material-storage";
+import {
+  getR2BucketUsage,
+  isB2Configured,
+  isR2Configured,
+} from "@/lib/material-storage";
 import { getTodayB2BandwidthStatus } from "@/lib/b2-bandwidth";
 import SettingsForm from "./SettingsForm";
 
@@ -29,9 +33,10 @@ export default async function SystemSettingsPage() {
     redirect("/dashboard");
   }
 
-  const [activeSettings, b2Bandwidth] = await Promise.all([
+  const [activeSettings, b2Bandwidth, r2Usage] = await Promise.all([
     getActivePlatformSettings(),
     getTodayB2BandwidthStatus(),
+    getR2BucketUsage(true),
   ]);
 
   return (
@@ -57,8 +62,7 @@ export default async function SystemSettingsPage() {
               System Settings
             </h1>
             <p className="mt-1 text-xs text-slate-400 sm:text-sm">
-              Configure real-time registration gates, file upload limits, and
-              maintenance windows.
+              Configure real-time registration gates, dynamic multi-cloud storage routing, and maintenance windows.
             </p>
           </div>
 
@@ -78,6 +82,7 @@ export default async function SystemSettingsPage() {
             registration_open: activeSettings.registration_open,
             max_upload_size_mb: activeSettings.max_upload_size_mb,
             material_storage_provider: activeSettings.material_storage_provider,
+            storage_routing_rules: activeSettings.storage_routing_rules,
             maintenance_mode: activeSettings.maintenance_mode,
             maintenance_message:
               activeSettings.maintenance_message ||
@@ -89,7 +94,9 @@ export default async function SystemSettingsPage() {
             updated_at: new Date().toISOString(),
           }}
           b2Configured={isB2Configured()}
+          r2Configured={isR2Configured()}
           b2Bandwidth={b2Bandwidth}
+          r2Usage={r2Usage}
         />
 
         <section className="flex items-start gap-3 rounded-2xl border border-slate-800/80 bg-[#0A1020]/70 px-5 py-4 text-xs text-slate-400">
@@ -99,7 +106,7 @@ export default async function SystemSettingsPage() {
               Real-Time Platform Control:
             </span>{" "}
             Changes saved here take effect immediately across registration,
-            material uploads, and maintenance middleware.
+            dynamic storage routing, and maintenance middleware.
           </p>
         </section>
       </main>

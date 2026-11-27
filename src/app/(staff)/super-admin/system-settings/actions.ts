@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createClient as createServerAuthClient } from "@/lib/supabase/server";
 import { createClient as createRawSupabaseClient } from "@supabase/supabase-js";
+import {
+  normalizeStorageRoutingRules,
+  type StorageRoutingRules,
+} from "@/lib/platform-settings";
 
 function normalizeBdTimestamp(val: string | null | undefined): string | null {
   if (!val || typeof val !== "string") return null;
@@ -17,7 +21,8 @@ function normalizeBdTimestamp(val: string | null | undefined): string | null {
 export interface SystemSettingsInput {
   registration_open?: boolean;
   max_upload_size_mb?: number;
-  material_storage_provider?: "b2" | "supabase";
+  material_storage_provider?: "b2" | "supabase" | "r2" | "smart_auto";
+  storage_routing_rules?: StorageRoutingRules;
   maintenance_mode?: boolean;
   maintenance_message?: string;
   maintenance_start_time?: string | null;
@@ -42,48 +47,73 @@ export async function savePlatformSettings(input: FormData | SystemSettingsInput
     .single();
 
   if (!profile || profile.role !== "super_admin") {
-    return { success: false as const, error: "Only Super Admins can modify system settings." };
+    return {
+      success: false as const,
+      error: "Only Super Admins can modify system settings.",
+    };
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const adminClient = createRawSupabaseClient(supabaseUrl, serviceKey);
 
   let registration_open = false;
   let max_upload_size_mb = 25;
-  let material_storage_provider: "b2" | "supabase" = "b2";
+  let storage_routing_rules = normalizeStorageRoutingRules(null);
   let maintenance_mode = false;
-  let maintenance_message = "The academic platform is currently undergoing scheduled maintenance. Please check back shortly.";
+  let maintenance_message =
+    "The academic platform is currently undergoing scheduled maintenance. Please check back shortly.";
   let maintenance_start_time: string | null = null;
   let maintenance_end_time: string | null = null;
   let maintenance_bypass_student_ids: string | null = null;
 
   if (input instanceof FormData) {
-    registration_open = input.get("registration_open") === "on" || input.get("registration_open") === "true";
+    registration_open =
+      input.get("registration_open") === "on" || input.get("registration_open") === "true";
     max_upload_size_mb = Number(input.get("max_upload_size_mb")) || 25;
-    material_storage_provider = input.get("material_storage_provider") === "supabase" ? "supabase" : "b2";
-    maintenance_mode = input.get("maintenance_mode") === "on" || input.get("maintenance_mode") === "true";
+    const rawRules = input.get("storage_routing_rules");
+    if (typeof rawRules === "string") {
+      try {
+        storage_routing_rules = normalizeStorageRoutingRules(JSON.parse(rawRules));
+      } catch {
+        storage_routing_rules = normalizeStorageRoutingRules(null);
+      }
+    }
+    maintenance_mode =
+      input.get("maintenance_mode") === "on" || input.get("maintenance_mode") === "true";
     maintenance_message = String(input.get("maintenance_message") || maintenance_message);
-    maintenance_start_time = normalizeBdTimestamp(input.get("maintenance_start_time") as string);
-    maintenance_end_time = normalizeBdTimestamp(input.get("maintenance_end_time") as string);
+    maintenance_start_time = normalizeBdTimestamp(
+      input.get("maintenance_start_time") as string,
+    );
+    maintenance_end_time = normalizeBdTimestamp(
+      input.get("maintenance_end_time") as string,
+    );
     const bypassRaw = input.get("maintenance_bypass_student_ids");
-    maintenance_bypass_student_ids = typeof bypassRaw === "string" && bypassRaw.trim() ? bypassRaw.trim() : null;
+    maintenance_bypass_student_ids =
+      typeof bypassRaw === "string" && bypassRaw.trim() ? bypassRaw.trim() : null;
   } else {
     registration_open = Boolean(input.registration_open);
     max_upload_size_mb = Number(input.max_upload_size_mb) || 25;
-    material_storage_provider = input.material_storage_provider === "supabase" ? "supabase" : "b2";
+    storage_routing_rules = normalizeStorageRoutingRules(input.storage_routing_rules);
     maintenance_mode = Boolean(input.maintenance_mode);
     maintenance_message = input.maintenance_message || maintenance_message;
     maintenance_start_time = normalizeBdTimestamp(input.maintenance_start_time);
     maintenance_end_time = normalizeBdTimestamp(input.maintenance_end_time);
-    maintenance_bypass_student_ids = input.maintenance_bypass_student_ids ? input.maintenance_bypass_student_ids.trim() : null;
+    maintenance_bypass_student_ids = input.maintenance_bypass_student_ids
+      ? input.maintenance_bypass_student_ids.trim()
+      : null;
   }
+
+  const material_storage_provider: "b2" | "supabase" =
+    storage_routing_rules.materials.mode === "supabase" ? "supabase" : "b2";
 
   const payload = {
     id: 1,
     registration_open,
     max_upload_size_mb,
     material_storage_provider,
+    storage_routing_rules,
     maintenance_mode,
     maintenance_message,
     maintenance_start_time,
