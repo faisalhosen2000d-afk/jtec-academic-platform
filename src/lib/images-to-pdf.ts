@@ -56,7 +56,7 @@ function normalizeMathScripts(raw: string): string {
     .replace(/\\mu(?![a-zA-Z])|\u03BC/g, "\u00B5")
     .replace(/\\beta(?![a-zA-Z])|\u03B2/g, "\u00DF")
     .replace(/\\text\{([^}]*)\}/g, "$1")
-    .replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, "\\frac{$1}{$2}");
+    .replace(/\\frac\s*\{((?:[^{}]|\{[^{}]*\})+)\}\s*\{((?:[^{}]|\{[^{}]*\})+)\}/g, "\\frac{$1}{$2}");
 }
 
 type RichSegment =
@@ -99,7 +99,7 @@ function parseRichSegments(line: string): RichSegment[] {
   const cleanLine = line.replace(/[\r\n]+/g, " ");
   const result: RichSegment[] = [];
   const tokenRegex =
-    /\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}|\\bar\s*\{([^{}]+)\}|\\sum(?![a-zA-Z])(?:_\{([^}]+)\}|_([A-Za-z0-9=+-]+))?(?:\^\{([^}]+)\}|\^([A-Za-z0-9+-]))?|!=|>=|<=/g;
+    /\\frac\s*\{((?:[^{}]|\{[^{}]*\})+)\}\s*\{((?:[^{}]|\{[^{}]*\})+)\}|\\bar\s*\{([^{}]+)\}|\\sum(?![a-zA-Z])(?:_\{([^}]+)\}|_([A-Za-z0-9=+-]+))?(?:\^\{([^}]+)\}|\^([A-Za-z0-9+-]))?|!=|>=|<=/g;
   let lastIdx = 0;
   let m: RegExpExecArray | null;
   while ((m = tokenRegex.exec(cleanLine)) !== null) {
@@ -144,8 +144,8 @@ function measureRichTextWidth(line: string, font: PDFFont, size: number): number
   let total = 0;
   for (const seg of parseRichSegments(line)) {
     if (seg.kind === "frac") {
-      const nw = font.widthOfTextAtSize(seg.num, fracSize);
-      const dw = font.widthOfTextAtSize(seg.den, fracSize);
+      const nw = measureRichTextWidth(seg.num, font, fracSize);
+      const dw = measureRichTextWidth(seg.den, font, fracSize);
       total += Math.max(nw, dw) + 6;
     } else if (seg.kind === "bar") {
       total += font.widthOfTextAtSize(seg.text, size) + 1;
@@ -182,11 +182,11 @@ function drawRichTextLine(
   let cursorX = opts.x;
   for (const seg of parseRichSegments(line)) {
     if (seg.kind === "frac") {
-      const nw = opts.font.widthOfTextAtSize(seg.num, fracSize);
-      const dw = opts.font.widthOfTextAtSize(seg.den, fracSize);
+      const nw = measureRichTextWidth(seg.num, opts.font, fracSize);
+      const dw = measureRichTextWidth(seg.den, opts.font, fracSize);
       const boxW = Math.max(nw, dw) + 4;
       const barY = opts.y + opts.size * 0.28;
-      drawSafeText(page, seg.num, {
+      drawRichTextLine(page, seg.num, {
         x: cursorX + (boxW - nw) / 2,
         y: barY + 2.0,
         size: fracSize,
@@ -199,7 +199,7 @@ function drawRichTextLine(
         thickness: 0.65,
         color: opts.color,
       });
-      drawSafeText(page, seg.den, {
+      drawRichTextLine(page, seg.den, {
         x: cursorX + (boxW - dw) / 2,
         y: barY - fracSize - 1.0,
         size: fracSize,
@@ -323,7 +323,7 @@ function sanitizeSingleLine(text: string): string {
 
 function wrapLines(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
   const protectedText = text.replace(
-    /\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g,
+    /\\frac\s*\{((?:[^{}]|\{[^{}]*\})+)\}\s*\{((?:[^{}]|\{[^{}]*\})+)\}/g,
     (_m, a: string, b: string) => `\\frac{${a.replace(/\s+/g, "\u00A0")}}{${b.replace(/\s+/g, "\u00A0")}}`,
   );
   const paragraphs = protectedText.split(/\r?\n/);
