@@ -9,10 +9,13 @@ import {
   CheckCircle2,
   Megaphone,
   MessageSquare,
+  Newspaper,
   Trash2,
 } from "lucide-react";
 import {
+  deleteAllNotifications,
   deleteNotification,
+  markAllNotificationsAsRead,
   markNotificationAsRead,
 } from "@/server/actions/notifications";
 
@@ -34,6 +37,13 @@ type FilterTab = "all" | "unread" | "notices" | "materials";
 
 function getTypeIcon(type: string) {
   const t = type.toLowerCase();
+  if (t.includes("pulse") || t.includes("news")) {
+    return (
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-500/15 text-cyan-300">
+        <Newspaper className="h-4.5 w-4.5" />
+      </div>
+    );
+  }
   if (t.includes("notice")) {
     return (
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/35 bg-amber-500/15 text-amber-300">
@@ -67,14 +77,24 @@ export default function StudentNotificationsList({
 }: StudentNotificationsListProps) {
   const router = useRouter();
   const [notifications, setNotifications] = useState(initialNotifications);
-
-  useEffect(() => {
-    setNotifications(initialNotifications);
-  }, [initialNotifications]);
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [readingId, setReadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+
+  useEffect(() => {
+    setNotifications(initialNotifications);
+  }, [initialNotifications]);
+
+  // Immediately pull fresh server data on route mount & window focus so no manual browser refresh is ever needed
+  useEffect(() => {
+    router.refresh();
+    const onFocus = () => router.refresh();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [router]);
 
   const unreadItems = useMemo(
     () => notifications.filter((n) => !n.is_read),
@@ -99,27 +119,31 @@ export default function StudentNotificationsList({
     if (markingAll || unreadItems.length === 0) return;
     setMarkingAll(true);
 
-    const results = await Promise.all(
-      unreadItems.map((item) => markNotificationAsRead(item.id)),
-    );
-
-    const succeededIds = new Set(
-      unreadItems
-        .filter((_, idx) => results[idx]?.success)
-        .map((item) => item.id),
-    );
-
-    if (succeededIds.size > 0) {
+    const result = await markAllNotificationsAsRead();
+    if (result.success) {
       setNotifications((current) =>
-        current.map((item) =>
-          succeededIds.has(item.id) ? { ...item, is_read: true } : item,
-        ),
+        current.map((item) => ({ ...item, is_read: true })),
       );
       window.dispatchEvent(new CustomEvent("jtec-notification-read"));
       router.refresh();
     }
 
     setMarkingAll(false);
+  }
+
+  async function handleDeleteAll() {
+    if (deletingAll || notifications.length === 0) return;
+    setDeletingAll(true);
+
+    const result = await deleteAllNotifications();
+    if (result.success) {
+      setNotifications([]);
+      setConfirmDeleteAll(false);
+      window.dispatchEvent(new CustomEvent("jtec-notification-read"));
+      router.refresh();
+    }
+
+    setDeletingAll(false);
   }
 
   async function handleDeleteNotification(notificationId: string) {
@@ -170,13 +194,39 @@ export default function StudentNotificationsList({
     }
 
     if (shouldNavigate && notification.link_url) {
-      router.push(notification.link_url);
+      let targetUrl = notification.link_url;
+      // Ensure Textile Pulse notifications always highlight & blink the exact new article
+      if (
+        (notification.type.toLowerCase().includes("pulse") ||
+          targetUrl.startsWith("/textile-pulse")) &&
+        !targetUrl.includes("highlight=")
+      ) {
+        const sep = targetUrl.includes("?") ? "&" : "?";
+        targetUrl = `${targetUrl}${sep}highlight=latest&highlightTitle=${encodeURIComponent(notification.body.slice(0, 140))}`;
+      }
+      router.push(targetUrl);
     }
+  }
+
+  if (notifications.length === 0) {
+    return (
+      <section className="rounded-2xl border border-dashed border-slate-800 bg-[#0A1020]/70 p-12 text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-400">
+          <Bell className="h-6 w-6" />
+        </div>
+        <h2 className="mt-4 font-serif text-lg font-bold text-white">
+          No notifications yet
+        </h2>
+        <p className="mt-1.5 text-xs sm:text-sm text-slate-400">
+          New academic notices and notifications will appear here.
+        </p>
+      </section>
+    );
   }
 
   return (
     <div className="space-y-4">
-      {/* Filter & Mark All Bar */}
+      {/* Filter, Mark All Read & Delete All Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800/90 bg-[#0A1020] p-3.5 shadow-lg">
         <div className="flex flex-wrap items-center gap-2">
           {(
@@ -193,7 +243,7 @@ export default function StudentNotificationsList({
                 key={tab.id}
                 type="button"
                 onClick={() => setFilterTab(tab.id)}
-                className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
+                className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
                   active
                     ? "border-amber-400/50 bg-amber-400/15 text-amber-300"
                     : "border-slate-800 bg-[#0E172A] text-slate-400 hover:border-slate-700 hover:text-slate-200"
@@ -205,17 +255,51 @@ export default function StudentNotificationsList({
           })}
         </div>
 
-        {unreadItems.length > 0 && (
-          <button
-            type="button"
-            disabled={markingAll}
-            onClick={() => void handleMarkAllRead()}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3.5 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50"
-          >
-            <CheckCheck className="h-3.5 w-3.5" />
-            {markingAll ? "Marking..." : "Mark All Read"}
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {unreadItems.length > 0 && (
+            <button
+              type="button"
+              disabled={markingAll || deletingAll}
+              onClick={() => void handleMarkAllRead()}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3.5 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50"
+            >
+              <CheckCheck className="h-3.5 w-3.5" />
+              {markingAll ? "Marking..." : "Mark All Read"}
+            </button>
+          )}
+
+          {!confirmDeleteAll ? (
+            <button
+              type="button"
+              disabled={deletingAll || markingAll}
+              onClick={() => setConfirmDeleteAll(true)}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-rose-500/35 bg-rose-500/10 px-3.5 py-1.5 text-xs font-bold text-rose-300 transition hover:border-rose-400/60 hover:bg-rose-500/20 disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete All
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 rounded-xl border border-rose-500/50 bg-rose-500/15 px-2.5 py-1">
+              <span className="text-[11px] font-semibold text-rose-200">Delete all?</span>
+              <button
+                type="button"
+                disabled={deletingAll}
+                onClick={() => void handleDeleteAll()}
+                className="cursor-pointer rounded-lg bg-rose-500 px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-rose-400 disabled:opacity-50"
+              >
+                {deletingAll ? "Deleting..." : "Confirm"}
+              </button>
+              <button
+                type="button"
+                disabled={deletingAll}
+                onClick={() => setConfirmDeleteAll(false)}
+                className="cursor-pointer rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-[11px] font-semibold text-slate-300 transition hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Notification Cards */}
@@ -293,7 +377,7 @@ export default function StudentNotificationsList({
                           event.stopPropagation();
                           void handleNotificationClick(notification, true);
                         }}
-                        className="inline-flex items-center gap-1 rounded-xl border border-cyan-500/35 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-300 transition hover:border-cyan-400/65 hover:bg-cyan-500/20"
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-cyan-500/35 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-300 transition hover:border-cyan-400/65 hover:bg-cyan-500/20"
                       >
                         Open
                         <ArrowUpRight className="h-3.5 w-3.5" />
@@ -307,7 +391,7 @@ export default function StudentNotificationsList({
                         event.stopPropagation();
                         void handleDeleteNotification(notification.id);
                       }}
-                      className="inline-flex items-center gap-1 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 transition hover:border-rose-400/60 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 transition hover:border-rose-400/60 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Trash2 className="h-3 w-3" />
                       {deletingId === notification.id ? "Deleting..." : "Delete"}

@@ -3,6 +3,9 @@ import { Bell } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import StudentNotificationsList from "./StudentNotificationsList";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function StudentNotificationsPage() {
   const supabase = await createClient();
 
@@ -16,13 +19,12 @@ export default async function StudentNotificationsPage() {
 
   const { data: notifications, error } = await supabase
     .from("notifications")
-    .select(
-      "id, type, title, body, link_url, is_read, created_at",
-    )
+    .select("id, type, title, body, link_url, is_read, created_at")
     .eq("recipient_id", user.id)
     .order("created_at", { ascending: false });
 
-  const unreadCount = (notifications ?? []).filter((n) => !n.is_read).length;
+  const list = notifications ?? [];
+  const unreadCount = list.filter((n) => !n.is_read).length;
 
   return (
     <div className="min-h-full bg-[#060A12] text-slate-100">
@@ -35,9 +37,7 @@ export default async function StudentNotificationsPage() {
         .dash-stagger-2 { animation: dashFadeUp 0.45s ease-out 0.08s both; }
       `}</style>
       <div className="flex min-h-full">
-
         <div className="flex min-w-0 flex-1 flex-col">
-
           <main className="flex-1 p-5 sm:p-6">
             <div className="mx-auto w-full max-w-4xl space-y-5">
               {/* Activity & Alerts Hero */}
@@ -64,7 +64,7 @@ export default async function StudentNotificationsPage() {
                       {unreadCount} Unread
                     </span>
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-700/80 bg-[#0B1324] px-3 py-1 text-xs font-semibold text-slate-200">
-                      {(notifications ?? []).length} Total
+                      {list.length} Total
                     </span>
                   </div>
                 </div>
@@ -74,22 +74,10 @@ export default async function StudentNotificationsPage() {
                 <section className="dash-stagger-2 rounded-2xl border border-rose-500/35 bg-rose-500/10 p-5 text-sm text-rose-300">
                   Notifications could not be loaded: {error.message}
                 </section>
-              ) : notifications && notifications.length > 0 ? (
-                <div className="dash-stagger-2">
-                  <StudentNotificationsList notifications={notifications} />
-                </div>
               ) : (
-                <section className="dash-stagger-2 rounded-2xl border border-dashed border-slate-800 bg-[#0A1020]/70 p-12 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-400">
-                    <Bell className="h-6 w-6" />
-                  </div>
-                  <h2 className="mt-4 font-serif text-lg font-bold text-white">
-                    No notifications yet
-                  </h2>
-                  <p className="mt-1.5 text-xs sm:text-sm text-slate-400">
-                    New academic notices and notifications will appear here.
-                  </p>
-                </section>
+                <div className="dash-stagger-2">
+                  <StudentNotificationsList notifications={list} />
+                </div>
               )}
             </div>
           </main>

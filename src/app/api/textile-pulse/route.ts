@@ -244,7 +244,7 @@ Return strictly valid JSON object with key "items" (array of 4-8 objects):
             type: "textile_pulse",
             title: "\u0986\u099C\u0995\u09C7\u09B0 \u099F\u09C7\u0995\u09CD\u09B8\u099F\u09BE\u0987\u09B2 \u09A8\u09BF\u0989\u099C \u0993 \u0987\u09A8\u09CB\u09AD\u09C7\u09B6\u09A8 \u09AC\u09CD\u09B0\u09BF\u09AB",
             body: items[0]?.title_bn || "\u09AC\u09BE\u0982\u09B2\u09BE\u09A6\u09C7\u09B6 \u0993 \u09AC\u09BF\u09B6\u09CD\u09AC\u09C7\u09B0 \u09A8\u09A4\u09C1\u09A8 \u099F\u09C7\u0995\u09CD\u09B8\u099F\u09BE\u0987\u09B2 \u0986\u09AA\u09A1\u09C7\u099F \u09A6\u09C7\u0996\u09C1\u09A8\u0964",
-            link_url: "/textile-pulse",
+            link_url: items[0]?.id ? `/textile-pulse?highlight=${encodeURIComponent(items[0].id)}&date=${encodeURIComponent(todayDhaka)}` : "/textile-pulse?highlight=latest",
             is_read: false,
           } as never);
         } catch {

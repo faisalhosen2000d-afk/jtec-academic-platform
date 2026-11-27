@@ -44,6 +44,8 @@ export function TextilePulseClient() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const highlightTargetRef = useRef<{ id: string | null; title: string | null } | null>(null);
   const dateMenuRef = useRef<HTMLDivElement | null>(null);
 
   const loadMoreNews = async () => {
@@ -87,8 +89,62 @@ export function TextilePulseClient() {
   };
 
   useEffect(() => {
-    loadBrief(false);
+    const params = new URLSearchParams(window.location.search);
+    const hlId = params.get("highlight");
+    const hlTitle = params.get("highlightTitle");
+    const targetDate = params.get("date") || undefined;
+
+    if (hlId || hlTitle) {
+      highlightTargetRef.current = { id: hlId, title: hlTitle };
+    }
+    void loadBrief(false, targetDate);
   }, []);
+
+  // Scroll to and trigger glowing/blinking animation on the newly opened news card
+  useEffect(() => {
+    if (loading || items.length === 0 || !highlightTargetRef.current) return;
+
+    const { id: targetId, title: targetTitle } = highlightTargetRef.current;
+    highlightTargetRef.current = null;
+
+    let matched =
+      (targetId && targetId !== "latest"
+        ? items.find((i) => i.id === targetId)
+        : undefined) ??
+      (targetTitle
+        ? items.find((i) =>
+            i.title_bn.toLowerCase().includes(targetTitle.toLowerCase().slice(0, 40)),
+          )
+        : undefined) ??
+      items[0];
+
+    if (!matched) return;
+
+    setRegionTab("all");
+    const regionItems = items.filter((i) => i.region === matched!.region);
+    const idxInRegion = regionItems.findIndex((i) => i.id === matched!.id);
+    if (idxInRegion >= 4) {
+      setShowAll(true);
+    }
+
+    setHighlightedId(matched.id);
+
+    const scrollTimer = window.setTimeout(() => {
+      const el = document.getElementById(`pulse-news-${matched!.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 180);
+
+    const clearTimer = window.setTimeout(() => {
+      setHighlightedId(null);
+    }, 7500);
+
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [loading, items]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -103,48 +159,84 @@ export function TextilePulseClient() {
   const bdItems = items.filter((i) => i.region === "bangladesh");
   const globalItems = items.filter((i) => i.region === "global");
 
-  const renderCard = (item: TextileBriefItem) => (
-    <article
-      key={item.id}
-      className="flex flex-col justify-between rounded-2xl border border-slate-800/90 bg-[#0A1020] p-5 transition hover:border-cyan-500/40"
-    >
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <span className="rounded-full border border-violet-500/35 bg-violet-500/15 px-2.5 py-0.5 text-[10.5px] font-semibold text-violet-200">
-            {item.category}
-          </span>
-          <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
-            <Globe className="h-3 w-3" /> {item.source}
-          </span>
+  const renderCard = (item: TextileBriefItem) => {
+    const isHighlighted = highlightedId === item.id;
+    return (
+      <article
+        key={item.id}
+        id={`pulse-news-${item.id}`}
+        className={`relative flex flex-col justify-between rounded-2xl border bg-[#0A1020] p-5 transition-all duration-300 ${
+          isHighlighted
+            ? "pulse-news-glow border-cyan-400 bg-gradient-to-br from-cyan-500/15 via-[#0B1528] to-amber-500/10"
+            : "border-slate-800/90 hover:border-cyan-500/40"
+        }`}
+      >
+        {isHighlighted && (
+          <div className="mb-3 flex items-center gap-2">
+            <span className="inline-flex animate-pulse items-center gap-1.5 rounded-full bg-gradient-to-r from-cyan-400 to-amber-300 px-3 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-950 shadow-[0_0_16px_rgba(34,211,238,0.65)]">
+              <Sparkles className="h-3 w-3" />
+              New Update
+            </span>
+            <span className="text-[11px] font-semibold text-cyan-300">
+              {"\u09A8\u09A4\u09C1\u09A8 \u0986\u09AA\u09A1\u09C7\u099F"}
+            </span>
+          </div>
+        )}
+
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="rounded-full border border-violet-500/35 bg-violet-500/15 px-2.5 py-0.5 text-[10.5px] font-semibold text-violet-200">
+              {item.category}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+              <Globe className="h-3 w-3" /> {item.source}
+            </span>
+          </div>
+
+          <h3 className="text-base font-bold leading-relaxed text-white">{item.title_bn}</h3>
+          <p className="text-xs leading-relaxed text-slate-300">{item.summary_bn}</p>
+
+          <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-[11.5px] leading-relaxed text-cyan-200">
+            <span className="inline-flex items-center gap-1 font-semibold text-cyan-300">
+              <Sparkles className="h-3 w-3" /> {"\u09B6\u09BF\u0995\u09CD\u09B7\u09BE\u09B0\u09CD\u09A5\u09C0\u09A6\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF:"}
+            </span>{" "}
+            {item.student_takeaway_bn}
+          </div>
         </div>
 
-        <h3 className="text-base font-bold leading-relaxed text-white">{item.title_bn}</h3>
-        <p className="text-xs leading-relaxed text-slate-300">{item.summary_bn}</p>
-
-        <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-[11.5px] leading-relaxed text-cyan-200">
-          <span className="inline-flex items-center gap-1 font-semibold text-cyan-300">
-            <Sparkles className="h-3 w-3" /> {"\u09B6\u09BF\u0995\u09CD\u09B7\u09BE\u09B0\u09CD\u09A5\u09C0\u09A6\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF:"}
-          </span>{" "}
-          {item.student_takeaway_bn}
+        <div className="mt-4 flex items-center justify-between border-t border-slate-800/80 pt-3">
+          <span className="text-[11px] text-slate-500">{item.published_at.slice(0, 16)}</span>
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-300 hover:text-cyan-200"
+          >
+            Read Source <ExternalLink className="h-3.5 w-3.5" />
+          </a>
         </div>
-      </div>
-
-      <div className="mt-4 flex items-center justify-between border-t border-slate-800/80 pt-3">
-        <span className="text-[11px] text-slate-500">{item.published_at.slice(0, 16)}</span>
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-300 hover:text-cyan-200"
-        >
-          Read Source <ExternalLink className="h-3.5 w-3.5" />
-        </a>
-      </div>
-    </article>
-  );
+      </article>
+    );
+  };
 
   return (
     <div className={`${notoBengali.className} space-y-5`}>
+      <style>{`
+        @keyframes pulseNewsGlow {
+          0%, 100% {
+            box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.75), 0 0 28px rgba(34, 211, 238, 0.45);
+            border-color: rgba(34, 211, 238, 0.95);
+          }
+          50% {
+            box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.85), 0 0 42px rgba(251, 191, 36, 0.55);
+            border-color: rgba(251, 191, 36, 0.95);
+          }
+        }
+        .pulse-news-glow {
+          animation: pulseNewsGlow 1.15s ease-in-out infinite;
+        }
+      `}</style>
+
       <section className="rounded-2xl border border-cyan-500/25 bg-gradient-to-br from-[#091822] via-[#0B1222] to-[#0E1326] p-5 sm:p-6 shadow-xl">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -156,7 +248,7 @@ export function TextilePulseClient() {
               {"\u099F\u09C7\u0995\u09CD\u09B8\u099F\u09BE\u0987\u09B2 \u0987\u09A8\u09CB\u09AD\u09C7\u09B6\u09A8 \u0993 \u0987\u09A8\u09CD\u09A1\u09BE\u09B8\u09CD\u099F\u09CD\u09B0\u09BF \u09AC\u09CD\u09B0\u09BF\u09AB"}
             </h1>
             <p className="mt-1 text-xs text-slate-400">
-              {briefDate ? `Updated for ${briefDate} · ` : ""}
+              {briefDate ? `Updated for ${briefDate} \u00B7 ` : ""}
               Bangladesh RMG &amp; Global Textile Tech Updates in Bengali
             </p>
           </div>
@@ -168,7 +260,7 @@ export function TextilePulseClient() {
                   type="button"
                   onClick={() => setDateMenuOpen((o) => !o)}
                   disabled={loading || refreshing}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700/80 bg-[#060A12] px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-cyan-500/40"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-700/80 bg-[#060A12] px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-cyan-500/40"
                 >
                   <Calendar className="h-3.5 w-3.5 text-cyan-400" />
                   <span>{availableDates[0] === briefDate ? `Latest (${briefDate})` : briefDate}</span>
@@ -184,9 +276,9 @@ export function TextilePulseClient() {
                           type="button"
                           onClick={() => {
                             setDateMenuOpen(false);
-                            loadBrief(false, d);
+                            void loadBrief(false, d);
                           }}
-                          className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${
+                          className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${
                             active ? "bg-cyan-500/15 font-semibold text-cyan-200" : "text-slate-300 hover:bg-slate-800"
                           }`}
                         >
@@ -202,9 +294,9 @@ export function TextilePulseClient() {
 
             <button
               type="button"
-              onClick={() => loadBrief(true)}
+              onClick={() => void loadBrief(true)}
               disabled={loading || refreshing}
-              className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-cyan-500/35 bg-cyan-500/15 px-3.5 py-2 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-500/25 disabled:opacity-50"
+              className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-xl border border-cyan-500/35 bg-cyan-500/15 px-3.5 py-2 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-500/25 disabled:opacity-50"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
               Refresh Today
@@ -224,7 +316,7 @@ export function TextilePulseClient() {
               key={t.id}
               type="button"
               onClick={() => setRegionTab(t.id)}
-              className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition ${
+              className={`cursor-pointer rounded-xl px-3.5 py-1.5 text-xs font-semibold transition ${
                 regionTab === t.id
                   ? "border border-cyan-400/50 bg-cyan-500/20 text-cyan-200"
                   : "border border-slate-800 bg-[#060A12] text-slate-400 hover:text-slate-200"
@@ -276,7 +368,7 @@ export function TextilePulseClient() {
                 type="button"
                 onClick={() => { if (!showAll && items.length > 8) { setShowAll(true); } else { void loadMoreNews(); } }}
                 disabled={loadingMore}
-                className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/15 px-5 py-2.5 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/25 disabled:opacity-50 transition"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/15 px-5 py-2.5 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/25 disabled:opacity-50 transition"
               >
                 {loadingMore ? "Loading more news..." : !showAll && items.length > 8 ? `See More (+${items.length - 8} News)` : "See More (+8 News)"}
               </button>
