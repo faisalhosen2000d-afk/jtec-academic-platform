@@ -107,7 +107,7 @@ export function TextilePulseClient() {
     const { id: targetId, title: targetTitle } = highlightTargetRef.current;
     highlightTargetRef.current = null;
 
-    let matched =
+    const matched =
       (targetId && targetId !== "latest"
         ? items.find((i) => i.id === targetId)
         : undefined) ??
