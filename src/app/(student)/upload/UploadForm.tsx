@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  Cloud,
   FileText,
   Loader2,
   Search,
@@ -38,6 +39,54 @@ type UploadFormProps = {
   currentTermId?: string;
   maxUploadSizeMb?: number;
 };
+
+type CloudProviderKey = "r2" | "b2" | "supabase";
+
+const CLOUD_NODES: Array<{
+  key: CloudProviderKey;
+  name: string;
+  tag: string;
+  activeBorder: string;
+  activeBg: string;
+  activeGlow: string;
+  dotColor: string;
+  pingColor: string;
+  textColor: string;
+}> = [
+  {
+    key: "r2",
+    name: "Cloudflare R2",
+    tag: "High-Speed",
+    activeBorder: "border-orange-400/80",
+    activeBg: "bg-orange-500/15",
+    activeGlow: "shadow-[0_0_22px_rgba(251,146,60,0.42)]",
+    dotColor: "bg-orange-400",
+    pingColor: "bg-orange-400",
+    textColor: "text-orange-200",
+  },
+  {
+    key: "b2",
+    name: "Backblaze B2",
+    tag: "Compact",
+    activeBorder: "border-cyan-400/80",
+    activeBg: "bg-cyan-500/15",
+    activeGlow: "shadow-[0_0_22px_rgba(34,211,238,0.42)]",
+    dotColor: "bg-cyan-400",
+    pingColor: "bg-cyan-400",
+    textColor: "text-cyan-200",
+  },
+  {
+    key: "supabase",
+    name: "Supabase",
+    tag: "Backup",
+    activeBorder: "border-emerald-400/80",
+    activeBg: "bg-emerald-500/15",
+    activeGlow: "shadow-[0_0_22px_rgba(16,185,129,0.42)]",
+    dotColor: "bg-emerald-400",
+    pingColor: "bg-emerald-400",
+    textColor: "text-emerald-200",
+  },
+];
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -80,6 +129,7 @@ export default function UploadForm({
     totalBytes: number;
     speedBps: number;
     etaSeconds: number | null;
+    provider?: CloudProviderKey | null;
     providerLabel?: string;
   }>({
     stage: "idle",
@@ -88,6 +138,7 @@ export default function UploadForm({
     totalBytes: 0,
     speedBps: 0,
     etaSeconds: null,
+    provider: null,
   });
   const activeXhrRef = useRef<XMLHttpRequest | null>(null);
   const [autoFilling, setAutoFilling] = useState(false);
@@ -322,6 +373,7 @@ export default function UploadForm({
         totalBytes: file.size,
         speedBps: 0,
         etaSeconds: null,
+        provider: null,
       });
 
       const prepareResponse = await fetch("/api/materials/upload", {
@@ -343,10 +395,17 @@ export default function UploadForm({
         );
       }
 
-      const providerLabel =
+      const resolvedProvider: CloudProviderKey =
         prepareData.storageProvider === "r2"
-          ? "Cloudflare R2"
+          ? "r2"
           : prepareData.storageProvider === "b2"
+            ? "b2"
+            : "supabase";
+
+      const providerLabel =
+        resolvedProvider === "r2"
+          ? "Cloudflare R2"
+          : resolvedProvider === "b2"
             ? "Backblaze B2"
             : "Supabase Storage";
 
@@ -357,6 +416,7 @@ export default function UploadForm({
         totalBytes: file.size,
         speedBps: 0,
         etaSeconds: null,
+        provider: resolvedProvider,
         providerLabel,
       });
 
@@ -384,6 +444,7 @@ export default function UploadForm({
               totalBytes: ev.total,
               speedBps,
               etaSeconds,
+              provider: resolvedProvider,
               providerLabel,
             });
           };
@@ -463,6 +524,7 @@ export default function UploadForm({
         totalBytes: file.size,
         speedBps: 0,
         etaSeconds: 0,
+        provider: resolvedProvider,
         providerLabel,
       });
 
@@ -486,11 +548,12 @@ export default function UploadForm({
           totalBytes: 0,
           speedBps: 0,
           etaSeconds: null,
+          provider: null,
         });
         setError("Upload cancelled.");
       } else {
         console.error("[upload_form_error]", err);
-        setUploadProgress((prev) => ({ ...prev, stage: "idle" }));
+        setUploadProgress((prev) => ({ ...prev, stage: "idle", provider: null }));
         setError(
           err instanceof Error && err.message
             ? err.message
@@ -895,9 +958,85 @@ export default function UploadForm({
         )}
       </div>
 
-      {/* Live 3-Stage Upload Progress Card */}
+      {/* Live 3-Stage Upload Progress Card with 3 Glowing Cloud Route Bars */}
       {(submitting || uploadProgress.stage === "done") && (
-        <div className="rounded-xl border border-emerald-500/30 bg-[#0A1324] p-3.5 shadow-[0_0_24px_rgba(16,185,129,0.08)]">
+        <div className="space-y-3 rounded-xl border border-emerald-500/30 bg-[#0A1324] p-4 shadow-[0_0_24px_rgba(16,185,129,0.08)]">
+          {/* 3-Node Live Cloud Routing Visualizer */}
+          <div className="grid grid-cols-3 gap-2">
+            {CLOUD_NODES.map((node) => {
+              const isPreparing = uploadProgress.stage === "preparing";
+              const isActive = uploadProgress.provider === node.key;
+              const isUploadingNow =
+                isActive &&
+                (uploadProgress.stage === "uploading" ||
+                  uploadProgress.stage === "finalizing");
+              const isSaved = isActive && uploadProgress.stage === "done";
+
+              return (
+                <div
+                  key={node.key}
+                  className={`relative overflow-hidden rounded-lg border px-2.5 py-2 transition-all duration-300 ${
+                    isActive
+                      ? `${node.activeBorder} ${node.activeBg} ${node.activeGlow} scale-[1.02]`
+                      : isPreparing
+                        ? "border-slate-700/80 bg-[#0E172A] animate-pulse"
+                        : "border-slate-800/80 bg-[#060A12]/70 opacity-40"
+                  }`}
+                >
+                  {isUploadingNow && (
+                    <div className="pointer-events-none absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+                  )}
+
+                  <div className="relative flex items-center justify-between gap-1.5">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="relative flex h-2.5 w-2.5 shrink-0 items-center justify-center">
+                        {isUploadingNow && (
+                          <span
+                            className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-80 ${node.pingColor}`}
+                          />
+                        )}
+                        <span
+                          className={`relative inline-flex h-2 w-2 rounded-full ${
+                            isActive
+                              ? node.dotColor
+                              : isPreparing
+                                ? "bg-slate-400"
+                                : "bg-slate-600"
+                          }`}
+                        />
+                      </span>
+                      <span
+                        className={`truncate text-[11px] font-bold ${
+                          isActive ? node.textColor : "text-slate-400"
+                        }`}
+                      >
+                        {node.name}
+                      </span>
+                    </div>
+                    <Cloud
+                      className={`hidden h-3.5 w-3.5 shrink-0 sm:block ${
+                        isActive ? node.textColor : "text-slate-600"
+                      }`}
+                    />
+                  </div>
+
+                  <div className="relative mt-1 flex items-center justify-between text-[10px]">
+                    <span className={isActive ? "text-slate-200 font-semibold" : "text-slate-500"}>
+                      {isSaved
+                        ? "Saved ✓"
+                        : isUploadingNow
+                          ? "Active · Uploading"
+                          : isPreparing
+                            ? "Routing..."
+                            : "Standby"}
+                    </span>
+                    <span className="hidden text-slate-500 sm:inline">{node.tag}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2 font-semibold text-slate-100">
               {uploadProgress.stage === "done" ? (
@@ -907,12 +1046,12 @@ export default function UploadForm({
               )}
               <span>
                 {uploadProgress.stage === "preparing"
-                  ? "1/3 Preparing secure upload..."
+                  ? "1/3 Smart Router analyzing file size..."
                   : uploadProgress.stage === "uploading"
                     ? `2/3 Uploading to ${uploadProgress.providerLabel ?? "Cloud Storage"}...`
                     : uploadProgress.stage === "finalizing"
                       ? "3/3 Saving material record..."
-                      : "Upload Complete (100%)"}
+                      : `Upload Complete via ${uploadProgress.providerLabel ?? "Cloud"} (100%)`}
               </span>
             </div>
 
@@ -933,18 +1072,22 @@ export default function UploadForm({
             </div>
           </div>
 
-          <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-800/90">
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-800/90">
             <div
               className={`h-full rounded-full transition-all duration-150 ${
                 uploadProgress.stage === "done"
                   ? "bg-emerald-400"
-                  : "bg-gradient-to-r from-cyan-400 via-emerald-400 to-teal-300"
+                  : uploadProgress.provider === "r2"
+                    ? "bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-300"
+                    : uploadProgress.provider === "b2"
+                      ? "bg-gradient-to-r from-cyan-400 via-sky-400 to-teal-300"
+                      : "bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-300"
               }`}
               style={{ width: `${uploadProgress.percent}%` }}
             />
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
             <span>
               {formatBytes(uploadProgress.loadedBytes)} / {formatBytes(uploadProgress.totalBytes)}
             </span>
