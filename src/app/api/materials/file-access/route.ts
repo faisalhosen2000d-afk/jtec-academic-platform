@@ -223,6 +223,12 @@ export async function POST(request: Request) {
     /*
      * 9. Log view.
      */
+    await recordB2BandwidthUsage(
+      serviceSupabase,
+      material.file_path,
+      Number(material.file_size_bytes ?? 0),
+    );
+
     if (body.action === "open") {
       const { error: logError } = await supabase
         .from("material_view_logs")
